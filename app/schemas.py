@@ -34,6 +34,7 @@ class IndikatorJejak(BaseModel):
     operator: str
     formula: str
     zona: str | None = None
+    luas_lahan: float | None = None
     referensi_hukum: list[str] = []
     fakta_spasial: FaktaSpasial | None = None
     target_rekomendasi: dict[str, float] | None = None
@@ -75,6 +76,7 @@ class PoinOutput(BaseModel):
     reasoning_panjang: str
     sitasi: list[SitasiOutput]
     rekomendasi: RekomendasiOutput
+    low_confidence: bool = False
 
 
 class RingkasanOutput(BaseModel):
