@@ -42,6 +42,7 @@ class IndikatorJejak(BaseModel):
 
 class JejakAturanRequest(BaseModel):
     skor_total: float
+    level: str | None = None
     zona: str | None = None
     indikator: list[IndikatorJejak]
 
