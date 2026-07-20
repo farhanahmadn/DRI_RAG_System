@@ -82,3 +82,12 @@ def hitung_target_rekomendasi(indikator: IndikatorJejak) -> dict[str, float] | N
         selisih = target_efektif - nilai_input
 
     return {key: target_efektif, "selisih": selisih}
+
+
+def pilih_target_utama(target: dict[str, float] | None) -> float | None:
+    """Pilih satu angka representatif dari hasil `hitung_target_rekomendasi` untuk `RekomendasiOutput.target`."""
+    if target is None:
+        return None
+    if "target_maks" in target:
+        return target["target_maks"]
+    return target.get("target")

@@ -5,16 +5,12 @@ Dua kasus dari CLAUDE.md § Konvensi kode:
 - Guardrail gagal -> ... -> fallback template + tanda low_confidence.
 """
 
-from app.reasoning.calculator import hitung_target_rekomendasi, klasifikasi_tipe_rekomendasi
+from app.reasoning.calculator import (
+    hitung_target_rekomendasi,
+    klasifikasi_tipe_rekomendasi,
+    pilih_target_utama,
+)
 from app.schemas import IndikatorJejak, PoinOutput, RekomendasiOutput
-
-
-def _pilih_target_utama(target: dict[str, float] | None) -> float | None:
-    if target is None:
-        return None
-    if "target_maks" in target:
-        return target["target_maks"]
-    return target.get("target")
 
 
 def _status_dari_skor(skor: float) -> str:
@@ -48,7 +44,7 @@ def template_aman(indikator: IndikatorJejak) -> PoinOutput:
         sitasi=[],
         rekomendasi=RekomendasiOutput(
             tipe=klasifikasi_tipe_rekomendasi(indikator.kategori),
-            target=_pilih_target_utama(target),
+            target=pilih_target_utama(target),
             saran="Tidak diperlukan tindakan khusus untuk indikator ini.",
             disclaimer=None,
         ),
@@ -83,7 +79,7 @@ def template_low_confidence(indikator: IndikatorJejak) -> PoinOutput:
         sitasi=[],
         rekomendasi=RekomendasiOutput(
             tipe=klasifikasi_tipe_rekomendasi(indikator.kategori),
-            target=_pilih_target_utama(target),
+            target=pilih_target_utama(target),
             saran="Perlu peninjauan manual oleh petugas terkait indikator ini.",
             disclaimer=(
                 "Penjelasan otomatis tidak tersedia untuk indikator ini; perlu verifikasi manual."
