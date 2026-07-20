@@ -33,6 +33,7 @@ def build_user_prompt(
     indikator: IndikatorJejak,
     chunks: list[Chunk],
     target: dict[str, float] | None,
+    catatan_perbaikan: str | None = None,
 ) -> str:
     """Susun prompt user, deterministik dari jejak aturan + chunk yang diretrieve + target calculator."""
     lines: list[str] = []
@@ -79,6 +80,12 @@ def build_user_prompt(
         lines.append(
             "Tidak ada target numerik untuk indikator ini — rekomendasi berupa penjelasan, bukan angka."
         )
+
+    if catatan_perbaikan:
+        lines.append("")
+        lines.append("## Catatan Perbaikan (percobaan sebelumnya gagal)")
+        lines.append(catatan_perbaikan)
+        lines.append("Perbaiki hal ini pada jawaban Anda kali ini.")
 
     lines.append("")
     lines.append(

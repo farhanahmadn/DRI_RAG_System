@@ -13,7 +13,7 @@ from app.reasoning.calculator import (
 from app.schemas import IndikatorJejak, PoinOutput, RekomendasiOutput
 
 
-def _status_dari_skor(skor: float) -> str:
+def status_dari_skor(skor: float) -> str:
     return "Aman" if skor <= 0 else "Tidak Aman"
 
 
@@ -58,7 +58,7 @@ def template_low_confidence(indikator: IndikatorJejak) -> PoinOutput:
     Status & target tetap dihitung deterministik dari jejak/calculator (kode, bukan LLM) — yang
     gagal cuma narasi bahasa, bukan angka.
     """
-    status = _status_dari_skor(indikator.skor)
+    status = status_dari_skor(indikator.skor)
     target = hitung_target_rekomendasi(indikator)
 
     reasoning_pendek = "Penjelasan otomatis tidak tersedia untuk indikator ini."

@@ -14,7 +14,7 @@ from app.reasoning.calculator import (
 )
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.reasoning.templates import template_aman
-from app.retrieval.base import RetrievalFilters, Retriever
+from app.retrieval.base import Chunk, RetrievalFilters, Retriever
 from app.schemas import IndikatorJejak, PoinOutput, RekomendasiOutput, SitasiOutput
 
 _LLM_RESPONSE_SCHEMA = {
@@ -42,29 +42,42 @@ _LLM_RESPONSE_SCHEMA = {
 }
 
 
+def ambil_chunks_pendukung(
+    indikator: IndikatorJejak,
+    retriever: Retriever,
+    top_k_dukungan: int = 3,
+) -> list[Chunk]:
+    """Retrieval chunk pendukung untuk satu indikator: referensi_hukum dulu, fallback search teks."""
+    chunks = retriever.get_by_reference(indikator.referensi_hukum)
+    if not chunks:
+        chunks = retriever.search(indikator.kategori, RetrievalFilters(), top_k=top_k_dukungan)
+    return chunks
+
+
 def generate_poin(
     indikator: IndikatorJejak,
     retriever: Retriever,
     *,
     top_k_dukungan: int = 3,
+    catatan_perbaikan: str | None = None,
+    temperature: float = 0.0,
 ) -> PoinOutput:
     """Hasilkan PoinOutput untuk satu indikator. Skor 0 -> template (tanpa retrieval/LLM)."""
     if indikator.skor == 0:
         return template_aman(indikator)
 
-    chunks = retriever.get_by_reference(indikator.referensi_hukum)
-    if not chunks:
-        chunks = retriever.search(indikator.kategori, RetrievalFilters(), top_k=top_k_dukungan)
+    chunks = ambil_chunks_pendukung(indikator, retriever, top_k_dukungan)
     chunk_by_id = {chunk.id: chunk for chunk in chunks}
 
     target = hitung_target_rekomendasi(indikator)
-    prompt = build_user_prompt(indikator, chunks, target)
+    prompt = build_user_prompt(indikator, chunks, target, catatan_perbaikan)
 
     llm_out = llm_client.generate(
         prompt,
         _LLM_RESPONSE_SCHEMA,
         schema_name="poin_reasoning",
         system=SYSTEM_PROMPT,
+        temperature=temperature,
     )
 
     sitasi: list[SitasiOutput] = []
