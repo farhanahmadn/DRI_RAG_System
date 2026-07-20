@@ -154,13 +154,73 @@ def rakit_status_kegiatan(indikator: IndikatorJejak) -> str | None:
     )
 
 
+def rakit_status_banjir(indikator: IndikatorJejak) -> str | None:
+    """Rakit FAKTA klasifikasi tingkat risiko banjir (mis. "KLASIFIKASI: TINGGI...").
+
+    Tingkat (Tinggi/Sedang/Rendah) sudah ditentukan GIS, disuntik ke prompt sebagai fakta supaya
+    LLM tidak menyimpulkan sendiri tingkat risikonya. `None` kalau kategori bukan banjir atau
+    `fakta_spasial.tingkat_banjir` tidak ada.
+    """
+    if "banjir" not in indikator.kategori.lower():
+        return None
+    if indikator.fakta_spasial is None or indikator.fakta_spasial.tingkat_banjir is None:
+        return None
+
+    tingkat = indikator.fakta_spasial.tingkat_banjir
+    return (
+        f"KLASIFIKASI: {tingkat.upper()}. Lokasi ini tergolong risiko banjir tingkat {tingkat} "
+        "berdasarkan data spasial (GIS)."
+    )
+
+
+def rakit_status_sempadan(indikator: IndikatorJejak) -> str | None:
+    """Rakit FAKTA verdict jarak sempadan sungai (mis. "STATUS: KURANG DARI MINIMUM...").
+
+    KASUS BUG notebook lama: jarak ke sungai yang KURANG dari sempadan minimum berarti MELANGGAR
+    (bukan "melebihi"). Dihitung jujur dari angka (nilai_input=jarak aktual, ambang=jarak minimum,
+    operator ge/gt), disuntik sebagai fakta supaya LLM tidak menyimpulkan arah sendiri. `None`
+    kalau kategori bukan sempadan atau datanya tidak bisa dibandingkan.
+    """
+    if "sempadan" not in indikator.kategori.lower():
+        return None
+
+    try:
+        jarak = float(indikator.nilai_input)
+        minimum = float(indikator.ambang)
+    except (TypeError, ValueError):
+        return None
+
+    arah = _OPERATOR_ALIASES.get(indikator.operator)
+    if arah is None:
+        return None
+
+    if arah in ("ge", "gt"):
+        if jarak < minimum:
+            return (
+                f"STATUS: KURANG DARI MINIMUM (MELANGGAR SEMPADAN). Jarak ke sungai ({jarak} m) "
+                f"< sempadan minimum ({minimum} m)."
+            )
+        return f"STATUS: SESUAI. Jarak ke sungai ({jarak} m) memenuhi sempadan minimum ({minimum} m)."
+    else:  # le, lt — jarang dipakai utk sempadan, tapi tetap dihitung jujur
+        if jarak > minimum:
+            return f"STATUS: MELEBIHI. Jarak ke sungai ({jarak} m) > batas ({minimum} m)."
+        return f"STATUS: SESUAI. Jarak ke sungai ({jarak} m) <= batas ({minimum} m)."
+
+
 def rakit_fakta_verdict(indikator: IndikatorJejak) -> str | None:
-    """Dispatcher fakta verdict — numerik/kegiatan punya fakta khusus, lokasional tidak (cukup fakta_spasial)."""
+    """Dispatcher fakta verdict — numerik/kegiatan/sebagian lokasional punya fakta khusus."""
     tipe = klasifikasi_tipe_rekomendasi(indikator.kategori)
     if tipe == "numerik":
         return rakit_status_numerik(indikator)
     if tipe == "kegiatan":
         return rakit_status_kegiatan(indikator)
+    if tipe == "lokasional":
+        k = indikator.kategori.lower()
+        if "banjir" in k:
+            return rakit_status_banjir(indikator)
+        if "sempadan" in k:
+            return rakit_status_sempadan(indikator)
+        return None  # LP2B, resapan: fakta_spasial sudah cukup sbg konteks
     return None
 
 

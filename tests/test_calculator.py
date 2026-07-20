@@ -4,10 +4,12 @@ from app.reasoning.calculator import (
     hitung_target_rekomendasi,
     klasifikasi_tipe_rekomendasi,
     rakit_fakta_verdict,
+    rakit_status_banjir,
     rakit_status_kegiatan,
     rakit_status_numerik,
+    rakit_status_sempadan,
 )
-from app.schemas import IndikatorJejak
+from app.schemas import FaktaSpasial, IndikatorJejak
 
 
 def _indikator(**overrides) -> IndikatorJejak:
@@ -213,4 +215,116 @@ def test_rakit_fakta_verdict_dispatch_kegiatan():
 
 def test_rakit_fakta_verdict_dispatch_lokasional_none():
     indikator = _indikator(kategori="Lokasional LP2B", nilai_input="dalam_lp2b", ambang="tidak_dalam_lp2b", operator="==")
+    assert rakit_fakta_verdict(indikator) is None
+
+
+# --- rakit_status_banjir ----------------------------------------------------------------
+
+@pytest.mark.parametrize("tingkat", ["Tinggi", "Sedang", "Rendah"])
+def test_rakit_status_banjir_semua_tingkat(tingkat):
+    indikator = _indikator(
+        kategori="Lokasional Banjir",
+        nilai_input=tingkat,
+        ambang="Rendah",
+        operator="==",
+        fakta_spasial=FaktaSpasial(banjir=True, tingkat_banjir=tingkat),
+    )
+    status = rakit_status_banjir(indikator)
+    assert status is not None
+    assert f"KLASIFIKASI: {tingkat.upper()}" in status
+    assert tingkat in status
+
+
+def test_rakit_status_banjir_none_tanpa_fakta_spasial():
+    indikator = _indikator(kategori="Lokasional Banjir", nilai_input="Tinggi", ambang="Rendah", operator="==")
+    assert rakit_status_banjir(indikator) is None
+
+
+def test_rakit_status_banjir_none_fakta_spasial_tanpa_tingkat():
+    indikator = _indikator(
+        kategori="Lokasional Banjir",
+        nilai_input="Tinggi",
+        ambang="Rendah",
+        operator="==",
+        fakta_spasial=FaktaSpasial(banjir=True),
+    )
+    assert rakit_status_banjir(indikator) is None
+
+
+def test_rakit_status_banjir_none_kategori_lain():
+    indikator = _indikator(
+        kategori="KDB",
+        nilai_input="Tinggi",
+        ambang="Rendah",
+        operator="==",
+        fakta_spasial=FaktaSpasial(tingkat_banjir="Tinggi"),
+    )
+    assert rakit_status_banjir(indikator) is None
+
+
+# --- rakit_status_sempadan ---------------------------------------------------------------
+
+
+def test_rakit_status_sempadan_melanggar_kurang_dari_minimum():
+    indikator = _indikator(
+        kategori="Lokasional Sempadan Sungai", nilai_input=8.0, ambang=15.0, operator=">="
+    )
+    status = rakit_status_sempadan(indikator)
+    assert status is not None
+    assert "KURANG DARI MINIMUM" in status
+    assert "MELANGGAR SEMPADAN" in status
+    assert "melebihi" not in status.lower()
+
+
+def test_rakit_status_sempadan_patuh_sesuai():
+    indikator = _indikator(
+        kategori="Lokasional Sempadan Sungai", nilai_input=20.0, ambang=15.0, operator=">="
+    )
+    status = rakit_status_sempadan(indikator)
+    assert status is not None
+    assert "SESUAI" in status
+
+
+def test_rakit_status_sempadan_batas_tepat_di_minimum():
+    indikator = _indikator(
+        kategori="Lokasional Sempadan Sungai", nilai_input=15.0, ambang=15.0, operator=">="
+    )
+    status = rakit_status_sempadan(indikator)
+    assert status is not None
+    assert "SESUAI" in status
+
+
+def test_rakit_status_sempadan_none_kategori_lain():
+    indikator = _indikator(kategori="KDB", nilai_input=8.0, ambang=15.0, operator=">=")
+    assert rakit_status_sempadan(indikator) is None
+
+
+# --- rakit_fakta_verdict dispatcher: banjir & sempadan ------------------------------------
+
+
+def test_rakit_fakta_verdict_dispatch_banjir():
+    indikator = _indikator(
+        kategori="Lokasional Banjir",
+        nilai_input="Tinggi",
+        ambang="Rendah",
+        operator="==",
+        fakta_spasial=FaktaSpasial(tingkat_banjir="Tinggi"),
+    )
+    assert rakit_fakta_verdict(indikator) == rakit_status_banjir(indikator)
+
+
+def test_rakit_fakta_verdict_dispatch_sempadan():
+    indikator = _indikator(
+        kategori="Lokasional Sempadan Sungai", nilai_input=8.0, ambang=15.0, operator=">="
+    )
+    assert rakit_fakta_verdict(indikator) == rakit_status_sempadan(indikator)
+
+
+def test_rakit_fakta_verdict_dispatch_resapan_none():
+    indikator = _indikator(
+        kategori="Lokasional Resapan Air",
+        nilai_input="dalam_resapan",
+        ambang="tidak_dalam_resapan",
+        operator="==",
+    )
     assert rakit_fakta_verdict(indikator) is None

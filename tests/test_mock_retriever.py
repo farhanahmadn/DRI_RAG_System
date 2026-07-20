@@ -67,6 +67,15 @@ def test_get_by_reference_kdb_lampiran_vi():
     results = retriever.get_by_reference(["RDTR Lampiran VI"])
 
     assert any(r.id == "rdtr-lampiran-vi-c1" for r in results)
+    assert any(r.id == "rdtr-lampiran-vi-r1" for r in results)
+
+
+def test_search_finds_kdh_lampiran_vi_r1():
+    retriever = MockRetriever()
+    results = retriever.search("KDH zona R-1", RetrievalFilters(), top_k=5)
+
+    assert len(results) > 0
+    assert any(r.id == "rdtr-lampiran-vi-r1" for r in results)
 
 
 def test_get_parent_kdb_ayat_ke_pasal():
@@ -100,3 +109,50 @@ def test_get_by_reference_kegiatan_lampiran_v():
     results = retriever.get_by_reference(["RDTR Lampiran V"])
 
     assert any(r.id == "rdtr-lampiran-v-c1" for r in results)
+
+
+def test_get_by_reference_banjir_metodologi():
+    retriever = MockRetriever()
+    results = retriever.get_by_reference(["Metodologi DRI Tingkat 2 Risiko Banjir"])
+
+    assert any(r.id == "dri2-metodologi-banjir" for r in results)
+
+
+def test_search_finds_banjir_metodologi():
+    retriever = MockRetriever()
+    results = retriever.search("risiko banjir metodologi DRI", RetrievalFilters(), top_k=5)
+
+    assert len(results) > 0
+    assert any(r.id == "dri2-metodologi-banjir" for r in results)
+
+
+def test_get_by_reference_resapan_rtrw():
+    retriever = MockRetriever()
+    results = retriever.get_by_reference(["RTRW Kabupaten Sleman - Kawasan Resapan Air"])
+
+    assert any(r.id == "rtrw-kawasan-resapan-air" for r in results)
+
+
+def test_search_finds_resapan_rtrw():
+    retriever = MockRetriever()
+    results = retriever.search("kawasan resapan air RTRW", RetrievalFilters(), top_k=5)
+
+    assert len(results) > 0
+    assert any(r.id == "rtrw-kawasan-resapan-air" for r in results)
+
+
+def test_get_by_reference_sempadan_permen_pupr_pasal_22():
+    retriever = MockRetriever()
+    results = retriever.get_by_reference(["Permen PUPR 28/2015 Pasal 22"])
+
+    assert len(results) == 1
+    assert results[0].id == "permen-pupr-28-2015-p22"
+    assert results[0].pasal == "22"
+
+
+def test_search_finds_sempadan_permen_pupr():
+    retriever = MockRetriever()
+    results = retriever.search("sempadan sungai garis sempadan", RetrievalFilters(), top_k=5)
+
+    assert len(results) > 0
+    assert any(r.id == "permen-pupr-28-2015-p22" for r in results)

@@ -17,7 +17,9 @@ from pydantic import BaseModel
 class FaktaSpasial(BaseModel):
     in_lp2b: bool | None = None
     banjir: bool | None = None
+    tingkat_banjir: Literal["Tinggi", "Sedang", "Rendah"] | None = None
     resapan: bool | None = None
+    in_sempadan: bool | None = None
     jarak_sungai_m: float | None = None
     nama_sungai: str | None = None
     arah: str | None = None

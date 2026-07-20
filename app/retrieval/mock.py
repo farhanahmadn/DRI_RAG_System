@@ -187,6 +187,83 @@ def _build_mock_chunks() -> list[Chunk]:
         jenis="RDTR",
     )
 
+    rdtr_lampiran_vi_r1 = Chunk(
+        id="rdtr-lampiran-vi-r1",
+        level="tabel",
+        parent_id=None,
+        teks=(
+            "Lampiran VI: Matriks Intensitas Pemanfaatan Ruang. Zona R-1 (Perumahan Kepadatan "
+            "Rendah): KDB maksimum 50%, KLB maksimum 1.0, KDH minimum 10%."
+        ),
+        dokumen=_rdtr_dokumen,
+        pasal=None,
+        istilah_kode="Lampiran VI",
+        halaman=113,
+        skor=0.0,
+        tanggal_berlaku=date(2021, 1, 1),
+        zona="R-1",
+        jenis="RDTR",
+    )
+
+    banjir_metodologi = Chunk(
+        id="dri2-metodologi-banjir",
+        level="tabel",
+        parent_id=None,
+        teks=(
+            "Metodologi Indeks Risiko Bencana (DRI) Tingkat 2 — Kajian Risiko Bencana Banjir "
+            "Kabupaten Sleman. Klasifikasi tingkat risiko banjir (Tinggi/Sedang/Rendah) mengacu "
+            "pada kedalaman genangan, frekuensi kejadian, dan tingkat kerentanan wilayah. Ini "
+            "adalah dasar METODOLOGIS penilaian risiko, BUKAN merupakan ketentuan hukum atau "
+            "pasal peraturan perundang-undangan."
+        ),
+        dokumen=(
+            "Metodologi Indeks Risiko Bencana (DRI) Tingkat 2 — Kajian Risiko Bencana Banjir "
+            "Kabupaten Sleman"
+        ),
+        pasal=None,
+        halaman=1,
+        skor=0.0,
+        tanggal_berlaku=date(2021, 1, 1),
+        jenis="Metodologi",
+    )
+    resapan_rtrw = Chunk(
+        id="rtrw-kawasan-resapan-air",
+        level="tabel",
+        parent_id=None,
+        teks=(
+            "RTRW Kabupaten Sleman 2011-2031 — Kawasan Resapan Air ditetapkan untuk menjaga "
+            "ketersediaan air tanah dan mencegah banjir/kekeringan. Pembangunan pada kawasan "
+            "resapan air berisiko mengganggu fungsi resapan dan keseimbangan tata air wilayah."
+        ),
+        dokumen="RTRW Kabupaten Sleman 2011-2031",
+        pasal=None,
+        halaman=45,
+        skor=0.0,
+        tanggal_berlaku=date(2011, 1, 1),
+        zona="Kawasan Resapan Air",
+        jenis="RTRW",
+    )
+    sempadan_permen_pupr = Chunk(
+        id="permen-pupr-28-2015-p22",
+        level="pasal",
+        parent_id=None,
+        teks=(
+            "Pasal 22: Garis sempadan sungai tidak bertanggul di kawasan perkotaan ditetapkan "
+            "paling sedikit 15 (lima belas) meter dari tepi sungai, untuk sungai dengan kedalaman "
+            "sedang. (Disederhanakan untuk keperluan pengujian — lihat Permen asli untuk kategori "
+            "kedalaman lengkap.)"
+        ),
+        dokumen=(
+            "Peraturan Menteri PUPR No. 28/PRT/M/2015 tentang Penetapan Garis Sempadan Sungai dan "
+            "Garis Sempadan Danau"
+        ),
+        pasal="22",
+        halaman=14,
+        skor=0.0,
+        tanggal_berlaku=date(2015, 1, 1),
+        jenis="Permen",
+    )
+
     return [
         pasal_44,
         pasal_44_ayat1,
@@ -198,6 +275,10 @@ def _build_mock_chunks() -> list[Chunk]:
         rdtr_lampiran_vi_c1,
         rdtr_p1_ayat108,
         rdtr_lampiran_v_c1,
+        rdtr_lampiran_vi_r1,
+        banjir_metodologi,
+        resapan_rtrw,
+        sempadan_permen_pupr,
     ]
 
 

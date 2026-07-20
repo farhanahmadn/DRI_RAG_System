@@ -14,7 +14,7 @@ from app.reasoning.guardrail import (
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk
 from app.retrieval.mock import MockRetriever
-from app.schemas import IndikatorJejak, PoinOutput, RekomendasiOutput, SitasiOutput
+from app.schemas import FaktaSpasial, IndikatorJejak, PoinOutput, RekomendasiOutput, SitasiOutput
 
 load_dotenv()
 
@@ -479,5 +479,215 @@ def test_kegiatan_klasifikasi_x_berisiko_live():
     for s in hasil.sitasi:
         assert s.citation_id in chunk_ids
         assert s.terverifikasi is True
+
+    assert hasil.low_confidence is False
+
+
+# --- Indikator numerik KLB & KDH — klon pola KDB --------------------------------------------
+
+
+def _indikator_numerik(**overrides) -> IndikatorJejak:
+    defaults = dict(
+        poin_id="NUM-01",
+        kategori="KLB",
+        bobot=15.0,
+        skor=15.0,
+        kontribusi=15.0,
+        nilai_input=2.8,
+        ambang=2.4,
+        operator="<=",
+        formula="",
+        zona="C-1",
+        referensi_hukum=["RDTR Lampiran VI"],
+    )
+    defaults.update(overrides)
+    return IndikatorJejak(**defaults)
+
+
+def test_klb_berisiko_mock(monkeypatch):
+    indikator = _indikator_numerik(
+        kategori="KLB", nilai_input=2.8, ambang=2.4, operator="<=", zona="C-1"
+    )
+    chunk_id = ambil_chunks_pendukung(indikator, MockRetriever())[0].id
+    monkeypatch.setattr(
+        llm_client_module,
+        "generate",
+        _stub_llm_generate_kegiatan(chunk_id, "Kurangi luas total lantai bangunan agar sesuai KLB maksimum."),
+    )
+
+    hasil = generate_poin_dengan_guardrail(indikator, MockRetriever())
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 15.0
+    assert hasil.rekomendasi.tipe == "numerik"
+    assert hasil.rekomendasi.target == pilih_target_utama(hitung_target_rekomendasi(indikator))
+    assert hasil.rekomendasi.target == 2.4
+    assert len(hasil.sitasi) > 0
+    assert all(s.terverifikasi for s in hasil.sitasi)
+    assert hasil.low_confidence is False
+
+
+@pytest.mark.skipif(
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",
+)
+def test_kdh_berisiko_live():
+    indikator = _indikator_numerik(
+        poin_id="NUM-02",
+        kategori="KDH",
+        bobot=10.0,
+        skor=10.0,
+        kontribusi=10.0,
+        nilai_input=6.0,
+        ambang=10.0,
+        operator=">=",
+        zona="R-1",
+    )
+    retriever = MockRetriever()
+
+    hasil = generate_poin_dengan_guardrail(indikator, retriever)
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 10.0
+    assert hasil.rekomendasi.tipe == "numerik"
+    assert hasil.rekomendasi.target == pilih_target_utama(hitung_target_rekomendasi(indikator))
+    assert hasil.rekomendasi.target == 10.0
+
+    chunk_ids = {c.id for c in ambil_chunks_pendukung(indikator, retriever)}
+    assert len(hasil.sitasi) > 0
+    for s in hasil.sitasi:
+        assert s.citation_id in chunk_ids
+        assert s.terverifikasi is True
+
+    assert hasil.low_confidence is False
+
+
+# --- Indikator lingkungan: Banjir, Resapan, Sempadan (lokasional) ---------------------------
+
+
+def test_banjir_rendah_aman_template_tanpa_llm():
+    indikator = IndikatorJejak(
+        poin_id="BJR-01",
+        kategori="Lokasional Banjir",
+        bobot=20.0,
+        skor=0.0,
+        kontribusi=0.0,
+        nilai_input="Rendah",
+        ambang="Rendah",
+        operator="==",
+        formula="",
+        fakta_spasial=FaktaSpasial(banjir=False, tingkat_banjir="Rendah"),
+    )
+    hasil = generate_poin_dengan_guardrail(indikator, MockRetriever())
+
+    assert hasil.status == "Aman"
+    assert hasil.rekomendasi.tipe == "lokasional"
+    assert hasil.rekomendasi.target is None
+    assert hasil.low_confidence is False
+
+
+@pytest.mark.skipif(
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",
+)
+def test_banjir_tinggi_berisiko_live():
+    indikator = IndikatorJejak(
+        poin_id="BJR-02",
+        kategori="Lokasional Banjir",
+        bobot=20.0,
+        skor=60.0,
+        kontribusi=60.0,
+        nilai_input="Tinggi",
+        ambang="Rendah",
+        operator="==",
+        formula="",
+        referensi_hukum=["Metodologi DRI Tingkat 2 Risiko Banjir"],
+        fakta_spasial=FaktaSpasial(banjir=True, tingkat_banjir="Tinggi"),
+    )
+    retriever = MockRetriever()
+
+    hasil = generate_poin_dengan_guardrail(indikator, retriever)
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 60.0
+    assert hasil.rekomendasi.tipe == "lokasional"
+    assert hasil.rekomendasi.target is None
+
+    chunk_ids = {c.id for c in ambil_chunks_pendukung(indikator, retriever)}
+    assert len(hasil.sitasi) > 0
+    for s in hasil.sitasi:
+        assert s.citation_id in chunk_ids
+        assert s.terverifikasi is True
+
+    assert hasil.low_confidence is False
+
+
+def test_resapan_berisiko_mock(monkeypatch):
+    indikator = IndikatorJejak(
+        poin_id="RSP-01",
+        kategori="Lokasional Resapan Air",
+        bobot=20.0,
+        skor=20.0,
+        kontribusi=20.0,
+        nilai_input="dalam_resapan",
+        ambang="tidak_dalam_resapan",
+        operator="==",
+        formula="",
+        referensi_hukum=["RTRW Kabupaten Sleman - Kawasan Resapan Air"],
+        fakta_spasial=FaktaSpasial(resapan=True),
+    )
+    chunk_id = ambil_chunks_pendukung(indikator, MockRetriever())[0].id
+    monkeypatch.setattr(
+        llm_client_module,
+        "generate",
+        _stub_llm_generate_kegiatan(chunk_id, "Hindari pembangunan pada kawasan resapan air ini."),
+    )
+
+    hasil = generate_poin_dengan_guardrail(indikator, MockRetriever())
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 20.0
+    assert hasil.rekomendasi.tipe == "lokasional"
+    assert hasil.rekomendasi.target is None
+    assert len(hasil.sitasi) > 0
+    assert all(s.terverifikasi for s in hasil.sitasi)
+    assert hasil.low_confidence is False
+
+
+@pytest.mark.skipif(
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",
+)
+def test_sempadan_melanggar_live():
+    indikator = IndikatorJejak(
+        poin_id="SMP-01",
+        kategori="Lokasional Sempadan Sungai",
+        bobot=30.0,
+        skor=30.0,
+        kontribusi=30.0,
+        nilai_input=8.0,
+        ambang=15.0,
+        operator=">=",
+        formula="jarak_sungai_m >= sempadan_minimum_m",
+        referensi_hukum=["Permen PUPR 28/2015 Pasal 22"],
+        fakta_spasial=FaktaSpasial(jarak_sungai_m=8.0, in_sempadan=True, nama_sungai="Sungai Code", arah="Timur"),
+    )
+    retriever = MockRetriever()
+
+    hasil = generate_poin_dengan_guardrail(indikator, retriever)
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 30.0
+    assert hasil.rekomendasi.tipe == "lokasional"
+    assert hasil.rekomendasi.target is None
+
+    chunk_ids = {c.id for c in ambil_chunks_pendukung(indikator, retriever)}
+    assert len(hasil.sitasi) > 0
+    for s in hasil.sitasi:
+        assert s.citation_id in chunk_ids
+        assert s.terverifikasi is True
+
+    teks_narasi = (hasil.reasoning_pendek + " " + hasil.reasoning_panjang + " " + hasil.rekomendasi.saran).lower()
+    assert "melebihi" not in teks_narasi
 
     assert hasil.low_confidence is False
