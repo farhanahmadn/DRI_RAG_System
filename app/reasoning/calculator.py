@@ -84,6 +84,45 @@ def hitung_target_rekomendasi(indikator: IndikatorJejak) -> dict[str, float] | N
     return {key: target_efektif, "selisih": selisih}
 
 
+def rakit_status_numerik(indikator: IndikatorJejak) -> str | None:
+    """Rakit FAKTA verdict perbandingan (mis. "STATUS: MELEBIHI...") untuk indikator numerik.
+
+    Dihitung JUJUR dari angka (bukan diasumsikan selalu "melanggar"), lalu disuntik ke prompt LLM
+    supaya LLM tidak perlu (dan tidak boleh) menyimpulkan sendiri arah pelanggaran — pelajaran dari
+    bug LLM salah simpul arah (mis. notebook Sempadan). `None` untuk indikator non-numerik atau
+    yang datanya tidak bisa dibandingkan.
+    """
+    if klasifikasi_tipe_rekomendasi(indikator.kategori) != "numerik":
+        return None
+
+    try:
+        target = hitung_target_rekomendasi(indikator)
+    except (TypeError, ValueError):
+        return None
+
+    batas = pilih_target_utama(target)
+    if batas is None:
+        return None
+
+    try:
+        nilai_input = float(indikator.nilai_input)
+    except (TypeError, ValueError):
+        return None
+
+    arah = _OPERATOR_ALIASES.get(indikator.operator)
+    if arah is None:
+        return None
+
+    if arah in ("le", "lt"):
+        if nilai_input > batas:
+            return f"STATUS: MELEBIHI. Nilai aktual ({nilai_input}) > batas ({batas})."
+        return f"STATUS: SESUAI. Nilai aktual ({nilai_input}) <= batas ({batas})."
+    else:  # ge, gt
+        if nilai_input < batas:
+            return f"STATUS: KURANG. Nilai aktual ({nilai_input}) < batas ({batas})."
+        return f"STATUS: SESUAI. Nilai aktual ({nilai_input}) >= batas ({batas})."
+
+
 def pilih_target_utama(target: dict[str, float] | None) -> float | None:
     """Pilih satu angka representatif dari hasil `hitung_target_rekomendasi` untuk `RekomendasiOutput.target`."""
     if target is None:

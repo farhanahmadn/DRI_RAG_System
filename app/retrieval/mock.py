@@ -100,10 +100,76 @@ def _build_mock_chunks() -> list[Chunk]:
         jenis="UU",
     )
 
-    return [pasal_44, pasal_44_ayat1, pasal_44_ayat2, pasal_50, pasal_50_ayat1]
+    _rdtr_dokumen = "Peraturan Daerah Kabupaten Sleman tentang Rencana Detail Tata Ruang (RDTR)"
+    rdtr_p1 = Chunk(
+        id="rdtr-p1",
+        level="pasal",
+        parent_id=None,
+        teks="Pasal 1: Ketentuan Umum memuat definisi istilah yang digunakan dalam Peraturan Daerah ini.",
+        dokumen=_rdtr_dokumen,
+        pasal="1",
+        halaman=3,
+        skor=0.0,
+        tanggal_berlaku=date(2021, 1, 1),
+        jenis="RDTR",
+    )
+    rdtr_p1_ayat107 = Chunk(
+        id="rdtr-p1-a107",
+        level="ayat",
+        parent_id=rdtr_p1.id,
+        teks=(
+            "(107) KDB (Koefisien Dasar Bangunan) adalah angka persentase perbandingan antara luas "
+            "seluruh lantai dasar bangunan gedung dan luas lahan/tanah perpetakan/daerah "
+            "perencanaan yang dikuasai sesuai rencana tata ruang dan rencana tata bangunan."
+        ),
+        dokumen=_rdtr_dokumen,
+        pasal="1",
+        ayat="107",
+        halaman=3,
+        skor=0.0,
+        tanggal_berlaku=rdtr_p1.tanggal_berlaku,
+        jenis="RDTR",
+    )
+    rdtr_lampiran_vi_c1 = Chunk(
+        id="rdtr-lampiran-vi-c1",
+        level="tabel",
+        parent_id=None,
+        teks=(
+            "Lampiran VI: Matriks Intensitas Pemanfaatan Ruang. Zona C-1 (Perdagangan dan Jasa): "
+            "KDB maksimum 80%, KLB maksimum 2.4, KDH minimum 20%."
+        ),
+        dokumen=_rdtr_dokumen,
+        pasal=None,
+        istilah_kode="Lampiran VI",
+        halaman=112,
+        skor=0.0,
+        tanggal_berlaku=date(2021, 1, 1),
+        zona="C-1",
+        jenis="RDTR",
+    )
+
+    return [
+        pasal_44,
+        pasal_44_ayat1,
+        pasal_44_ayat2,
+        pasal_50,
+        pasal_50_ayat1,
+        rdtr_p1,
+        rdtr_p1_ayat107,
+        rdtr_lampiran_vi_c1,
+    ]
 
 
 _PASAL_RE = re.compile(r"pasal\s+(\d+)", re.IGNORECASE)
+
+_STOPWORDS_DOKUMEN = {
+    "no", "nomor", "tahun", "tentang", "dan", "atau", "yang",
+    "tata", "ruang", "daerah", "kabupaten", "peraturan", "rencana", "detail",
+}
+
+
+def _tokens_signifikan(teks: str) -> set[str]:
+    return set(re.findall(r"\w+", teks.lower())) - _STOPWORDS_DOKUMEN
 
 
 class MockRetriever:
@@ -131,14 +197,13 @@ class MockRetriever:
         seen_ids: set[str] = set()
         for ref in referensi:
             ref_lower = ref.lower()
+            ref_tokens = _tokens_signifikan(ref_lower)
             match = _PASAL_RE.search(ref_lower)
             pasal_num = match.group(1) if match else None
             for chunk in self._chunks:
                 if chunk.id in seen_ids:
                     continue
-                dokumen_hit = any(
-                    tok in ref_lower for tok in ("41/2009", "41 tahun 2009", "lp2b")
-                ) or chunk.dokumen.lower() in ref_lower
+                dokumen_hit = bool(_tokens_signifikan(chunk.dokumen) & ref_tokens)
                 pasal_hit = pasal_num is not None and chunk.pasal == pasal_num
                 if dokumen_hit and (pasal_num is None or pasal_hit):
                     found.append(chunk)

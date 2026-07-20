@@ -16,6 +16,7 @@ ATURAN WAJIB (jangan dilanggar):
 4. JANGAN menyebutkan angka rekomendasi (target, selisih, dsb) dalam narasi Anda — angka tersebut dihitung dan digabungkan otomatis oleh sistem secara terpisah; tugas Anda hanya menulis narasi kualitatif.
 5. Bedakan dengan jelas antara "pelanggaran hukum/regulasi" (mis. melanggar ambang KDB, alih fungsi LP2B tanpa izin) dan "faktor risiko alam/lokasi" (mis. dekat sungai, rawan banjir) — jangan mencampur keduanya seolah setara.
 6. Tulis dalam Bahasa Indonesia yang jelas, ringkas, dan mudah dipahami warga awam, bukan bahasa hukum yang kaku.
+7. Kalau ada baris "STATUS: ..." pada data di bawah, itu adalah FAKTA hasil perhitungan kode. Gunakan APA ADANYA dalam narasi Anda — JANGAN menyimpulkan arah pelanggaran sendiri dari nilai_input/ambang.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -24,6 +25,8 @@ def _format_chunk(chunk: Chunk) -> str:
     lokasi = f"{chunk.dokumen} Pasal {chunk.pasal}" if chunk.pasal else chunk.dokumen
     if chunk.ayat:
         lokasi += f" Ayat {chunk.ayat}"
+    if chunk.istilah_kode:
+        lokasi += f" ({chunk.istilah_kode})"
     if chunk.halaman is not None:
         lokasi += f" (hal. {chunk.halaman})"
     return f"- citation_id={chunk.id} | {lokasi}\n  Teks: {chunk.teks}"
@@ -34,6 +37,7 @@ def build_user_prompt(
     chunks: list[Chunk],
     target: dict[str, float] | None,
     catatan_perbaikan: str | None = None,
+    fakta_verdict: str | None = None,
 ) -> str:
     """Susun prompt user, deterministik dari jejak aturan + chunk yang diretrieve + target calculator."""
     lines: list[str] = []
@@ -48,6 +52,11 @@ def build_user_prompt(
     lines.append(f"- formula: {indikator.formula}")
     if indikator.zona:
         lines.append(f"- zona: {indikator.zona}")
+
+    if fakta_verdict:
+        lines.append("")
+        lines.append("## STATUS Perbandingan (FAKTA sudah dihitung kode — jangan disimpulkan ulang)")
+        lines.append(fakta_verdict)
 
     if indikator.fakta_spasial is not None:
         fakta_items = {

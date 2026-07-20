@@ -3,6 +3,7 @@ import os
 import pytest
 from dotenv import load_dotenv
 
+from app.reasoning import llm_client as llm_client_module
 from app.reasoning.generator import generate_poin
 from app.reasoning.templates import template_aman
 from app.retrieval.mock import MockRetriever
@@ -44,6 +45,42 @@ def test_generate_poin_skor_nol_pakai_template_tanpa_retrieval():
     indikator = _indikator(skor=0.0, kontribusi=0.0)
     hasil = generate_poin(indikator, _RetrieverYangMelarangDipanggil())
     assert hasil == template_aman(indikator)
+
+
+def test_generate_poin_kdb_prompt_menyuntik_status_melebihi(monkeypatch):
+    prompt_tertangkap = {}
+
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        prompt_tertangkap["prompt"] = prompt
+        return {
+            "reasoning_pendek": "KDB melebihi batas.",
+            "reasoning_panjang": "Nilai KDB aktual melebihi batas maksimum zona ini.",
+            "sitasi": [],
+            "saran": "Kurangi luas lantai dasar bangunan.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    indikator = IndikatorJejak(
+        poin_id="KDB-01",
+        kategori="KDB",
+        bobot=20.0,
+        skor=20.0,
+        kontribusi=20.0,
+        nilai_input=90.0,
+        ambang=80.0,
+        operator="<=",
+        formula="kdb_aktual <= kdb_maks",
+        zona="C-1",
+        referensi_hukum=["RDTR Pasal 1 Ayat 107", "RDTR Lampiran VI"],
+    )
+
+    hasil = generate_poin(indikator, MockRetriever())
+
+    assert "STATUS: MELEBIHI" in prompt_tertangkap["prompt"]
+    assert hasil.rekomendasi.tipe == "numerik"
+    assert hasil.rekomendasi.target == 80.0
 
 
 @pytest.mark.skipif(

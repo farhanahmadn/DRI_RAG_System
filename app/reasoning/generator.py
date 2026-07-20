@@ -11,6 +11,7 @@ from app.reasoning.calculator import (
     hitung_target_rekomendasi,
     klasifikasi_tipe_rekomendasi,
     pilih_target_utama,
+    rakit_status_numerik,
 )
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.reasoning.templates import template_aman
@@ -70,7 +71,8 @@ def generate_poin(
     chunk_by_id = {chunk.id: chunk for chunk in chunks}
 
     target = hitung_target_rekomendasi(indikator)
-    prompt = build_user_prompt(indikator, chunks, target, catatan_perbaikan)
+    fakta_verdict = rakit_status_numerik(indikator)
+    prompt = build_user_prompt(indikator, chunks, target, catatan_perbaikan, fakta_verdict)
 
     llm_out = llm_client.generate(
         prompt,

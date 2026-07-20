@@ -1,6 +1,11 @@
+import os
+
 import pytest
+from dotenv import load_dotenv
 
 from app.reasoning import guardrail as guardrail_module
+from app.reasoning.calculator import hitung_target_rekomendasi, pilih_target_utama
+from app.reasoning.generator import ambil_chunks_pendukung
 from app.reasoning.guardrail import (
     generate_poin_dengan_guardrail,
     perbaiki_poin,
@@ -9,6 +14,8 @@ from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk
 from app.retrieval.mock import MockRetriever
 from app.schemas import IndikatorJejak, PoinOutput, RekomendasiOutput, SitasiOutput
+
+load_dotenv()
 
 
 def _indikator(**overrides) -> IndikatorJejak:
@@ -317,3 +324,39 @@ def test_skor_nol_tidak_menyentuh_generate_poin(monkeypatch):
     hasil = generate_poin_dengan_guardrail(indikator, retriever=object())
 
     assert hasil.status == "Aman"
+
+
+@pytest.mark.skipif(
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",
+)
+def test_generate_poin_dengan_guardrail_kdb_live():
+    indikator = IndikatorJejak(
+        poin_id="KDB-01",
+        kategori="KDB",
+        bobot=20.0,
+        skor=20.0,
+        kontribusi=20.0,
+        nilai_input=90.0,
+        ambang=80.0,
+        operator="<=",
+        formula="kdb_aktual <= kdb_maks",
+        zona="C-1",
+        referensi_hukum=["RDTR Pasal 1 Ayat 107", "RDTR Lampiran VI"],
+    )
+    retriever = MockRetriever()
+
+    hasil = generate_poin_dengan_guardrail(indikator, retriever)
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 20.0
+    assert hasil.rekomendasi.tipe == "numerik"
+    assert hasil.rekomendasi.target == pilih_target_utama(hitung_target_rekomendasi(indikator))
+    assert hasil.rekomendasi.target == 80.0
+
+    chunk_ids = {c.id for c in ambil_chunks_pendukung(indikator, retriever)}
+    assert len(hasil.sitasi) > 0
+    for s in hasil.sitasi:
+        assert s.citation_id in chunk_ids
+
+    assert hasil.low_confidence is False

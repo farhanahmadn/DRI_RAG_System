@@ -42,6 +42,8 @@ def test_system_prompt_memuat_semua_aturan_wajib():
     assert "pelanggaran hukum" in SYSTEM_PROMPT
     assert "risiko alam" in SYSTEM_PROMPT
     assert "warga awam" in SYSTEM_PROMPT
+    assert "STATUS" in SYSTEM_PROMPT
+    assert "FAKTA hasil perhitungan kode" in SYSTEM_PROMPT
 
 
 def test_build_user_prompt_memuat_ringkasan_jejak():
@@ -99,3 +101,28 @@ def test_build_user_prompt_target_terisi():
     prompt = build_user_prompt(_indikator(), [], {"target_maks": 600.0, "selisih": 50.0})
     assert "target_maks: 600.0" in prompt
     assert "selisih: 50.0" in prompt
+
+
+def test_build_user_prompt_fakta_verdict_terisi():
+    prompt = build_user_prompt(
+        _indikator(), [], None, fakta_verdict="STATUS: MELEBIHI. Nilai aktual (90.0) > batas (80.0)."
+    )
+    assert "STATUS Perbandingan" in prompt
+    assert "STATUS: MELEBIHI. Nilai aktual (90.0) > batas (80.0)." in prompt
+
+
+def test_build_user_prompt_fakta_verdict_none_tidak_muncul():
+    prompt = build_user_prompt(_indikator(), [], None, fakta_verdict=None)
+    assert "STATUS Perbandingan" not in prompt
+
+
+def test_build_user_prompt_chunk_dengan_istilah_kode():
+    chunk = _chunk(
+        id="rdtr-lampiran-vi-c1",
+        pasal=None,
+        istilah_kode="Lampiran VI",
+        dokumen="Peraturan Daerah Kabupaten Sleman tentang RDTR",
+        teks="KDB maksimum 80%.",
+    )
+    prompt = build_user_prompt(_indikator(), [chunk], None)
+    assert "(Lampiran VI)" in prompt

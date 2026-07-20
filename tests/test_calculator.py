@@ -1,6 +1,10 @@
 import pytest
 
-from app.reasoning.calculator import hitung_target_rekomendasi, klasifikasi_tipe_rekomendasi
+from app.reasoning.calculator import (
+    hitung_target_rekomendasi,
+    klasifikasi_tipe_rekomendasi,
+    rakit_status_numerik,
+)
 from app.schemas import IndikatorJejak
 
 
@@ -133,3 +137,33 @@ def test_operator_tidak_didukung_raises_valueerror():
     indikator = _indikator(kategori="KDB", nilai_input=0.5, ambang=0.6, operator="==")
     with pytest.raises(ValueError):
         hitung_target_rekomendasi(indikator)
+
+
+def test_rakit_status_numerik_kdb_melebihi():
+    indikator = _indikator(kategori="KDB", nilai_input=90.0, ambang=80.0, operator="<=")
+    status = rakit_status_numerik(indikator)
+    assert status is not None
+    assert "MELEBIHI" in status
+    assert "90.0" in status
+    assert "80.0" in status
+
+
+def test_rakit_status_numerik_kdh_kurang():
+    indikator = _indikator(kategori="KDH", nilai_input=15.0, ambang=20.0, operator=">=")
+    status = rakit_status_numerik(indikator)
+    assert status is not None
+    assert "KURANG" in status
+    assert "15.0" in status
+    assert "20.0" in status
+
+
+def test_rakit_status_numerik_sesuai():
+    indikator = _indikator(kategori="KDB", nilai_input=70.0, ambang=80.0, operator="<=")
+    status = rakit_status_numerik(indikator)
+    assert status is not None
+    assert "SESUAI" in status
+
+
+def test_rakit_status_numerik_none_untuk_kategori_non_numerik():
+    indikator = _indikator(kategori="Lokasional LP2B", nilai_input=1.0, ambang=1.0, operator="==")
+    assert rakit_status_numerik(indikator) is None
