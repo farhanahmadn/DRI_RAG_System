@@ -79,6 +79,27 @@ bentuk lengkap.
 pytest
 ```
 
+`pytest` mostly-mock (cepat, gratis, menguji KODE). Live-test yang butuh `GROQ_API_KEY` otomatis
+di-skip kalau key tidak ada.
+
+## Eval Harness
+
+Beda dari `pytest`: `eval/` menguji KUALITAS OUTPUT LLM, jadi SELALU memanggil Groq nyata (perlu
+`GROQ_API_KEY`, ada biaya kecil tiap dijalankan) — tidak masuk `pytest`/CI rutin.
+
+```bash
+python -m eval.run_eval     # jalankan 15 kasus gold set, cetak tabel lulus/gagal 4 metrik
+python -m eval.bakeoff      # bandingkan beberapa model Groq atas gold set yang sama (MAHAL — jalankan manual saat butuh)
+```
+
+- `eval/gold_set.jsonl` — 15 kasus berlabel manual (semua tipe indikator, 3 tipe rekomendasi,
+  kasus batas, kasus "Aman", kasus RAG-kosong). Gold set ini diseed dev, **perlu divalidasi ahli
+  tata ruang** sebelum dipakai sebagai acuan produksi.
+- `eval/metrics.py` — 4 metrik struktural deterministik (faithfulness/arah verdict, sitasi
+  grounded, target numerik = calculator, JSON valid). "Kejelasan Bahasa Indonesia" via
+  LLM-as-judge **DITUNDA** sampai metrik struktural terbukti tidak cukup.
+- `eval/bakeoff.py` — pemilihan model harus berdasar tabel angka ini, bukan tebakan.
+
 ## Struktur
 
 - `app/schemas.py` — skema Pydantic (jejak aturan & output JSON)
