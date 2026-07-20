@@ -123,6 +123,47 @@ def rakit_status_numerik(indikator: IndikatorJejak) -> str | None:
         return f"STATUS: SESUAI. Nilai aktual ({nilai_input}) >= batas ({batas})."
 
 
+_ITBX_LABEL = {
+    "I": "Diizinkan",
+    "T": "Terbatas",
+    "B": "Bersyarat",
+    "X": "Dilarang",
+}
+
+
+def rakit_status_kegiatan(indikator: IndikatorJejak) -> str | None:
+    """Rakit FAKTA klasifikasi ITBX (mis. "KLASIFIKASI: X...") untuk indikator kegiatan.
+
+    Sama semangat dengan `rakit_status_numerik`: klasifikasi (I/T/B/X) sudah ada di jejak
+    (`nilai_input`), disuntik ke prompt sebagai fakta supaya LLM tidak perlu (dan tidak boleh)
+    menyimpulkan sendiri klasifikasinya. `None` untuk indikator non-kegiatan atau klasifikasi yang
+    tidak dikenal.
+    """
+    if klasifikasi_tipe_rekomendasi(indikator.kategori) != "kegiatan":
+        return None
+
+    klasifikasi = str(indikator.nilai_input).strip().upper()
+    label = _ITBX_LABEL.get(klasifikasi)
+    if label is None:
+        return None
+
+    zona = f" di zona {indikator.zona}" if indikator.zona else ""
+    return (
+        f"KLASIFIKASI: {klasifikasi} ({label}). Kegiatan ini{zona} tergolong {label} "
+        "menurut matriks ITBX RDTR."
+    )
+
+
+def rakit_fakta_verdict(indikator: IndikatorJejak) -> str | None:
+    """Dispatcher fakta verdict — numerik/kegiatan punya fakta khusus, lokasional tidak (cukup fakta_spasial)."""
+    tipe = klasifikasi_tipe_rekomendasi(indikator.kategori)
+    if tipe == "numerik":
+        return rakit_status_numerik(indikator)
+    if tipe == "kegiatan":
+        return rakit_status_kegiatan(indikator)
+    return None
+
+
 def pilih_target_utama(target: dict[str, float] | None) -> float | None:
     """Pilih satu angka representatif dari hasil `hitung_target_rekomendasi` untuk `RekomendasiOutput.target`."""
     if target is None:

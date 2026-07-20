@@ -3,6 +3,8 @@ import pytest
 from app.reasoning.calculator import (
     hitung_target_rekomendasi,
     klasifikasi_tipe_rekomendasi,
+    rakit_fakta_verdict,
+    rakit_status_kegiatan,
     rakit_status_numerik,
 )
 from app.schemas import IndikatorJejak
@@ -167,3 +169,48 @@ def test_rakit_status_numerik_sesuai():
 def test_rakit_status_numerik_none_untuk_kategori_non_numerik():
     indikator = _indikator(kategori="Lokasional LP2B", nilai_input=1.0, ambang=1.0, operator="==")
     assert rakit_status_numerik(indikator) is None
+
+
+@pytest.mark.parametrize(
+    "klasifikasi,label_diharapkan",
+    [("I", "Diizinkan"), ("T", "Terbatas"), ("B", "Bersyarat"), ("X", "Dilarang")],
+)
+def test_rakit_status_kegiatan_semua_kelas(klasifikasi, label_diharapkan):
+    indikator = _indikator(
+        kategori="Kegiatan: Gudang",
+        nilai_input=klasifikasi,
+        ambang="I",
+        operator="==",
+        zona="C-1",
+    )
+    status = rakit_status_kegiatan(indikator)
+    assert status is not None
+    assert f"KLASIFIKASI: {klasifikasi}" in status
+    assert label_diharapkan in status
+
+
+def test_rakit_status_kegiatan_klasifikasi_tak_dikenal():
+    indikator = _indikator(kategori="Kegiatan: Gudang", nilai_input="Z", ambang="I", operator="==")
+    assert rakit_status_kegiatan(indikator) is None
+
+
+def test_rakit_status_kegiatan_none_untuk_kategori_non_kegiatan():
+    indikator = _indikator(kategori="KDB", nilai_input="X", ambang="I", operator="==")
+    assert rakit_status_kegiatan(indikator) is None
+
+
+def test_rakit_fakta_verdict_dispatch_numerik():
+    indikator = _indikator(kategori="KDB", nilai_input=90.0, ambang=80.0, operator="<=")
+    assert rakit_fakta_verdict(indikator) == rakit_status_numerik(indikator)
+    assert "STATUS" in rakit_fakta_verdict(indikator)
+
+
+def test_rakit_fakta_verdict_dispatch_kegiatan():
+    indikator = _indikator(kategori="Kegiatan: Gudang", nilai_input="X", ambang="I", operator="==", zona="C-1")
+    assert rakit_fakta_verdict(indikator) == rakit_status_kegiatan(indikator)
+    assert "KLASIFIKASI" in rakit_fakta_verdict(indikator)
+
+
+def test_rakit_fakta_verdict_dispatch_lokasional_none():
+    indikator = _indikator(kategori="Lokasional LP2B", nilai_input="dalam_lp2b", ambang="tidak_dalam_lp2b", operator="==")
+    assert rakit_fakta_verdict(indikator) is None

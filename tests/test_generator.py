@@ -83,6 +83,43 @@ def test_generate_poin_kdb_prompt_menyuntik_status_melebihi(monkeypatch):
     assert hasil.rekomendasi.target == 80.0
 
 
+def test_generate_poin_kegiatan_x_prompt_menyuntik_klasifikasi_dan_daftar_diizinkan(monkeypatch):
+    prompt_tertangkap = {}
+
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        prompt_tertangkap["prompt"] = prompt
+        return {
+            "reasoning_pendek": "Kegiatan ini tidak diizinkan di zona ini.",
+            "reasoning_panjang": "Industri besar/pabrik tergolong X (dilarang) pada zona C-1.",
+            "sitasi": [],
+            "saran": "Pertimbangkan kegiatan alternatif yang diizinkan di zona ini.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    indikator = IndikatorJejak(
+        poin_id="KEG-04",
+        kategori="Kegiatan: Industri Besar/Pabrik",
+        bobot=20.0,
+        skor=60.0,
+        kontribusi=60.0,
+        nilai_input="X",
+        ambang="I",
+        operator="==",
+        formula="",
+        zona="C-1",
+        referensi_hukum=["RDTR Pasal 1 Ayat 108", "RDTR Lampiran V"],
+    )
+
+    hasil = generate_poin(indikator, MockRetriever())
+
+    assert "KLASIFIKASI: X" in prompt_tertangkap["prompt"]
+    assert "Rumah toko (ruko) skala kecil" in prompt_tertangkap["prompt"]
+    assert hasil.rekomendasi.tipe == "kegiatan"
+    assert hasil.rekomendasi.target is None
+
+
 @pytest.mark.skipif(
     not os.getenv("GROQ_API_KEY"),
     reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",

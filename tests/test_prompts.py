@@ -44,6 +44,8 @@ def test_system_prompt_memuat_semua_aturan_wajib():
     assert "warga awam" in SYSTEM_PROMPT
     assert "STATUS" in SYSTEM_PROMPT
     assert "FAKTA hasil perhitungan kode" in SYSTEM_PROMPT
+    assert "KLASIFIKASI" in SYSTEM_PROMPT
+    assert "Kegiatan Diizinkan di Zona Ini" in SYSTEM_PROMPT
 
 
 def test_build_user_prompt_memuat_ringkasan_jejak():
@@ -126,3 +128,20 @@ def test_build_user_prompt_chunk_dengan_istilah_kode():
     )
     prompt = build_user_prompt(_indikator(), [chunk], None)
     assert "(Lampiran VI)" in prompt
+
+
+def test_build_user_prompt_kegiatan_diizinkan_terisi():
+    prompt = build_user_prompt(
+        _indikator(), [], None, kegiatan_diizinkan=["Rumah toko (ruko) skala kecil", "Perdagangan eceran"]
+    )
+    assert "Kegiatan Diizinkan di Zona Ini" in prompt
+    assert "Rumah toko (ruko) skala kecil" in prompt
+    assert "Perdagangan eceran" in prompt
+
+
+def test_build_user_prompt_kegiatan_diizinkan_kosong_tidak_muncul():
+    prompt = build_user_prompt(_indikator(), [], None, kegiatan_diizinkan=None)
+    assert "Kegiatan Diizinkan di Zona Ini" not in prompt
+
+    prompt_kosong = build_user_prompt(_indikator(), [], None, kegiatan_diizinkan=[])
+    assert "Kegiatan Diizinkan di Zona Ini" not in prompt_kosong

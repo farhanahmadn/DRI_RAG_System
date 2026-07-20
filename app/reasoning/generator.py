@@ -11,8 +11,9 @@ from app.reasoning.calculator import (
     hitung_target_rekomendasi,
     klasifikasi_tipe_rekomendasi,
     pilih_target_utama,
-    rakit_status_numerik,
+    rakit_fakta_verdict,
 )
+from app.reasoning.kegiatan_data import kegiatan_diizinkan_untuk_prompt
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.reasoning.templates import template_aman
 from app.retrieval.base import Chunk, RetrievalFilters, Retriever
@@ -71,8 +72,11 @@ def generate_poin(
     chunk_by_id = {chunk.id: chunk for chunk in chunks}
 
     target = hitung_target_rekomendasi(indikator)
-    fakta_verdict = rakit_status_numerik(indikator)
-    prompt = build_user_prompt(indikator, chunks, target, catatan_perbaikan, fakta_verdict)
+    fakta_verdict = rakit_fakta_verdict(indikator)
+    kegiatan_diizinkan = kegiatan_diizinkan_untuk_prompt(indikator)
+    prompt = build_user_prompt(
+        indikator, chunks, target, catatan_perbaikan, fakta_verdict, kegiatan_diizinkan
+    )
 
     llm_out = llm_client.generate(
         prompt,

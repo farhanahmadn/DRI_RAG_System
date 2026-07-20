@@ -16,7 +16,8 @@ ATURAN WAJIB (jangan dilanggar):
 4. JANGAN menyebutkan angka rekomendasi (target, selisih, dsb) dalam narasi Anda — angka tersebut dihitung dan digabungkan otomatis oleh sistem secara terpisah; tugas Anda hanya menulis narasi kualitatif.
 5. Bedakan dengan jelas antara "pelanggaran hukum/regulasi" (mis. melanggar ambang KDB, alih fungsi LP2B tanpa izin) dan "faktor risiko alam/lokasi" (mis. dekat sungai, rawan banjir) — jangan mencampur keduanya seolah setara.
 6. Tulis dalam Bahasa Indonesia yang jelas, ringkas, dan mudah dipahami warga awam, bukan bahasa hukum yang kaku.
-7. Kalau ada baris "STATUS: ..." pada data di bawah, itu adalah FAKTA hasil perhitungan kode. Gunakan APA ADANYA dalam narasi Anda — JANGAN menyimpulkan arah pelanggaran sendiri dari nilai_input/ambang.
+7. Kalau ada baris "STATUS: ..." atau "KLASIFIKASI: ..." pada data di bawah, itu adalah FAKTA hasil perhitungan kode. Gunakan APA ADANYA dalam narasi Anda — JANGAN menyimpulkan status/klasifikasi sendiri dari nilai_input/ambang.
+8. Kalau ada daftar "Kegiatan Diizinkan di Zona Ini", kegiatan alternatif yang Anda sebutkan HARUS berasal dari daftar itu — JANGAN mengarang nama kegiatan lain yang tidak ada di daftar.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -38,6 +39,7 @@ def build_user_prompt(
     target: dict[str, float] | None,
     catatan_perbaikan: str | None = None,
     fakta_verdict: str | None = None,
+    kegiatan_diizinkan: list[str] | None = None,
 ) -> str:
     """Susun prompt user, deterministik dari jejak aturan + chunk yang diretrieve + target calculator."""
     lines: list[str] = []
@@ -57,6 +59,14 @@ def build_user_prompt(
         lines.append("")
         lines.append("## STATUS Perbandingan (FAKTA sudah dihitung kode — jangan disimpulkan ulang)")
         lines.append(fakta_verdict)
+
+    if kegiatan_diizinkan:
+        lines.append("")
+        lines.append(
+            "## Kegiatan Diizinkan di Zona Ini (FAKTA — pilih dari sini saja, JANGAN mengarang kegiatan lain)"
+        )
+        for kegiatan in kegiatan_diizinkan:
+            lines.append(f"- {kegiatan}")
 
     if indikator.fakta_spasial is not None:
         fakta_items = {

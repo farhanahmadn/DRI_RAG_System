@@ -148,6 +148,45 @@ def _build_mock_chunks() -> list[Chunk]:
         jenis="RDTR",
     )
 
+    rdtr_p1_ayat108 = Chunk(
+        id="rdtr-p1-a108",
+        level="ayat",
+        parent_id=rdtr_p1.id,
+        teks=(
+            "(108) Klasifikasi kegiatan I (Diizinkan): kegiatan yang diizinkan tanpa syarat pada "
+            "zona bersangkutan. T (Terbatas): diizinkan dengan batasan tertentu (mis. jam "
+            "operasional, skala kegiatan). B (Bersyarat): diizinkan dengan syarat tertentu (mis. "
+            "kajian teknis, izin tambahan). X (Tidak Diizinkan): kegiatan yang dilarang pada zona "
+            "bersangkutan."
+        ),
+        dokumen=_rdtr_dokumen,
+        pasal="1",
+        ayat="108",
+        halaman=3,
+        skor=0.0,
+        tanggal_berlaku=rdtr_p1.tanggal_berlaku,
+        jenis="RDTR",
+    )
+    rdtr_lampiran_v_c1 = Chunk(
+        id="rdtr-lampiran-v-c1",
+        level="tabel",
+        parent_id=None,
+        teks=(
+            "Lampiran V: Matriks ITBX Ketentuan Kegiatan per Zona. Zona C-1 (Perdagangan dan "
+            "Jasa): Rumah toko (ruko) skala kecil = I (Diizinkan); Gudang penyimpanan = T "
+            "(Terbatas); Bengkel kendaraan bermotor = B (Bersyarat); Industri besar/pabrik = X "
+            "(Tidak Diizinkan)."
+        ),
+        dokumen=_rdtr_dokumen,
+        pasal=None,
+        istilah_kode="Lampiran V",
+        halaman=108,
+        skor=0.0,
+        tanggal_berlaku=date(2021, 1, 1),
+        zona="C-1",
+        jenis="RDTR",
+    )
+
     return [
         pasal_44,
         pasal_44_ayat1,
@@ -157,6 +196,8 @@ def _build_mock_chunks() -> list[Chunk]:
         rdtr_p1,
         rdtr_p1_ayat107,
         rdtr_lampiran_vi_c1,
+        rdtr_p1_ayat108,
+        rdtr_lampiran_v_c1,
     ]
 
 

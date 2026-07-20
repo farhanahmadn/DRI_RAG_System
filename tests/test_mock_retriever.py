@@ -76,3 +76,27 @@ def test_get_parent_kdb_ayat_ke_pasal():
     assert parent is not None
     assert parent.id == "rdtr-p1"
     assert parent.level == "pasal"
+
+
+def test_search_finds_kegiatan_lampiran_v():
+    retriever = MockRetriever()
+    results = retriever.search("kegiatan ITBX zona C-1", RetrievalFilters(), top_k=5)
+
+    assert len(results) > 0
+    assert any(r.id == "rdtr-lampiran-v-c1" for r in results)
+
+
+def test_get_by_reference_kegiatan_pasal_1_ayat_108():
+    retriever = MockRetriever()
+    results = retriever.get_by_reference(["RDTR Pasal 1 Ayat 108"])
+
+    assert len(results) > 0
+    assert all(r.pasal == "1" for r in results)
+    assert any(r.id == "rdtr-p1-a108" for r in results)
+
+
+def test_get_by_reference_kegiatan_lampiran_v():
+    retriever = MockRetriever()
+    results = retriever.get_by_reference(["RDTR Lampiran V"])
+
+    assert any(r.id == "rdtr-lampiran-v-c1" for r in results)

@@ -4,6 +4,7 @@ import pytest
 from dotenv import load_dotenv
 
 from app.reasoning import guardrail as guardrail_module
+from app.reasoning import llm_client as llm_client_module
 from app.reasoning.calculator import hitung_target_rekomendasi, pilih_target_utama
 from app.reasoning.generator import ambil_chunks_pendukung
 from app.reasoning.guardrail import (
@@ -358,5 +359,125 @@ def test_generate_poin_dengan_guardrail_kdb_live():
     assert len(hasil.sitasi) > 0
     for s in hasil.sitasi:
         assert s.citation_id in chunk_ids
+
+    assert hasil.low_confidence is False
+
+
+# --- Indikator Kegiatan (I/T/B/X) — end-to-end tiap kelas -----------------------------------
+
+
+def _indikator_kegiatan(**overrides) -> IndikatorJejak:
+    defaults = dict(
+        poin_id="KEG-01",
+        kategori="Kegiatan: Gudang",
+        bobot=20.0,
+        skor=0.0,
+        kontribusi=0.0,
+        nilai_input="I",
+        ambang="I",
+        operator="==",
+        formula="",
+        zona="C-1",
+        referensi_hukum=["RDTR Pasal 1 Ayat 108", "RDTR Lampiran V"],
+    )
+    defaults.update(overrides)
+    return IndikatorJejak(**defaults)
+
+
+def test_kegiatan_klasifikasi_i_aman_template_tanpa_llm():
+    indikator = _indikator_kegiatan(skor=0.0, kontribusi=0.0, nilai_input="I")
+    hasil = generate_poin_dengan_guardrail(indikator, MockRetriever())
+
+    assert hasil.status == "Aman"
+    assert hasil.rekomendasi.tipe == "kegiatan"
+    assert hasil.rekomendasi.target is None
+    assert hasil.low_confidence is False
+
+
+def _stub_llm_generate_kegiatan(chunk_id: str, saran: str):
+    def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "Penjelasan singkat kegiatan.",
+            "reasoning_panjang": "Penjelasan panjang kegiatan berdasarkan klasifikasi ITBX.",
+            "sitasi": [{"citation_id": chunk_id, "kutipan": "kutipan relevan"}],
+            "saran": saran,
+            "disclaimer": None,
+        }
+
+    return _stub
+
+
+def test_kegiatan_klasifikasi_t_berisiko_mock(monkeypatch):
+    indikator = _indikator_kegiatan(
+        poin_id="KEG-02", kategori="Kegiatan: Gudang", skor=20.0, kontribusi=20.0, nilai_input="T"
+    )
+    chunk_id = ambil_chunks_pendukung(indikator, MockRetriever())[0].id
+    monkeypatch.setattr(
+        llm_client_module, "generate", _stub_llm_generate_kegiatan(chunk_id, "Batasi jam operasional gudang.")
+    )
+
+    hasil = generate_poin_dengan_guardrail(indikator, MockRetriever())
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 20.0
+    assert hasil.rekomendasi.tipe == "kegiatan"
+    assert hasil.rekomendasi.target is None
+    assert len(hasil.sitasi) > 0
+    assert all(s.terverifikasi for s in hasil.sitasi)
+    assert hasil.low_confidence is False
+
+
+def test_kegiatan_klasifikasi_b_berisiko_mock(monkeypatch):
+    indikator = _indikator_kegiatan(
+        poin_id="KEG-03",
+        kategori="Kegiatan: Bengkel Kendaraan",
+        skor=40.0,
+        kontribusi=40.0,
+        nilai_input="B",
+    )
+    chunk_id = ambil_chunks_pendukung(indikator, MockRetriever())[0].id
+    monkeypatch.setattr(
+        llm_client_module,
+        "generate",
+        _stub_llm_generate_kegiatan(chunk_id, "Lakukan kajian teknis dan penuhi syarat perizinan tambahan."),
+    )
+
+    hasil = generate_poin_dengan_guardrail(indikator, MockRetriever())
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 40.0
+    assert hasil.rekomendasi.tipe == "kegiatan"
+    assert hasil.rekomendasi.target is None
+    assert len(hasil.sitasi) > 0
+    assert all(s.terverifikasi for s in hasil.sitasi)
+    assert hasil.low_confidence is False
+
+
+@pytest.mark.skipif(
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",
+)
+def test_kegiatan_klasifikasi_x_berisiko_live():
+    indikator = _indikator_kegiatan(
+        poin_id="KEG-04",
+        kategori="Kegiatan: Industri Besar/Pabrik",
+        skor=60.0,
+        kontribusi=60.0,
+        nilai_input="X",
+    )
+    retriever = MockRetriever()
+
+    hasil = generate_poin_dengan_guardrail(indikator, retriever)
+
+    assert hasil.status == "Tidak Aman"
+    assert hasil.kontribusi == 60.0
+    assert hasil.rekomendasi.tipe == "kegiatan"
+    assert hasil.rekomendasi.target is None
+
+    chunk_ids = {c.id for c in ambil_chunks_pendukung(indikator, retriever)}
+    assert len(hasil.sitasi) > 0
+    for s in hasil.sitasi:
+        assert s.citation_id in chunk_ids
+        assert s.terverifikasi is True
 
     assert hasil.low_confidence is False
