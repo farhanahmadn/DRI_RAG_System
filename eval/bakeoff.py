@@ -10,6 +10,7 @@ Jalankan: `python -m eval.bakeoff` dari root repo.
 """
 
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -24,6 +25,9 @@ MODEL_KANDIDAT = [
     "gemma2-9b-it",
 ]
 
+JEDA_ANTAR_KASUS_DETIK = 3.0
+JEDA_ANTAR_MODEL_DETIK = 8.0
+
 
 def _ringkas(hasil: list[HasilKasus]) -> dict:
     total = len(hasil)
@@ -36,6 +40,7 @@ def _ringkas(hasil: list[HasilKasus]) -> dict:
     latensi = [h.latensi_detik for h in hasil if h.error is None]
     avg_latensi = sum(latensi) / len(latensi) if latensi else 0.0
     n_error = sum(1 for h in hasil if h.error is not None)
+    n_low_confidence = sum(1 for h in hasil if h.low_confidence)
 
     return {
         "overall": lulus_semua / total if total else 0.0,
@@ -45,6 +50,7 @@ def _ringkas(hasil: list[HasilKasus]) -> dict:
         "json_valid": rate("json_valid"),
         "avg_latensi_s": avg_latensi,
         "n_error": n_error,
+        "n_low_confidence": n_low_confidence,
     }
 
 
@@ -56,18 +62,27 @@ def main() -> None:
     ringkasan_per_model: dict[str, dict] = {}
 
     try:
-        for model in MODEL_KANDIDAT:
+        for idx, model in enumerate(MODEL_KANDIDAT):
+            if idx > 0:
+                print(f"\n(jeda {JEDA_ANTAR_MODEL_DETIK:.0f}s sebelum model berikutnya, hindari rate limit RPM)")
+                time.sleep(JEDA_ANTAR_MODEL_DETIK)
+
             print(f"\n=== Menjalankan gold set dengan model: {model} ===")
             os.environ["LLM_MODEL"] = model
-            hasil = jalankan_gold_set(retriever, gold_set)
+            hasil = jalankan_gold_set(retriever, gold_set, jeda_detik=JEDA_ANTAR_KASUS_DETIK)
             ringkasan_per_model[model] = _ringkas(hasil)
             r = ringkasan_per_model[model]
             print(
                 f"  overall={r['overall']:.0%} faithfulness={r['faithfulness']:.0%} "
                 f"grounded={r['sitasi_grounded']:.0%} numerik={r['numerik_benar']:.0%} "
                 f"json={r['json_valid']:.0%} avg_latensi={r['avg_latensi_s']:.2f}s "
-                f"errors={r['n_error']}"
+                f"errors={r['n_error']} low_confidence={r['n_low_confidence']}"
             )
+            if r["n_low_confidence"] or r["n_error"]:
+                print(
+                    "  [!] low_confidence/error terdeteksi — bisa berarti model memang lemah "
+                    "ATAU rate limit/kuota API. Periksa sebelum menyimpulkan kualitas model."
+                )
     finally:
         if model_asli is not None:
             os.environ["LLM_MODEL"] = model_asli
@@ -77,7 +92,7 @@ def main() -> None:
     print("\n" + "=" * 100)
     header = (
         f"{'Model':<28} {'Overall':<9} {'Faith':<8} {'Ground':<8} {'Numerik':<9} "
-        f"{'JSON':<7} {'AvgLat(s)':<10} {'Errors':<7}"
+        f"{'JSON':<7} {'AvgLat(s)':<10} {'Errors':<7} {'LowConf':<8}"
     )
     print(header)
     print("-" * len(header))
@@ -85,7 +100,14 @@ def main() -> None:
         print(
             f"{model:<28} {r['overall']:<9.0%} {r['faithfulness']:<8.0%} "
             f"{r['sitasi_grounded']:<8.0%} {r['numerik_benar']:<9.0%} {r['json_valid']:<7.0%} "
-            f"{r['avg_latensi_s']:<10.2f} {r['n_error']:<7}"
+            f"{r['avg_latensi_s']:<10.2f} {r['n_error']:<7} {r['n_low_confidence']:<8}"
+        )
+
+    if any(r["n_low_confidence"] or r["n_error"] for r in ringkasan_per_model.values()):
+        print(
+            "\n[!] Ada kasus low_confidence/error di atas — sebelum menyimpulkan model mana yang "
+            "lebih baik, pastikan itu bukan kuota API habis (cek pesan RateLimitError di log run) "
+            "dan bukan kelemahan model asli."
         )
 
 

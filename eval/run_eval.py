@@ -49,11 +49,20 @@ def muat_gold_set(path: Path = GOLD_SET_PATH) -> list[dict]:
     return kasus_list
 
 
-def jalankan_gold_set(retriever: Retriever, gold_set: list[dict]) -> list[HasilKasus]:
-    """Jalankan setiap kasus gold set lewat jalankan_precheck, kembalikan hasil per kasus."""
+def jalankan_gold_set(
+    retriever: Retriever, gold_set: list[dict], jeda_detik: float = 0.0
+) -> list[HasilKasus]:
+    """Jalankan setiap kasus gold set lewat jalankan_precheck, kembalikan hasil per kasus.
+
+    `jeda_detik` (default 0, dipakai bakeoff.py dengan nilai >0) memberi jeda antar kasus supaya
+    tidak menembak API beruntun tanpa henti — menghindari rate limit per-menit (RPM), terpisah dari
+    kuota harian (TPD) yang tidak bisa diatasi lewat jeda.
+    """
     hasil: list[HasilKasus] = []
 
-    for kasus in gold_set:
+    for i, kasus in enumerate(gold_set):
+        if jeda_detik and i > 0:
+            time.sleep(jeda_detik)
         nama = kasus["nama"]
         expected = kasus["expected"]
         try:
