@@ -1,8 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api import main as main_module
 from app.api.dependencies import get_retriever
 from app.api.main import app
+from app.api.rate_limit import _LIMIT, reset_rate_limiter
 from app.schemas import (
     KesimpulanOutput,
     OutputPreCheck,
@@ -12,6 +14,15 @@ from app.schemas import (
 )
 
 client = TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.fixture(autouse=True)
+def _bersihkan_rate_limiter():
+    # State limiter global (in-memory, per-IP) — reset supaya test lain di file ini tidak ikut
+    # menghabiskan/terpengaruh kuota dari TestClient yang berbagi IP palsu yang sama.
+    reset_rate_limiter()
+    yield
+    reset_rate_limiter()
 
 
 def _output_kanonik() -> OutputPreCheck:
@@ -114,3 +125,21 @@ def test_reasoning_exception_tak_terduga_500_terstruktur(monkeypatch):
     body = response.json()
     assert set(body.keys()) == {"error", "message"}
     assert "boom" not in response.text
+
+
+def test_reasoning_rate_limit_429_setelah_melebihi_batas(monkeypatch):
+    output = _output_kanonik()
+    monkeypatch.setattr(main_module, "jalankan_precheck", lambda request, retriever: output)
+
+    for _ in range(_LIMIT):
+        response = client.post("/reasoning", json=_request_body())
+        assert response.status_code == 200
+
+    response = client.post("/reasoning", json=_request_body())
+    assert response.status_code == 429
+
+
+def test_health_tidak_kena_rate_limit():
+    for _ in range(_LIMIT + 5):
+        response = client.get("/health")
+        assert response.status_code == 200

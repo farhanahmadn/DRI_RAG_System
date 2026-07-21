@@ -1,4 +1,5 @@
 import os
+import time
 
 import pytest
 from dotenv import load_dotenv
@@ -231,6 +232,100 @@ def test_log_precheck_dipanggil_sekali_dengan_data_benar(monkeypatch):
     logged_request, logged_response = panggilan[0]
     assert logged_request == request
     assert logged_response == output
+
+
+# --- pemrosesan paralel -------------------------------------------------------------------
+
+
+def _indikator_generik(n: int, **overrides) -> IndikatorJejak:
+    defaults = dict(
+        poin_id=f"IND-{n:02d}",
+        kategori="KDB",
+        bobot=10.0,
+        skor=10.0,
+        kontribusi=10.0,
+        nilai_input=0.7,
+        ambang=0.6,
+        operator="<=",
+        formula="",
+    )
+    defaults.update(overrides)
+    return IndikatorJejak(**defaults)
+
+
+def test_indikator_diproses_paralel_bukan_sekuensial(monkeypatch):
+    jumlah = 5
+    durasi_tidur = 0.2
+
+    def _stub_lambat(indikator, retriever, *, max_retry=2):
+        time.sleep(durasi_tidur)
+        return _poin_aman(poin_id=indikator.poin_id, kategori=indikator.kategori)
+
+    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_lambat)
+    _patch_log(monkeypatch)
+
+    request = JejakAturanRequest(
+        skor_total=0.0,
+        level="Rendah",
+        indikator=[_indikator_generik(i) for i in range(jumlah)],
+    )
+
+    mulai = time.perf_counter()
+    output = jalankan_precheck(request, MockRetriever())
+    durasi_total = time.perf_counter() - mulai
+
+    assert len(output.poin) == jumlah
+    # Sekuensial akan >= jumlah * durasi_tidur (~1.0s). Paralel harus jauh di bawah itu.
+    assert durasi_total < jumlah * durasi_tidur * 0.6
+
+
+def test_urutan_poin_sesuai_urutan_indikator_walau_selesai_out_of_order(monkeypatch):
+    # Indikator pertama tidur PALING LAMA, terakhir tidur PALING CEPAT — kalau eksekusi konkuren,
+    # yang terakhir akan SELESAI duluan. Urutan output harus tetap ikuti urutan request, bukan
+    # urutan selesai.
+    durasi_per_indikator = [0.3, 0.2, 0.1, 0.05]
+
+    def _stub_durasi_bervariasi(indikator, retriever, *, max_retry=2):
+        idx = int(indikator.poin_id.split("-")[1])
+        time.sleep(durasi_per_indikator[idx])
+        return _poin_aman(poin_id=indikator.poin_id, kategori=indikator.kategori)
+
+    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_durasi_bervariasi)
+    _patch_log(monkeypatch)
+
+    request = JejakAturanRequest(
+        skor_total=0.0,
+        level="Rendah",
+        indikator=[_indikator_generik(i) for i in range(len(durasi_per_indikator))],
+    )
+
+    output = jalankan_precheck(request, MockRetriever())
+
+    assert [p.poin_id for p in output.poin] == [ind.poin_id for ind in request.indikator]
+
+
+def test_satu_indikator_gagal_tak_terduga_tidak_menggagalkan_batch(monkeypatch):
+    def _stub_campuran(indikator, retriever, *, max_retry=2):
+        if indikator.poin_id == "IND-01":
+            raise RuntimeError("bug tak terduga di guardrail")
+        return _poin_aman(poin_id=indikator.poin_id, kategori=indikator.kategori)
+
+    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_campuran)
+    _patch_log(monkeypatch)
+
+    request = JejakAturanRequest(
+        skor_total=0.0,
+        level="Rendah",
+        indikator=[_indikator_generik(0), _indikator_generik(1), _indikator_generik(2)],
+    )
+
+    output = jalankan_precheck(request, MockRetriever())  # TIDAK BOLEH raise
+
+    poin_by_id = {p.poin_id: p for p in output.poin}
+    assert poin_by_id["IND-00"].low_confidence is False
+    assert poin_by_id["IND-02"].low_confidence is False
+    assert poin_by_id["IND-01"].low_confidence is True
+    assert poin_by_id["IND-01"].status in ("Aman", "Tidak Aman")  # tetap terisi valid, bukan crash
 
 
 # --- live integration (1x, skip kalau tanpa GROQ_API_KEY) ----------------------------------

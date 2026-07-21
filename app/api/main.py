@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.dependencies import get_retriever
+from app.api.rate_limit import cek_rate_limit
 from app.reasoning.assemble import jalankan_precheck
 from app.retrieval.base import Retriever
 from app.schemas import JejakAturanRequest, OutputPreCheck
@@ -32,7 +33,7 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/reasoning", response_model=OutputPreCheck)
+@app.post("/reasoning", response_model=OutputPreCheck, dependencies=[Depends(cek_rate_limit)])
 def reasoning(
     request: JejakAturanRequest,
     retriever: Retriever = Depends(get_retriever),

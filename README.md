@@ -100,6 +100,25 @@ python -m eval.bakeoff      # bandingkan beberapa model Groq atas gold set yang 
   LLM-as-judge **DITUNDA** sampai metrik struktural terbukti tidak cukup.
 - `eval/bakeoff.py` — pemilihan model harus berdasar tabel angka ini, bukan tebakan.
 
+## Hardening (Fase 3.3)
+
+- **Paralel** — indikator dalam satu request diproses konkuren (`ThreadPoolExecutor`, atur lewat
+  `REASONING_MAX_WORKERS`, default 8) — mengurangi latensi total utk request dengan banyak indikator
+  berisiko. Urutan `poin[]` di respons tetap sesuai urutan `indikator[]` di request.
+- **Timeout & retry transport** — panggilan Groq punya `LLM_TIMEOUT_S` (default 30 detik) &
+  `LLM_MAX_RETRIES` (default 2, retry bawaan SDK openai utk error transient: timeout/5xx/429).
+  Beda lapis dari retry semantik guardrail (regenerasi terarah saat output gagal validasi). Kegagalan
+  apa pun (transport habis retry, ATAU semantik habis retry) berujung fallback `low_confidence`,
+  BUKAN crash.
+- **Rate limiting** — `/reasoning` dibatasi `RATE_LIMIT_PER_MENIT` (default 10) permintaan/menit
+  per-IP (in-memory, MVP single-instance). `/health` tidak dibatasi.
+- **Observability (opsional)** — integrasi Langfuse self-host, **no-op total** kalau
+  `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` kosong atau library belum terpasang. Aktifkan lewat
+  `pip install -e ".[observability]"` + isi env Langfuse. Tracing TIDAK PERNAH menggagalkan pipeline
+  reasoning utama walau server Langfuse tidak terjangkau.
+
+Semua env di atas opsional dengan default masuk akal — lihat `.env.example`.
+
 ## Struktur
 
 - `app/schemas.py` — skema Pydantic (jejak aturan & output JSON)

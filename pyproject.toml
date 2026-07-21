@@ -15,6 +15,9 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+observability = [
+    "langfuse>=4.0",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

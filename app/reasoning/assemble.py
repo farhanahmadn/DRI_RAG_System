@@ -4,14 +4,23 @@ Prinsip 3 CLAUDE.md: skor & level komposit adalah ranah rule engine (back-end), 
 ulang atau dikarang di sini. Kalimat ringkasan & langkah_berdampak dirakit deterministik dari data
 poin yang sudah ada (termasuk rekomendasi.saran yang sudah lolos guardrail) — tanpa panggilan LLM
 tambahan di jalur ini.
+
+Indikator diproses PARALEL (ThreadPoolExecutor) — panggilan Groq itu I/O-bound, GIL dilepas saat
+menunggu socket, jadi threading beri speedup nyata tanpa perlu menulis ulang seluruh chain jadi
+async (yang akan memaksa ubah SEAM Retriever Protocol, kontrak dengan teman).
 """
 
 import logging
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 from app.logging_util import log_precheck
+from app.reasoning import observability
 from app.reasoning.guardrail import generate_poin_dengan_guardrail
+from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
 from app.schemas import (
+    IndikatorJejak,
     JejakAturanRequest,
     KesimpulanOutput,
     OutputPreCheck,
@@ -22,6 +31,22 @@ from app.schemas import (
 logger = logging.getLogger(__name__)
 
 _LEVEL_BELUM_TERSEDIA = "BELUM_DITENTUKAN (menunggu level dari back-end)"
+
+_MAX_WORKERS = int(os.getenv("REASONING_MAX_WORKERS", "8"))
+_executor = ThreadPoolExecutor(max_workers=_MAX_WORKERS, thread_name_prefix="reasoning-poin")
+
+
+def _generate_poin_aman(indikator: IndikatorJejak, retriever: Retriever) -> PoinOutput:
+    """Lapis pertahanan tambahan: guardrail.py seharusnya tidak pernah raise, tapi kalau suatu
+    saat ada bug tak terduga, batch tidak boleh gagal total gara-gara 1 indikator."""
+    try:
+        return generate_poin_dengan_guardrail(indikator, retriever)
+    except Exception:
+        logger.exception(
+            "generate_poin_dengan_guardrail gagal tak terduga utk %s — fallback low_confidence.",
+            indikator.poin_id,
+        )
+        return template_low_confidence(indikator)
 
 
 def _rakit_ringkasan(request: JejakAturanRequest, poin_list: list[PoinOutput]) -> RingkasanOutput:
@@ -67,10 +92,12 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput]) -> KesimpulanOutput:
 
 
 def jalankan_precheck(request: JejakAturanRequest, retriever: Retriever) -> OutputPreCheck:
-    """Jalankan precheck penuh: generate tiap poin (dengan guardrail), rakit ringkasan/kesimpulan."""
-    poin_list = [
-        generate_poin_dengan_guardrail(indikator, retriever) for indikator in request.indikator
+    """Jalankan precheck penuh: generate tiap poin PARALEL (dengan guardrail), rakit ringkasan/kesimpulan."""
+    futures = [
+        _executor.submit(_generate_poin_aman, indikator, retriever)
+        for indikator in request.indikator
     ]
+    poin_list = [f.result() for f in futures]  # urutan submit == urutan hasil, walau selesai konkuren
 
     output = OutputPreCheck(
         ringkasan=_rakit_ringkasan(request, poin_list),
@@ -82,5 +109,9 @@ def jalankan_precheck(request: JejakAturanRequest, retriever: Retriever) -> Outp
         log_precheck(request, output)
     except Exception:
         logger.exception("Gagal menulis log precheck — melanjutkan tanpa menggagalkan respons.")
+
+    observability.catat_precheck_trace(
+        "jalankan_precheck", request.model_dump(mode="json"), output.model_dump(mode="json")
+    )
 
     return output

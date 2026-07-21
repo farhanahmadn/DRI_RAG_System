@@ -5,16 +5,23 @@ pemanggilnya TIDAK berubah (CLAUDE.md § Tech stack, LLM serving).
 
 Modul ini murni transport (panggil LLM, paksa JSON valid). Retry bisnis / fallback template saat
 guardrail gagal adalah tanggung jawab `app/reasoning/generator.py` + `guardrail.py` (Fase 2), bukan
-di sini.
+di sini. `timeout`/`max_retries` di sini adalah hardening TRANSPORT (koneksi macet/5xx sesaat) —
+beda lapis dari retry semantik guardrail (regenerasi terarah saat output gagal validasi).
 """
 
 import json
 import os
+import time
 
 from dotenv import load_dotenv
 from openai import BadRequestError, OpenAI
 
+from app.reasoning import observability
+
 load_dotenv()
+
+_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "30"))
+_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
 _client: OpenAI | None = None
 
@@ -28,7 +35,12 @@ def _get_client() -> OpenAI:
             raise RuntimeError(
                 "GROQ_API_KEY tidak ditemukan di environment. Salin .env.example ke .env dan isi key."
             )
-        _client = OpenAI(api_key=api_key, base_url=base_url)
+        _client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=_TIMEOUT_S,
+            max_retries=_MAX_RETRIES,
+        )
     return _client
 
 
@@ -60,40 +72,56 @@ def generate(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    try:
-        completion = client.chat.completions.create(
-            model=_model(),
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {"name": schema_name, "schema": json_schema, "strict": True},
-            },
-        )
-    except BadRequestError:
-        fallback_messages = list(messages)
-        fallback_messages.append(
-            {
-                "role": "user",
-                "content": (
-                    "Balas HANYA dengan JSON valid yang mengikuti skema berikut, tanpa teks lain:\n"
-                    f"{json.dumps(json_schema, ensure_ascii=False)}"
-                ),
-            }
-        )
-        completion = client.chat.completions.create(
-            model=_model(),
-            messages=fallback_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-        )
+    mulai = time.perf_counter()
+    hasil: dict | None = None
+    error_msg: str | None = None
 
-    content = completion.choices[0].message.content
-    if not content:
-        raise RuntimeError("LLM mengembalikan konten kosong.")
     try:
-        return json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"LLM tidak mengembalikan JSON valid: {content!r}") from exc
+        try:
+            completion = client.chat.completions.create(
+                model=_model(),
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": schema_name, "schema": json_schema, "strict": True},
+                },
+            )
+        except BadRequestError:
+            fallback_messages = list(messages)
+            fallback_messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Balas HANYA dengan JSON valid yang mengikuti skema berikut, tanpa teks lain:\n"
+                        f"{json.dumps(json_schema, ensure_ascii=False)}"
+                    ),
+                }
+            )
+            completion = client.chat.completions.create(
+                model=_model(),
+                messages=fallback_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+            )
+
+        content = completion.choices[0].message.content
+        if not content:
+            raise RuntimeError("LLM mengembalikan konten kosong.")
+        try:
+            hasil = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"LLM tidak mengembalikan JSON valid: {content!r}") from exc
+
+        return hasil
+    except Exception as exc:
+        error_msg = str(exc)
+        raise
+    finally:
+        latensi = time.perf_counter() - mulai
+        # os.getenv langsung (bukan _model()) — finally tidak boleh raise baru yang menutupi
+        # exception asli kalau LLM_MODEL entah bagaimana hilang di tengah jalan.
+        model_untuk_log = os.getenv("LLM_MODEL") or "unknown"
+        observability.catat_generation(schema_name, prompt, hasil, model_untuk_log, latensi, error=error_msg)
