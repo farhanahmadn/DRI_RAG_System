@@ -1,0 +1,603 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "RDTR Sleman — AI Reasoning",
+    "description": "Komponen AI Reasoning untuk pre-check risiko izin bangunan Kabupaten Sleman: menerima jejak aturan rule-based, menghasilkan reasoning, sitasi terverifikasi, rekomendasi, dan kesimpulan sebagai JSON.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reasoning": {
+      "post": {
+        "summary": "Reasoning",
+        "operationId": "reasoning_reasoning_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JejakAturanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputPreCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FaktaSpasial": {
+        "properties": {
+          "in_lp2b": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Lp2B"
+          },
+          "banjir": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Banjir"
+          },
+          "tingkat_banjir": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Tinggi",
+                  "Sedang",
+                  "Rendah"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tingkat Banjir"
+          },
+          "resapan": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resapan"
+          },
+          "in_sempadan": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Sempadan"
+          },
+          "jarak_sungai_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jarak Sungai M"
+          },
+          "nama_sungai": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nama Sungai"
+          },
+          "arah": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arah"
+          }
+        },
+        "type": "object",
+        "title": "FaktaSpasial"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IndikatorJejak": {
+        "properties": {
+          "poin_id": {
+            "type": "string",
+            "title": "Poin Id"
+          },
+          "kategori": {
+            "type": "string",
+            "title": "Kategori"
+          },
+          "bobot": {
+            "type": "number",
+            "title": "Bobot"
+          },
+          "skor": {
+            "type": "number",
+            "title": "Skor"
+          },
+          "kontribusi": {
+            "type": "number",
+            "title": "Kontribusi"
+          },
+          "nilai_input": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Nilai Input"
+          },
+          "ambang": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Ambang"
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          },
+          "luas_lahan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Lahan"
+          },
+          "referensi_hukum": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Referensi Hukum",
+            "default": []
+          },
+          "fakta_spasial": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FaktaSpasial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_rekomendasi": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Rekomendasi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "poin_id",
+          "kategori",
+          "bobot",
+          "skor",
+          "kontribusi",
+          "nilai_input",
+          "ambang",
+          "operator",
+          "formula"
+        ],
+        "title": "IndikatorJejak"
+      },
+      "JejakAturanRequest": {
+        "properties": {
+          "skor_total": {
+            "type": "number",
+            "title": "Skor Total"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          },
+          "indikator": {
+            "items": {
+              "$ref": "#/components/schemas/IndikatorJejak"
+            },
+            "type": "array",
+            "title": "Indikator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "skor_total",
+          "indikator"
+        ],
+        "title": "JejakAturanRequest"
+      },
+      "KesimpulanOutput": {
+        "properties": {
+          "langkah_berdampak": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Langkah Berdampak"
+          },
+          "catatan_lokasi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catatan Lokasi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "langkah_berdampak"
+        ],
+        "title": "KesimpulanOutput"
+      },
+      "OutputPreCheck": {
+        "properties": {
+          "ringkasan": {
+            "$ref": "#/components/schemas/RingkasanOutput"
+          },
+          "poin": {
+            "items": {
+              "$ref": "#/components/schemas/PoinOutput"
+            },
+            "type": "array",
+            "title": "Poin"
+          },
+          "kesimpulan": {
+            "$ref": "#/components/schemas/KesimpulanOutput"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ringkasan",
+          "poin",
+          "kesimpulan"
+        ],
+        "title": "OutputPreCheck"
+      },
+      "PoinOutput": {
+        "properties": {
+          "poin_id": {
+            "type": "string",
+            "title": "Poin Id"
+          },
+          "kategori": {
+            "type": "string",
+            "title": "Kategori"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "kontribusi": {
+            "type": "number",
+            "title": "Kontribusi"
+          },
+          "reasoning_pendek": {
+            "type": "string",
+            "title": "Reasoning Pendek"
+          },
+          "reasoning_panjang": {
+            "type": "string",
+            "title": "Reasoning Panjang"
+          },
+          "sitasi": {
+            "items": {
+              "$ref": "#/components/schemas/SitasiOutput"
+            },
+            "type": "array",
+            "title": "Sitasi"
+          },
+          "rekomendasi": {
+            "$ref": "#/components/schemas/RekomendasiOutput"
+          },
+          "low_confidence": {
+            "type": "boolean",
+            "title": "Low Confidence",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "poin_id",
+          "kategori",
+          "status",
+          "kontribusi",
+          "reasoning_pendek",
+          "reasoning_panjang",
+          "sitasi",
+          "rekomendasi"
+        ],
+        "title": "PoinOutput"
+      },
+      "RekomendasiOutput": {
+        "properties": {
+          "tipe": {
+            "type": "string",
+            "enum": [
+              "numerik",
+              "kegiatan",
+              "lokasional"
+            ],
+            "title": "Tipe"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "saran": {
+            "type": "string",
+            "title": "Saran"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipe",
+          "saran"
+        ],
+        "title": "RekomendasiOutput"
+      },
+      "RingkasanOutput": {
+        "properties": {
+          "skor_total": {
+            "type": "number",
+            "title": "Skor Total"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "kalimat": {
+            "type": "string",
+            "title": "Kalimat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "skor_total",
+          "level",
+          "kalimat"
+        ],
+        "title": "RingkasanOutput"
+      },
+      "SitasiOutput": {
+        "properties": {
+          "citation_id": {
+            "type": "string",
+            "title": "Citation Id"
+          },
+          "dokumen": {
+            "type": "string",
+            "title": "Dokumen"
+          },
+          "pasal": {
+            "type": "string",
+            "title": "Pasal"
+          },
+          "halaman": {
+            "type": "integer",
+            "title": "Halaman"
+          },
+          "kutipan": {
+            "type": "string",
+            "title": "Kutipan"
+          },
+          "terverifikasi": {
+            "type": "boolean",
+            "title": "Terverifikasi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "citation_id",
+          "dokumen",
+          "pasal",
+          "halaman",
+          "kutipan",
+          "terverifikasi"
+        ],
+        "title": "SitasiOutput"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
