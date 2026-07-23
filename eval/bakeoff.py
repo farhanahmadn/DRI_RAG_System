@@ -22,8 +22,11 @@ load_dotenv()
 MODEL_KANDIDAT = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "gemma2-9b-it",
+    "openai/gpt-oss-20b",
 ]
+# Katalog model Groq sering berubah — "gemma2-9b-it" dipakai sebelumnya sudah DECOMMISSIONED
+# per klien.models.list() (400 model_decommissioned). Cek `client.models.list()` kalau kandidat
+# di atas suatu saat gagal serupa, jangan asumsikan itu otomatis rate limit.
 
 JEDA_ANTAR_KASUS_DETIK = 3.0
 JEDA_ANTAR_MODEL_DETIK = 8.0

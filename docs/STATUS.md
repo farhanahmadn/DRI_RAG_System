@@ -34,10 +34,29 @@ data mock & data terstruktur (`kegiatan_data.py`).
   4 metrik struktural deterministik (`eval/metrics.py`): faithfulness (status + arah verdict),
   sitasi grounded, target numerik = kalkulator, JSON valid. **Terverifikasi 15/15 lulus** saat
   kuota tersedia (`python -m eval.run_eval`).
-- **Bakeoff model** (`eval/bakeoff.py`) — kode siap, PACING antar-panggilan sudah ditambah supaya
-  tahan rate-limit RPM, tapi **belum menghasilkan angka yang bisa dipercaya** — dua kali percobaan
-  sama-sama kena kuota harian (TPD) Groq yang sudah habis dari pemakaian sepanjang sesi
-  pengembangan (bukan RPM — jeda tidak membantu, terkonfirmasi via `RateLimitError` langsung).
+- **Bakeoff model** (`eval/bakeoff.py`) — **selesai, hasil bersih & dipercaya** (kuota tersedia,
+  dikonfirmasi bukan artefak rate limit). Kandidat awal `gemma2-9b-it` ternyata sudah
+  **decommissioned** di Groq (400 `model_decommissioned`, dicek via `client.models.list()`) —
+  diganti `openai/gpt-oss-20b`. Tabel hasil:
+
+  | Model | Overall | Grounded | Low_confidence | Avg Latensi |
+  |---|---|---|---|---|
+  | **llama-3.3-70b-versatile** | 100% | 100% | 0/15 | 2.21s |
+  | llama-3.1-8b-instant | 33% | 33% | 10/15 | 39.06s |
+  | openai/gpt-oss-20b | 100% | 100% | 0/15 | 8.70s |
+
+  `llama-3.1-8b-instant` gagal GENUINE (bukan rate limit) — diagnosis langsung ke JSON mentahnya:
+  model ini membeo STRUKTUR skema (menaruh jawaban di dalam `"value"` per-field) alih-alih
+  menghasilkan instance JSON yang sesuai, sehingga `generator.py` gagal parse dan guardrail
+  fallback ke `low_confidence` secara benar di 10/15 kasus.
+
+  **Keputusan model: `llama-3.3-70b-versatile`** (sudah default `.env.example`/`.env`, tak perlu
+  diubah). Alasan: seri dengan `openai/gpt-oss-20b` di keempat metrik struktural (100%), tapi ~4x
+  lebih cepat (2.21s vs 8.70s) — penting utk precheck yang harus responsif, apalagi latensi
+  bertumpuk saat guardrail retry (maks 2x) atau banyak indikator. Sesuai juga ekspektasi arsitektur
+  CLAUDE.md ("model dev: katalog Groq, mis. Llama terbaru"). **Catatan**: kualitas Bahasa Indonesia
+  (LLM-as-judge) belum diukur sama sekali (sengaja ditunda, lihat di bawah) — bukan faktor
+  pembeda keputusan ini; kalau nanti diaktifkan, keputusan model bisa ditinjau ulang.
 
 ## Hardening (Fase 3.3)
 
@@ -63,8 +82,6 @@ tertangani dengan benar setiap kali.
 
 ## Item Tersisa / Ditunda (sengaja, dengan alasan)
 
-- **Bakeoff model dengan kuota segar** — perlu sesi baru di luar jam pemakaian berat hari ini
-  (lihat di atas). Kode & tabel siap pakai begitu kuota reset.
 - **Integrasi RAG asli** — `MockRetriever` masih dipakai (data dummy, `app/retrieval/mock.py`).
   Titik sambung SUDAH disiapkan (`app/api/dependencies.py::get_retriever`) — lihat
   `docs/INTEGRASI_RETRIEVER.md`. Menunggu implementasi dari tim RAG.
