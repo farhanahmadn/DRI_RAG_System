@@ -3,11 +3,20 @@
 > File ini otomatis dibaca Claude Code setiap sesi. Ia memberi konteks arsitektur, batas tanggung jawab, dan aturan main. **Jaga tetap ringkas & akurat.**
 
 ## Apa yang kita bangun
-Komponen **AI Reasoning** untuk sistem pre-check risiko izin bangunan (B2G, Pemda Sleman). Sistem menerima **skor risiko rule-based** + jejak aturannya dari back-end, lalu menghasilkan untuk tiap sub-skor: **reasoning** (penjelasan), **sitasi terverifikasi** dari dokumen regulasi (RAG), dan **rekomendasi** — diakhiri **kesimpulan utama**. Output berupa **JSON** yang di-render tim web.
+Komponen **AI Reasoning** — peran **"L3 Advisory"** — untuk sistem pre-check risiko izin bangunan
+(B2G, Pemda Sleman). Sistem menerima dari back-end (L2) hasil **gate_hukum** (2 tahap: ITBX →
+Intensitas) dan **impact_assessment** (skor dampak tata guna lahan), lalu menghasilkan untuk tiap
+poin: **reasoning** (penjelasan), **sitasi terverifikasi** dari dokumen regulasi (RAG), dan
+**rekomendasi** — DAN men-turunkan **rekomendasi_sistem** kami sendiri secara deterministik (bukan
+dari LLM) — diakhiri **kesimpulan utama**. Output berupa **JSON** yang di-render tim web.
 
 ## Batas tanggung jawab (PENTING)
-- **BUKAN tugas kita:** scoring rule-based, GIS/PostGIS (koordinat→fakta spasial), web/UI/PDF, alur persetujuan admin. Semua ada di tim lain.
-- **Tugas kita:** RAG + reasoning + sitasi + rekomendasi + guardrail + API. Kita **mengonsumsi** jejak aturan, **menghasilkan** payload JSON.
+- **BUKAN tugas kita:** menghitung **gate_hukum**/**impact_assessment** (itu L2/back-end — kita
+  KONSUMSI, tidak menghitung ulang), GIS/PostGIS (koordinat→fakta spasial), web/UI/PDF, alur
+  persetujuan admin. Semua ada di tim lain.
+- **Tugas kita:** RAG + reasoning + sitasi + rekomendasi + **rekomendasi_sistem** (turunan kami
+  sendiri, deterministik) + guardrail + API. Kita **mengonsumsi** gate_hukum & impact_assessment,
+  **menghasilkan** payload JSON.
 
 ## Pembagian kerja (2 dev)
 - **Teman → seluruh RAG:** app/ingest/ (parse, chunk, embed, isi DB) + app/retrieval/retriever.py
@@ -34,14 +43,37 @@ Komponen **AI Reasoning** untuk sistem pre-check risiko izin bangunan (B2G, Pemd
 3. **Deterministik di tempat presisi** — semua ANGKA (skor, target rekomendasi) berasal dari kode/back-end, **BUKAN dari LLM**. LLM hanya membungkus jadi kalimat.
 4. **Neuro-simbolik** — kode untuk angka & fakta; LLM untuk bahasa. Karena itu model lokal menengah cukup.
 
-## Kontrak Input (jejak aturan dari back-end)
-Per indikator: `poin_id, kategori, bobot, skor, kontribusi, nilai_input, ambang, operator, formula, zona, referensi_hukum[], fakta_spasial{in_lp2b, banjir, resapan, jarak_sungai_m, nama_sungai, arah}`.
-- **Target rekomendasi** (mis. `footprint_maks`, `selisih`) idealnya juga dikirim back-end. Jika tidak, hitung dengan satu fungsi deterministik dari nilai yang sudah ada — JANGAN minta LLM menghitung.
-- Reasoning HANYA boleh menyebut fakta spasial yang ADA di `fakta_spasial`.
+## Kontrak Input (gate_hukum + impact_assessment dari back-end/L2)
+**Gate hukum — 2 tahap, short-circuit** (hanya evaluasi tahap 2 kalau tahap 1 lolos):
+1. **Tahap ITBX** — klasifikasi kegiatan di zona (I/T/B/X). Hanya kalau hasilnya **'X'** →
+   **Tidak Lolos**, tahap Intensitas TIDAK dievaluasi.
+2. **Tahap Intensitas** (KDB/KLB/KDH, dst) — dievaluasi kalau ITBX bukan 'X'. Ada pelanggaran
+   intensitas → **Lolos Bersyarat** (bukan Tidak Lolos).
+
+**Impact assessment** — skor dampak berdasar kelas tata guna lahan. **Skor INVERS: TINGGI = dampak
+RENDAH.** JANGAN dibalik saat menyusun reasoning/rekomendasi — cek dulu arah skornya tiap kali dipakai.
+
+**Field-level structure**: lihat `tests/fixtures/l2_sample_lolos.json` &
+`l2_sample_lolos_bersyarat.json` (contoh nyata dari back-end) — JANGAN menebak nama field baru di
+luar yang ada di fixtures/skema.
+
+Reasoning HANYA boleh menyebut fakta yang ADA di payload gate_hukum/impact_assessment yang dikirim.
 
 ## Kontrak Output (JSON ke web)
 `{ ringkasan{skor_total, level, kalimat}, poin[ {poin_id, kategori, status, kontribusi, reasoning_pendek, reasoning_panjang, sitasi[{citation_id, dokumen, pasal, halaman, kutipan, terverifikasi}], rekomendasi{tipe, target, saran, disclaimer}} ], kesimpulan{langkah_berdampak[], catatan_lokasi} }`
-Taksonomi rekomendasi: `numerik` (hitung target) · `kegiatan` (I/T/B/X) · `lokasional` (banjir/resapan/sempadan/LP2B → jelaskan, tak bisa ditweak).
+
+Taksonomi rekomendasi (3 tipe):
+- `kategorikal` — hasil tahap ITBX (lolos/tidak lolos kegiatan di zona).
+- `numerik` — pelanggaran tahap Intensitas (KDB/KLB/KDH dst.), hitung target.
+- `numerik-mitigasi` — dampak tata guna lahan (impact_assessment): mitigasi KDB↓ / KDH↑ / sumur
+  resapan / kolam retensi.
+
+**Caveat wajib:**
+- Fallback ITBX saat kegiatan **tidak ditemukan** di tabel zona → `low_confidence`, JANGAN
+  diasumsikan otomatis sebagai 'X'.
+- Kalau klasifikasi ITBX = 'X', **reason WAJIB membedakan** dua makna: (a) kegiatan **dilarang**
+  eksplisit di zona tsb, vs (b) kegiatan **tidak terdaftar/tidak ditemukan** di tabel zona (ambiguitas
+  data, bukan larangan tegas). Reasoning tidak boleh menyamakan keduanya.
 
 ## Data
 - `Indikator Scoring L2` (rubrik) → definisi indikator (dasar jejak aturan).

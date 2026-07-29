@@ -1,88 +1,103 @@
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from app.schemas import (
-    FaktaSpasial,
-    IndikatorJejak,
-    JejakAturanRequest,
     KesimpulanOutput,
-    OutputPreCheck,
+    L2Assessment,
+    OutputL3,
+    ParameterIntensitas,
     PoinOutput,
     RekomendasiOutput,
-    RingkasanOutput,
+    RingkasanDampakOutput,
+    RingkasanGateOutput,
     SitasiOutput,
 )
 
-
-def test_jejak_aturan_request_valid_lp2b():
-    request = JejakAturanRequest(
-        skor_total=35.0,
-        zona="LP2B",
-        indikator=[
-            IndikatorJejak(
-                poin_id="LP2B-01",
-                kategori="Lokasional",
-                bobot=20.0,
-                skor=20.0,
-                kontribusi=20.0,
-                nilai_input="dalam_lp2b",
-                ambang="tidak_dalam_lp2b",
-                operator="==",
-                formula="in_lp2b == True",
-                zona="LP2B",
-                referensi_hukum=["UU No. 41 Tahun 2009 Pasal 44"],
-                fakta_spasial=FaktaSpasial(in_lp2b=True, banjir=False, resapan=False),
-                target_rekomendasi=None,
-            )
-        ],
-    )
-
-    dumped = request.model_dump()
-    restored = JejakAturanRequest.model_validate(dumped)
-    assert restored == request
-    assert restored.indikator[0].fakta_spasial.in_lp2b is True
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-def test_output_pre_check_valid_roundtrip():
-    output = OutputPreCheck(
-        ringkasan=RingkasanOutput(skor_total=35.0, level="Tinggi", kalimat="Risiko tinggi karena lokasi berada di LP2B."),
+@pytest.mark.parametrize("nama_file", ["l2_sample_lolos.json", "l2_sample_lolos_bersyarat.json"])
+def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
+    payload = json.loads((FIXTURES_DIR / nama_file).read_text(encoding="utf-8"))
+    assessment = L2Assessment.model_validate(payload["data"])
+
+    dumped = assessment.model_dump()
+    restored = L2Assessment.model_validate(dumped)
+    assert restored == assessment
+
+
+def test_l2_assessment_toleran_extra_fields_di_payload_asli():
+    # payload["data"] punya application_id/application_number/timestamp yang TIDAK ada di daftar
+    # field eksplisit kontrak awal, tapi kita sertakan di skema — pastikan tetap valid, bukan diabaikan.
+    payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+    assessment = L2Assessment.model_validate(payload["data"])
+    assert assessment.application_id == 11
+    assert assessment.application_number == "APP-2026-3468"
+
+
+def test_parameter_intensitas_ambang_null_toleran():
+    # KDH cuma punya ambang_min, KDB/KLB cuma ambang_maks — keduanya optional generik.
+    param = ParameterIntensitas(usulan=29.4, ambang_min=0, memenuhi=True, satuan="persen")
+    assert param.ambang_maks is None
+
+
+def test_meta_boleh_absen():
+    payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+    data = dict(payload["data"])
+    data.pop("meta", None)
+    assessment = L2Assessment.model_validate(data)
+    assert assessment.meta is None
+
+
+def test_itbx_status_invalid_raises():
+    payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+    data = json.loads(json.dumps(payload["data"]))
+    data["gate_hukum"]["tahapan"]["itbx"]["status"] = "STATUS_TAK_DIKENAL"
+    with pytest.raises(ValidationError):
+        L2Assessment.model_validate(data)
+
+
+def test_output_l3_roundtrip():
+    output = OutputL3(
+        ringkasan_gate=RingkasanGateOutput(final_gate_status="Lolos Bersyarat", kalimat="Lolos bersyarat karena KDB melampaui ambang."),
+        ringkasan_dampak=RingkasanDampakOutput(impact_category="Sedang", impact_score=65, kalimat="Dampak tata guna lahan tergolong sedang."),
         poin=[
             PoinOutput(
-                poin_id="LP2B-01",
-                kategori="Lokasional",
-                status="melanggar",
-                kontribusi=20.0,
-                reasoning_pendek="Lokasi berada di kawasan LP2B.",
-                reasoning_panjang="Berdasarkan jejak aturan, lokasi terindikasi berada di dalam LP2B sehingga dilarang dialihfungsikan kecuali memenuhi syarat kepentingan umum.",
+                poin_id="intensitas",
+                kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+                status="MELAMPAUI_BATAS",
+                reasoning_pendek="KDB usulan melampaui ambang maksimum.",
+                reasoning_panjang="KDB yang diusulkan 70% melampaui ambang maksimum 60% yang ditetapkan.",
                 sitasi=[
                     SitasiOutput(
                         citation_id="c1",
-                        dokumen="UU No. 41 Tahun 2009",
-                        pasal="44",
-                        halaman=21,
-                        kutipan="Lahan Pertanian Pangan Berkelanjutan yang sudah ditetapkan dilarang dialihfungsikan.",
+                        dokumen="RDTR Sleman",
+                        pasal="Lampiran VI",
+                        halaman=12,
+                        kutipan="KDB maksimum untuk zona perumahan kepadatan sedang adalah 60%.",
                         terverifikasi=True,
                     )
                 ],
-                rekomendasi=RekomendasiOutput(
-                    tipe="lokasional",
-                    target=None,
-                    saran="Ajukan kajian kelayakan strategis bila ingin melanjutkan.",
-                    disclaimer="Keputusan akhir ada pada pemerintah daerah.",
-                ),
+                rekomendasi=RekomendasiOutput(tipe="numerik", target=60.0, saran="Kurangi luas tapak agar KDB tidak melampaui 60%."),
             )
         ],
-        kesimpulan=KesimpulanOutput(
-            langkah_berdampak=["Konsultasi dengan dinas terkait status LP2B."],
-            catatan_lokasi="Lokasi berada di kawasan LP2B Sleman.",
-        ),
+        rekomendasi_sistem="Setuju Bersyarat",
+        kesimpulan=KesimpulanOutput(langkah_berdampak=["Revisi desain agar KDB memenuhi ambang."]),
     )
 
     dumped = output.model_dump()
-    restored = OutputPreCheck.model_validate(dumped)
+    restored = OutputL3.model_validate(dumped)
     assert restored == output
 
 
 def test_rekomendasi_tipe_invalid_raises():
     with pytest.raises(ValidationError):
         RekomendasiOutput(tipe="bukan_tipe_valid", saran="x")
+
+
+def test_rekomendasi_tipe_taksonomi_baru_valid():
+    for tipe in ("kategorikal", "numerik", "numerik-mitigasi"):
+        RekomendasiOutput(tipe=tipe, saran="x")
