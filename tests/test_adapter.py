@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.adapter import _bangun_poin_intensitas, adaptasi, cek_konsistensi_intensitas
+from app.adapter import _bangun_poin_intensitas, _deteksi_fallback_itbx, adaptasi, cek_konsistensi_intensitas
 from app.schemas import L2Assessment
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -77,6 +77,48 @@ class TestFixtureLolosBersyarat:
         assert poin_asli.status == poin_dibalik.status == "MELAMPAUI_BATAS"
 
 
+class TestFixtureTidakLolos:
+    def test_parse_tanpa_error(self):
+        _muat_assessment("l2_sample_tidak_lolos.json")
+
+    def test_intensitas_reason_null_diterima(self):
+        # Back-end kirim intensitas.reason=null saat intensitas BUKAN decisive_stage (gate sudah
+        # short-circuit di ITBX) — schemas.py IntensitasTahap.reason harus nullable utk kasus ini.
+        assessment = _muat_assessment("l2_sample_tidak_lolos.json")
+        assert assessment.gate_hukum.tahapan.intensitas.reason is None
+
+    def test_itbx_x_reason_ambigu_memicu_fallback_heuristik(self):
+        # reason back-end: "Gagal karena kegiatan dilarang (X) atau tidak ditemukan di zona ..."
+        # — teks itu sendiri ambigu antara "dilarang" vs "tidak ditemukan", mengandung kata kunci
+        # "tidak ditemukan" -> heuristik fallback_data_kosong AKTIF (respons yg tepat: lebih baik
+        # menandai perlu kehati-hatian ekstra drpd back-end sendiri tak yakin).
+        assessment = _muat_assessment("l2_sample_tidak_lolos.json")
+        itbx = assessment.gate_hukum.tahapan.itbx
+        assert itbx.status == "X"
+        assert _deteksi_fallback_itbx(itbx.reason) is True
+
+        hasil = adaptasi(assessment)
+        poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
+        assert poin_itbx.fakta["fallback_data_kosong"] is True
+
+    def test_tiga_poin_dengan_status_benar(self):
+        hasil = adaptasi(_muat_assessment("l2_sample_tidak_lolos.json"))
+        poin_by_id = {p.poin_id: p for p in hasil.poin}
+
+        assert poin_by_id["itbx"].status == "X"
+        assert poin_by_id["intensitas"].status == "MEMENUHI_SYARAT"
+        assert poin_by_id["dampak"].status == "Tidak Dinilai"  # impact_assessment.dinilai=False
+
+    def test_rekomendasi_sistem_tidak_setuju(self):
+        hasil = adaptasi(_muat_assessment("l2_sample_tidak_lolos.json"))
+        assert hasil.rekomendasi_sistem == "Tidak Setuju"
+
+    def test_cek_konsistensi_intensitas_tetap_konsisten(self):
+        # ITBX yang menggagalkan gate, tapi intensitas sendiri (MEMENUHI_SYARAT, semua parameter
+        # patuh) tetap konsisten secara internal — cek_konsistensi_intensitas cuma soal intensitas.
+        assert cek_konsistensi_intensitas(_muat_assessment("l2_sample_tidak_lolos.json")) == []
+
+
 class TestCekKonsistensiIntensitas:
     def test_fixture_lolos_konsisten(self):
         assert cek_konsistensi_intensitas(_muat_assessment("l2_sample_lolos.json")) == []
@@ -119,7 +161,9 @@ class TestCekKonsistensiIntensitas:
         assert any("harusnya Lolos Bersyarat" in m for m in masalah)
 
 
-@pytest.mark.parametrize("nama_file", ["l2_sample_lolos.json", "l2_sample_lolos_bersyarat.json"])
+@pytest.mark.parametrize(
+    "nama_file", ["l2_sample_lolos.json", "l2_sample_lolos_bersyarat.json", "l2_sample_tidak_lolos.json"]
+)
 def test_poin_dampak_tidak_dinilai_fallback(nama_file):
     assessment = _muat_assessment(nama_file)
     assessment.impact_assessment.dinilai = False

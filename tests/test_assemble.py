@@ -173,9 +173,9 @@ class TestRakitKesimpulanFallback:
 
 
 class TestJalankanPrecheckEndToEnd:
-    """Mock llm_client.generate (cepat/gratis) + MockRetriever. HANYA 2 fixture nyata yang ada —
-    kasus "Tidak Lolos" DITUNDA sampai fixture asli tersedia (lihat TestRakitKalimatGate utk
-    cakupan cabang teksnya tanpa fabrikasi data)."""
+    """Mock llm_client.generate (cepat/gratis) + MockRetriever. 3 fixture nyata: lolos,
+    lolos_bersyarat, tidak_lolos (fixture tidak_lolos ditambah belakangan — sebelumnya ditunda,
+    lihat riwayat git; TestRakitKalimatGate tetap dipertahankan utk cakupan cabang teks murni)."""
 
     def _stub_llm_generic(self, prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
         if schema_name == "kesimpulan":
@@ -210,6 +210,43 @@ class TestJalankanPrecheckEndToEnd:
         assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju Bersyarat"
         poin_intensitas = next(p for p in output.poin if p.poin_id == "intensitas")
         assert poin_intensitas.status == "MELAMPAUI_BATAS"
+
+    def test_fixture_tidak_lolos_rekomendasi_tak_dihitung_ulang(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_tidak_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        assert output.ringkasan_gate.final_gate_status == "Tidak Lolos"
+        assert output.ringkasan_gate.decisive_stage == "itbx"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Tidak Setuju"
+
+    def test_fixture_tidak_lolos_itbx_x_fallback_dipaksa_low_confidence_dan_caveat(self, monkeypatch):
+        # reason back-end ("dilarang (X) atau tidak ditemukan") ambigu -> heuristik fallback_data_kosong
+        # aktif -> guardrail WAJIB paksa low_confidence + caveat, walau LLM mengembalikan teks bersih.
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_tidak_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        poin_itbx = next(p for p in output.poin if p.poin_id == "itbx")
+        assert poin_itbx.status == "X"
+        assert poin_itbx.low_confidence is True
+        assert "diloloskan otomatis" in poin_itbx.rekomendasi.disclaimer.lower()
+
+    def test_fixture_tidak_lolos_dampak_belum_dinilai(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_tidak_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        assert output.ringkasan_dampak.impact_category is None
+        assert "belum dinilai" in output.ringkasan_dampak.kalimat.lower()
+        poin_dampak = next(p for p in output.poin if p.poin_id == "dampak")
+        assert poin_dampak.status == "Tidak Dinilai"
 
     def test_log_precheck_dipanggil_sekali(self, monkeypatch):
         monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)

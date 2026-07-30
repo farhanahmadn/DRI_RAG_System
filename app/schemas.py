@@ -68,7 +68,9 @@ class IntensitasTahap(BaseModel):
     luas_tapak_m2: float | None = None
     jumlah_lantai: int | None = None
     luas_rth_usulan_m2: float | None = None
-    reason: str
+    # Nullable: back-end kirim null saat intensitas BUKAN decisive_stage (gate sudah short-circuit
+    # di ITBX duluan, lihat tests/fixtures/l2_sample_tidak_lolos.json).
+    reason: str | None = None
     dasar_hukum: list[DasarHukum] = []
 
 
