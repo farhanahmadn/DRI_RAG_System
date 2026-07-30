@@ -3,12 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.adapter import (
-    _bangun_poin_intensitas,
-    _normalisasi_kategori_dampak,
-    adaptasi,
-    cek_konsistensi_intensitas,
-)
+from app.adapter import _bangun_poin_intensitas, adaptasi, cek_konsistensi_intensitas
 from app.schemas import L2Assessment
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -19,18 +14,8 @@ def _muat_assessment(nama_file: str) -> L2Assessment:
     return L2Assessment.model_validate(payload["data"])
 
 
-class TestNormalisasiKategoriDampak:
-    def test_uppercase_ke_title_case(self):
-        assert _normalisasi_kategori_dampak("SEDANG") == "Sedang"
-
-    def test_multi_kata(self):
-        assert _normalisasi_kategori_dampak("SANGAT TINGGI") == "Sangat Tinggi"
-
-    def test_none_tetap_none(self):
-        assert _normalisasi_kategori_dampak(None) is None
-
-    def test_sudah_title_case_idempoten(self):
-        assert _normalisasi_kategori_dampak("Sangat Tinggi") == "Sangat Tinggi"
+# Normalisasi kategori dampak dipindah & diuji di tests/test_calculator.py
+# (app.reasoning.calculator.normalisasi_kategori_dampak) — adapter.py sekarang cuma memakainya.
 
 
 class TestFixtureLolos:

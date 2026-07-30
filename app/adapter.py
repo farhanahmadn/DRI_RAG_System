@@ -4,13 +4,13 @@ Murni transformasi data deterministik — tidak ada LLM/RAG di sini (itu tugas g
 berikutnya). Lihat CLAUDE.md § Kontrak Input untuk kontrak gate_hukum/impact_assessment.
 """
 
+from app.reasoning.calculator import (
+    hitung_target_intensitas,
+    normalisasi_kategori_dampak,
+    sarankan_arah_mitigasi_dampak,
+)
 from app.reasoning.rekomendasi import turunkan_rekomendasi
 from app.schemas import AdapterResult, L2Assessment, PoinKonteks
-
-
-def _normalisasi_kategori_dampak(raw: str | None) -> str | None:
-    """"SEDANG" -> "Sedang", "SANGAT TINGGI" -> "Sangat Tinggi", None -> None."""
-    return raw.strip().title() if raw else None
 
 
 def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
@@ -61,6 +61,9 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
             "luas_tapak_m2": intensitas.luas_tapak_m2,
             "jumlah_lantai": intensitas.jumlah_lantai,
             "luas_rth_usulan_m2": intensitas.luas_rth_usulan_m2,
+            # Angka target PATUH (mis. footprint_maks_m2) — dihitung app/reasoning/calculator.py,
+            # dict kosong kalau semua parameter patuh. Tidak mengubah `status` di atas.
+            "target": hitung_target_intensitas(intensitas, assessment.lokasi.luas_lahan_m2),
         },
         dasar_hukum=intensitas.dasar_hukum,
     )
@@ -68,7 +71,7 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
 
 def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
     impact = assessment.impact_assessment
-    kategori_dampak = _normalisasi_kategori_dampak(impact.impact_category)
+    kategori_dampak = normalisasi_kategori_dampak(impact.impact_category)
     return PoinKonteks(
         poin_id="dampak",
         kategori="Dampak Tata Guna Lahan",
@@ -86,6 +89,8 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "c_coefficients": impact.c_coefficients,
             "data_confidence": impact.data_confidence,
             "limitations": impact.limitations,
+            # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
+            "mitigasi": sarankan_arah_mitigasi_dampak(impact),
         },
         dasar_hukum=[],
     )
@@ -94,7 +99,7 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
 def adaptasi(assessment: L2Assessment) -> AdapterResult:
     # final_gate_status dikonsumsi APA ADANYA (ground truth back-end) — tidak diturunkan ulang dari
     # status/parameter tahap-tahap di bawahnya.
-    kategori_dampak = _normalisasi_kategori_dampak(assessment.impact_assessment.impact_category)
+    kategori_dampak = normalisasi_kategori_dampak(assessment.impact_assessment.impact_category)
     rekomendasi_sistem = turunkan_rekomendasi(assessment.gate_hukum.final_gate_status, kategori_dampak)
     return AdapterResult(
         poin=[
