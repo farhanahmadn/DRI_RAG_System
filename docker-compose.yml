@@ -1,0 +1,30 @@
+# Postgres 16 + pgvector untuk RAG/retrieval RDTR Sleman (dev lokal).
+# Jalankan:  docker compose up -d
+# Cek siap:  docker compose ps   (kolom STATUS -> healthy)
+# Masuk psql: docker compose exec db psql -U rdtr -d rdtr
+# schema.sql otomatis diterapkan SEKALI saat volume kosong (initdb).
+# Kalau ubah schema.sql setelah DB pernah jalan: `docker compose down -v` lalu up lagi,
+# ATAU terapkan manual (lihat sql/apply.md).
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rdtr_pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rdtr
+      POSTGRES_PASSWORD: rdtr
+      POSTGRES_DB: rdtr
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rdtr -d rdtr"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  pgdata:

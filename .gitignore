@@ -40,3 +40,6 @@ logs/
 
 # Data mentah besar (PDF regulasi, 100+MB) — jangan pernah di-track
 data/raw/
+
+# Claude Code local state
+.claude/

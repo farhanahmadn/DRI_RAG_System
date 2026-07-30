@@ -1,0 +1,41 @@
+[
+  {
+    "dokumen_id": "rdtr-sleman-barat",
+    "nama": "Peraturan Bupati Sleman Nomor 57 Tahun 2021 tentang RDTR Kawasan Sleman Barat Tahun 2021-2041",
+    "jenis": "RDTR",
+    "tanggal_berlaku": "2021-12-29",
+    "tanggal_dicabut": null,
+    "aliases": [
+      "RDTR Sleman Barat",
+      "RDTR Kawasan Sleman Barat",
+      "Perbup Sleman 57/2021",
+      "Peraturan Bupati Sleman Nomor 57 Tahun 2021"
+    ]
+  },
+  {
+    "dokumen_id": "rdtr-sleman-tengah",
+    "nama": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+    "jenis": "RDTR",
+    "tanggal_berlaku": "2023-12-21",
+    "tanggal_dicabut": null,
+    "aliases": [
+      "RDTR Sleman Tengah",
+      "RDTR Kawasan Sleman Tengah",
+      "Perbup Sleman 80/2023",
+      "Peraturan Bupati Sleman Nomor 80 Tahun 2023"
+    ]
+  },
+  {
+    "dokumen_id": "rdtr-sleman-timur",
+    "nama": "Peraturan Bupati Sleman Nomor 3 Tahun 2021 tentang RDTR Kawasan Sleman Timur Tahun 2021-2040",
+    "jenis": "RDTR",
+    "tanggal_berlaku": "2021-01-15",
+    "tanggal_dicabut": null,
+    "aliases": [
+      "RDTR Sleman Timur",
+      "RDTR Kawasan Sleman Timur",
+      "Perbup Sleman 3/2021",
+      "Peraturan Bupati Sleman Nomor 3 Tahun 2021"
+    ]
+  }
+]

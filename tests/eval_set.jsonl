@@ -1,0 +1,22 @@
+{"query": "Lokasional LP2B", "relevan": ["rdtr-sleman-tengah-p49-a2", "rdtr-sleman-tengah-p49-a1", "rdtr-sleman-tengah-p25-a2"], "catatan": "ketentuan khusus LP2B + sub-zona P-1 LP2B"}
+{"query": "LP2B lahan pertanian pangan berkelanjutan", "relevan": ["rdtr-sleman-tengah-p49-a2", "rdtr-sleman-tengah-p49-a1"], "catatan": "ketentuan khusus LP2B"}
+{"query": "alih fungsi lahan pertanian", "relevan": ["rdtr-sleman-tengah-p49-a2", "rdtr-sleman-tengah-p25-a2"], "catatan": "LP2B"}
+{"query": "KDB", "relevan": ["rdtr-sleman-tengah-p1-a117", "rdtr-sleman-tengah-p61-a4"], "catatan": "definisi KDB + provisi intensitas"}
+{"query": "Koefisien Dasar Bangunan", "relevan": ["rdtr-sleman-tengah-p1-a117"], "catatan": "definisi KDB"}
+{"query": "KLB", "relevan": ["rdtr-sleman-tengah-p1-a119", "rdtr-sleman-tengah-p61-a4"], "catatan": "definisi KLB + intensitas"}
+{"query": "Koefisien Lantai Bangunan", "relevan": ["rdtr-sleman-tengah-p1-a119"], "catatan": "definisi KLB"}
+{"query": "KDH koefisien daerah hijau", "relevan": ["rdtr-sleman-tengah-p1-a118"], "catatan": "definisi KDH"}
+{"query": "intensitas pemanfaatan ruang", "relevan": ["rdtr-sleman-tengah-p61-a4", "rdtr-sleman-tengah-vi-c-1"], "catatan": "provisi intensitas + ringkasan Lampiran VI"}
+{"query": "ketentuan intensitas bangunan zona C-1", "relevan": ["rdtr-sleman-tengah-vi-c-1", "rdtr-sleman-tengah-p61-a4"], "catatan": "Lampiran VI ringkasan intensitas C-1 (tabel-chunk)"}
+{"query": "Sempadan Sungai", "relevan": ["rdtr-sleman-tengah-p1-a75", "rdtr-sleman-tengah-vb-ps"], "catatan": "Zona Perlindungan Setempat (PS) = sempadan"}
+{"query": "Perlindungan Setempat", "relevan": ["rdtr-sleman-tengah-p1-a75"], "catatan": "definisi zona PS"}
+{"query": "GSB garis sempadan bangunan", "relevan": ["rdtr-sleman-tengah-p1-a121"], "catatan": "definisi GSB"}
+{"query": "Resapan", "relevan": ["rdtr-sleman-tengah-p53", "rdtr-sleman-tengah-p53-a2", "rdtr-sleman-tengah-p53-a3"], "catatan": "ketentuan khusus kawasan resapan air"}
+{"query": "kawasan resapan air", "relevan": ["rdtr-sleman-tengah-p53", "rdtr-sleman-tengah-p53-a2"], "catatan": "ketentuan khusus resapan"}
+{"query": "Kegiatan", "relevan": ["rdtr-sleman-tengah-p43-a1", "rdtr-sleman-tengah-vb-kpi", "rdtr-sleman-tengah-vb-ps"], "catatan": "ketentuan kegiatan (ITBX) + syarat T/B Lampiran V.B"}
+{"query": "ketentuan kegiatan dan penggunaan lahan ITBX", "relevan": ["rdtr-sleman-tengah-p43-a1"], "catatan": "pasal ketentuan kegiatan"}
+{"query": "syarat kegiatan terbatas bersyarat zona perlindungan setempat", "relevan": ["rdtr-sleman-tengah-vb-ps"], "catatan": "Lampiran V.B syarat T/B zona PS (tabel-chunk)"}
+{"query": "Ketentuan Khusus", "relevan": ["rdtr-sleman-tengah-p47", "rdtr-sleman-tengah-p49", "rdtr-sleman-tengah-p53"], "catatan": "penetapan ketentuan khusus + turunannya"}
+{"query": "Banjir", "relevan": ["rdtr-sleman-tengah-p50-a9", "rdtr-sleman-tengah-p50-a8", "rdtr-sleman-tengah-p50-a7"], "catatan": "ketentuan khusus rawan bencana banjir lahar"}
+{"query": "rawan bencana banjir lahar", "relevan": ["rdtr-sleman-tengah-p50-a9", "rdtr-sleman-tengah-p50-a8"], "catatan": "rawan bencana"}
+{"query": "Peraturan Zonasi", "relevan": ["rdtr-sleman-tengah-p1-a116", "rdtr-sleman-tengah-p42"], "catatan": "definisi + pasal peraturan zonasi"}
