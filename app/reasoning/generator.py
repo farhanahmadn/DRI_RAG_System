@@ -51,7 +51,7 @@ def ambil_chunks_pendukung(
     return chunks
 
 
-def _apakah_aman(poin: PoinKonteks) -> bool:
+def apakah_aman(poin: PoinKonteks) -> bool:
     """Poin jelas aman/lolos -> boleh template tanpa LLM (hemat kuota). REUSE fakta yang sudah
     dihitung adapter/calculator, tidak menurunkan ulang di sini.
     """
@@ -79,7 +79,7 @@ def generate_poin(
     temperature: float = 0.0,
 ) -> PoinOutput:
     """Hasilkan PoinOutput untuk satu poin. Poin jelas aman -> template (tanpa retrieval/LLM)."""
-    if _apakah_aman(poin):
+    if apakah_aman(poin):
         return template_aman(poin)
 
     chunks = ambil_chunks_pendukung(poin, retriever, top_k_dukungan)

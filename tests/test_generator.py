@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from app.adapter import adaptasi
 from app.reasoning import llm_client as llm_client_module
-from app.reasoning.generator import _apakah_aman, generate_poin
+from app.reasoning.generator import apakah_aman, generate_poin
 from app.reasoning.templates import template_aman
 from app.retrieval.mock import MockRetriever
 from app.schemas import L2Assessment, PoinKonteks
@@ -48,18 +48,18 @@ class _RetrieverYangMelarangDipanggil:
 
 class TestApakahAman:
     def test_itbx_aman(self):
-        assert _apakah_aman(_poin(status="I", fakta={"lolos": True, "reason": "x"})) is True
+        assert apakah_aman(_poin(status="I", fakta={"lolos": True, "reason": "x"})) is True
 
     def test_itbx_tidak_aman_karena_bukan_i(self):
-        assert _apakah_aman(_poin(status="B", fakta={"lolos": True, "reason": "x"})) is False
+        assert apakah_aman(_poin(status="B", fakta={"lolos": True, "reason": "x"})) is False
 
     def test_itbx_tidak_aman_karena_fallback(self):
         poin = _poin(status="I", fakta={"lolos": True, "reason": "x", "fallback_data_kosong": True})
-        assert _apakah_aman(poin) is False
+        assert apakah_aman(poin) is False
 
     def test_intensitas_aman_tanpa_target(self):
         poin = _poin(poin_id="intensitas", tipe_rekomendasi="numerik", status="MEMENUHI_SYARAT", fakta={"target": {}})
-        assert _apakah_aman(poin) is True
+        assert apakah_aman(poin) is True
 
     def test_intensitas_tidak_aman_dengan_target(self):
         poin = _poin(
@@ -68,7 +68,7 @@ class TestApakahAman:
             status="MELAMPAUI_BATAS",
             fakta={"target": {"kdb": {"target_kdb": 60.0}}},
         )
-        assert _apakah_aman(poin) is False
+        assert apakah_aman(poin) is False
 
     def test_dampak_aman_tanpa_mitigasi(self):
         poin = _poin(
@@ -77,7 +77,7 @@ class TestApakahAman:
             status="Sedang",
             fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}},
         )
-        assert _apakah_aman(poin) is True
+        assert apakah_aman(poin) is True
 
     def test_dampak_tidak_aman_dengan_mitigasi(self):
         poin = _poin(
@@ -86,7 +86,7 @@ class TestApakahAman:
             status="Tinggi",
             fakta={"mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]}},
         )
-        assert _apakah_aman(poin) is False
+        assert apakah_aman(poin) is False
 
 
 def test_generate_poin_aman_pakai_template_tanpa_retrieval_atau_llm(monkeypatch):
