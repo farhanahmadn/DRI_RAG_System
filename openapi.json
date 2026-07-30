@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "RDTR Sleman — AI Reasoning",
-    "description": "Komponen AI Reasoning untuk pre-check risiko izin bangunan Kabupaten Sleman: menerima jejak aturan rule-based, menghasilkan reasoning, sitasi terverifikasi, rekomendasi, dan kesimpulan sebagai JSON.",
-    "version": "0.1.0"
+    "title": "RDTR Sleman — AI Reasoning (L3 Advisory)",
+    "description": "Komponen AI Reasoning untuk pre-check risiko izin bangunan Kabupaten Sleman: menerima gate_hukum + impact_assessment dari back-end (L2), menghasilkan reasoning, sitasi terverifikasi, rekomendasi, rekomendasi_sistem, dan kesimpulan sebagai JSON.",
+    "version": "0.2.0"
   },
   "paths": {
     "/health": {
@@ -34,7 +34,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JejakAturanRequest"
+                "$ref": "#/components/schemas/L2Assessment"
               }
             }
           },
@@ -46,7 +46,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OutputPreCheck"
+                  "$ref": "#/components/schemas/OutputL3"
                 }
               }
             }
@@ -67,104 +67,93 @@
   },
   "components": {
     "schemas": {
-      "FaktaSpasial": {
+      "DasarHukum": {
         "properties": {
-          "in_lp2b": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "In Lp2B"
+          "dokumen": {
+            "type": "string",
+            "title": "Dokumen"
           },
-          "banjir": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Banjir"
+          "pasal": {
+            "type": "string",
+            "title": "Pasal"
           },
-          "tingkat_banjir": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "Tinggi",
-                  "Sedang",
-                  "Rendah"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tingkat Banjir"
-          },
-          "resapan": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resapan"
-          },
-          "in_sempadan": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "In Sempadan"
-          },
-          "jarak_sungai_m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Jarak Sungai M"
-          },
-          "nama_sungai": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nama Sungai"
-          },
-          "arah": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Arah"
+          "kutipan": {
+            "type": "string",
+            "title": "Kutipan"
           }
         },
         "type": "object",
-        "title": "FaktaSpasial"
+        "required": [
+          "dokumen",
+          "pasal",
+          "kutipan"
+        ],
+        "title": "DasarHukum"
+      },
+      "GateHukum": {
+        "properties": {
+          "final_gate_status": {
+            "type": "string",
+            "enum": [
+              "Lolos",
+              "Lolos Bersyarat",
+              "Tidak Lolos"
+            ],
+            "title": "Final Gate Status"
+          },
+          "rekomendasi_sistem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rekomendasi Sistem"
+          },
+          "decisive_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisive Stage"
+          },
+          "tahapan": {
+            "$ref": "#/components/schemas/Tahapan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final_gate_status",
+          "tahapan"
+        ],
+        "title": "GateHukum"
+      },
+      "GeoJSONPoint": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "coordinates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Coordinates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "GeoJSONPoint"
       },
       "HTTPValidationError": {
         "properties": {
@@ -179,70 +168,13 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "IndikatorJejak": {
+      "ImpactAssessment": {
         "properties": {
-          "poin_id": {
-            "type": "string",
-            "title": "Poin Id"
+          "dinilai": {
+            "type": "boolean",
+            "title": "Dinilai"
           },
-          "kategori": {
-            "type": "string",
-            "title": "Kategori"
-          },
-          "bobot": {
-            "type": "number",
-            "title": "Bobot"
-          },
-          "skor": {
-            "type": "number",
-            "title": "Skor"
-          },
-          "kontribusi": {
-            "type": "number",
-            "title": "Kontribusi"
-          },
-          "nilai_input": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Nilai Input"
-          },
-          "ambang": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Ambang"
-          },
-          "operator": {
-            "type": "string",
-            "title": "Operator"
-          },
-          "formula": {
-            "type": "string",
-            "title": "Formula"
-          },
-          "zona": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Zona"
-          },
-          "luas_lahan": {
+          "c_before": {
             "anyOf": [
               {
                 "type": "number"
@@ -251,27 +183,90 @@
                 "type": "null"
               }
             ],
-            "title": "Luas Lahan"
+            "title": "C Before"
           },
-          "referensi_hukum": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Referensi Hukum",
-            "default": []
-          },
-          "fakta_spasial": {
+          "c_after": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FaktaSpasial"
+                "type": "number"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "C After"
           },
-          "target_rekomendasi": {
+          "runoff_change_index": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runoff Change Index"
+          },
+          "impact_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact Score"
+          },
+          "impact_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact Category"
+          },
+          "calculation_details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculation Details"
+          },
+          "threshold_bands": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Bands"
+          },
+          "existing_surface_details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Surface Details"
+          },
+          "proposed_surface_details": {
             "anyOf": [
               {
                 "additionalProperties": {
@@ -283,30 +278,117 @@
                 "type": "null"
               }
             ],
-            "title": "Target Rekomendasi"
+            "title": "Proposed Surface Details"
+          },
+          "c_coefficients": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "C Coefficients"
+          },
+          "luas_lahan_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Lahan M2"
+          },
+          "data_confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Confidence"
+          },
+          "limitations": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitations"
           }
         },
         "type": "object",
         "required": [
-          "poin_id",
-          "kategori",
-          "bobot",
-          "skor",
-          "kontribusi",
-          "nilai_input",
-          "ambang",
-          "operator",
-          "formula"
+          "dinilai"
         ],
-        "title": "IndikatorJejak"
+        "title": "ImpactAssessment"
       },
-      "JejakAturanRequest": {
+      "IntensitasTahap": {
         "properties": {
-          "skor_total": {
-            "type": "number",
-            "title": "Skor Total"
+          "status": {
+            "type": "string",
+            "enum": [
+              "MEMENUHI_SYARAT",
+              "MELAMPAUI_BATAS"
+            ],
+            "title": "Status"
           },
-          "level": {
+          "lolos": {
+            "type": "boolean",
+            "title": "Lolos"
+          },
+          "parameter": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ParameterIntensitas"
+            },
+            "type": "object",
+            "title": "Parameter"
+          },
+          "luas_tapak_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Tapak M2"
+          },
+          "jumlah_lantai": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jumlah Lantai"
+          },
+          "luas_rth_usulan_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Rth Usulan M2"
+          },
+          "reason": {
             "anyOf": [
               {
                 "type": "string"
@@ -315,33 +397,124 @@
                 "type": "null"
               }
             ],
-            "title": "Level"
+            "title": "Reason"
           },
-          "zona": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Zona"
-          },
-          "indikator": {
+          "dasar_hukum": {
             "items": {
-              "$ref": "#/components/schemas/IndikatorJejak"
+              "$ref": "#/components/schemas/DasarHukum"
             },
             "type": "array",
-            "title": "Indikator"
+            "title": "Dasar Hukum",
+            "default": []
           }
         },
         "type": "object",
         "required": [
-          "skor_total",
-          "indikator"
+          "status",
+          "lolos",
+          "parameter"
         ],
-        "title": "JejakAturanRequest"
+        "title": "IntensitasTahap"
+      },
+      "ItbxTahap": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "I",
+              "T",
+              "B",
+              "TB",
+              "X"
+            ],
+            "title": "Status"
+          },
+          "lolos": {
+            "type": "boolean",
+            "title": "Lolos"
+          },
+          "kbli_diusulkan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kbli Diusulkan"
+          },
+          "kegiatan_diusulkan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kegiatan Diusulkan"
+          },
+          "kegiatan_diizinkan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Diizinkan",
+            "default": []
+          },
+          "kegiatan_terbatas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Terbatas",
+            "default": []
+          },
+          "kegiatan_bersyarat": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Bersyarat",
+            "default": []
+          },
+          "kegiatan_terbatas_bersyarat": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Terbatas Bersyarat",
+            "default": []
+          },
+          "keterangan_ketentuan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keterangan Ketentuan",
+            "default": []
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "dasar_hukum": {
+            "items": {
+              "$ref": "#/components/schemas/DasarHukum"
+            },
+            "type": "array",
+            "title": "Dasar Hukum",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "lolos",
+          "reason"
+        ],
+        "title": "ItbxTahap"
       },
       "KesimpulanOutput": {
         "properties": {
@@ -370,10 +543,151 @@
         ],
         "title": "KesimpulanOutput"
       },
-      "OutputPreCheck": {
+      "Koordinat": {
         "properties": {
-          "ringkasan": {
-            "$ref": "#/components/schemas/RingkasanOutput"
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "title": "Koordinat"
+      },
+      "L2Assessment": {
+        "properties": {
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "application_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Number"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "lokasi": {
+            "$ref": "#/components/schemas/Lokasi"
+          },
+          "gate_hukum": {
+            "$ref": "#/components/schemas/GateHukum"
+          },
+          "impact_assessment": {
+            "$ref": "#/components/schemas/ImpactAssessment"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetaL2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "lokasi",
+          "gate_hukum",
+          "impact_assessment"
+        ],
+        "title": "L2Assessment"
+      },
+      "Lokasi": {
+        "properties": {
+          "koordinat": {
+            "$ref": "#/components/schemas/Koordinat"
+          },
+          "geojson": {
+            "$ref": "#/components/schemas/GeoJSONPoint"
+          },
+          "rdtr_zone": {
+            "type": "string",
+            "title": "Rdtr Zone"
+          },
+          "luas_lahan_m2": {
+            "type": "number",
+            "title": "Luas Lahan M2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "koordinat",
+          "geojson",
+          "rdtr_zone",
+          "luas_lahan_m2"
+        ],
+        "title": "Lokasi"
+      },
+      "MetaL2": {
+        "properties": {
+          "data_confidence_keseluruhan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Confidence Keseluruhan"
+          },
+          "caveats": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caveats"
+          }
+        },
+        "type": "object",
+        "title": "MetaL2"
+      },
+      "OutputL3": {
+        "properties": {
+          "ringkasan_gate": {
+            "$ref": "#/components/schemas/RingkasanGateOutput"
+          },
+          "ringkasan_dampak": {
+            "$ref": "#/components/schemas/RingkasanDampakOutput"
           },
           "poin": {
             "items": {
@@ -382,17 +696,68 @@
             "type": "array",
             "title": "Poin"
           },
+          "rekomendasi_sistem": {
+            "type": "string",
+            "title": "Rekomendasi Sistem"
+          },
           "kesimpulan": {
             "$ref": "#/components/schemas/KesimpulanOutput"
           }
         },
         "type": "object",
         "required": [
-          "ringkasan",
+          "ringkasan_gate",
+          "ringkasan_dampak",
           "poin",
+          "rekomendasi_sistem",
           "kesimpulan"
         ],
-        "title": "OutputPreCheck"
+        "title": "OutputL3"
+      },
+      "ParameterIntensitas": {
+        "properties": {
+          "usulan": {
+            "type": "number",
+            "title": "Usulan"
+          },
+          "ambang_maks": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ambang Maks"
+          },
+          "ambang_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ambang Min"
+          },
+          "memenuhi": {
+            "type": "boolean",
+            "title": "Memenuhi"
+          },
+          "satuan": {
+            "type": "string",
+            "title": "Satuan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usulan",
+          "memenuhi",
+          "satuan"
+        ],
+        "title": "ParameterIntensitas"
       },
       "PoinOutput": {
         "properties": {
@@ -407,10 +772,6 @@
           "status": {
             "type": "string",
             "title": "Status"
-          },
-          "kontribusi": {
-            "type": "number",
-            "title": "Kontribusi"
           },
           "reasoning_pendek": {
             "type": "string",
@@ -441,7 +802,6 @@
           "poin_id",
           "kategori",
           "status",
-          "kontribusi",
           "reasoning_pendek",
           "reasoning_panjang",
           "sitasi",
@@ -454,9 +814,9 @@
           "tipe": {
             "type": "string",
             "enum": [
+              "kategorikal",
               "numerik",
-              "kegiatan",
-              "lokasional"
+              "numerik-mitigasi"
             ],
             "title": "Tipe"
           },
@@ -497,15 +857,29 @@
         ],
         "title": "RekomendasiOutput"
       },
-      "RingkasanOutput": {
+      "RingkasanDampakOutput": {
         "properties": {
-          "skor_total": {
-            "type": "number",
-            "title": "Skor Total"
+          "impact_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact Category"
           },
-          "level": {
-            "type": "string",
-            "title": "Level"
+          "impact_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact Score"
           },
           "kalimat": {
             "type": "string",
@@ -514,11 +888,43 @@
         },
         "type": "object",
         "required": [
-          "skor_total",
-          "level",
           "kalimat"
         ],
-        "title": "RingkasanOutput"
+        "title": "RingkasanDampakOutput"
+      },
+      "RingkasanGateOutput": {
+        "properties": {
+          "final_gate_status": {
+            "type": "string",
+            "enum": [
+              "Lolos",
+              "Lolos Bersyarat",
+              "Tidak Lolos"
+            ],
+            "title": "Final Gate Status"
+          },
+          "decisive_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisive Stage"
+          },
+          "kalimat": {
+            "type": "string",
+            "title": "Kalimat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final_gate_status",
+          "kalimat"
+        ],
+        "title": "RingkasanGateOutput"
       },
       "SitasiOutput": {
         "properties": {
@@ -557,6 +963,22 @@
           "terverifikasi"
         ],
         "title": "SitasiOutput"
+      },
+      "Tahapan": {
+        "properties": {
+          "itbx": {
+            "$ref": "#/components/schemas/ItbxTahap"
+          },
+          "intensitas": {
+            "$ref": "#/components/schemas/IntensitasTahap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itbx",
+          "intensitas"
+        ],
+        "title": "Tahapan"
       },
       "ValidationError": {
         "properties": {

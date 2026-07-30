@@ -13,18 +13,18 @@ from app.api.dependencies import get_retriever
 from app.api.rate_limit import cek_rate_limit
 from app.reasoning.assemble import jalankan_precheck
 from app.retrieval.base import Retriever
-from app.schemas import JejakAturanRequest, OutputPreCheck
+from app.schemas import L2Assessment, OutputL3
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="RDTR Sleman — AI Reasoning",
+    title="RDTR Sleman — AI Reasoning (L3 Advisory)",
     description=(
         "Komponen AI Reasoning untuk pre-check risiko izin bangunan Kabupaten Sleman: menerima "
-        "jejak aturan rule-based, menghasilkan reasoning, sitasi terverifikasi, rekomendasi, dan "
-        "kesimpulan sebagai JSON."
+        "gate_hukum + impact_assessment dari back-end (L2), menghasilkan reasoning, sitasi "
+        "terverifikasi, rekomendasi, rekomendasi_sistem, dan kesimpulan sebagai JSON."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
 
 
@@ -33,11 +33,11 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/reasoning", response_model=OutputPreCheck, dependencies=[Depends(cek_rate_limit)])
+@app.post("/reasoning", response_model=OutputL3, dependencies=[Depends(cek_rate_limit)])
 def reasoning(
-    request: JejakAturanRequest,
+    request: L2Assessment,
     retriever: Retriever = Depends(get_retriever),
-) -> OutputPreCheck:
+) -> OutputL3:
     return jalankan_precheck(request, retriever)
 
 

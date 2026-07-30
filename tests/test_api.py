@@ -1,3 +1,7 @@
+import copy
+import json
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,13 +11,16 @@ from app.api.main import app
 from app.api.rate_limit import _LIMIT, reset_rate_limiter
 from app.schemas import (
     KesimpulanOutput,
-    OutputPreCheck,
+    OutputL3,
     PoinOutput,
     RekomendasiOutput,
-    RingkasanOutput,
+    RingkasanDampakOutput,
+    RingkasanGateOutput,
 )
 
 client = TestClient(app, raise_server_exceptions=False)
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture(autouse=True)
@@ -25,45 +32,29 @@ def _bersihkan_rate_limiter():
     reset_rate_limiter()
 
 
-def _output_kanonik() -> OutputPreCheck:
-    return OutputPreCheck(
-        ringkasan=RingkasanOutput(skor_total=20.0, level="Tinggi", kalimat="kalimat ringkasan"),
+def _request_body() -> dict:
+    payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+    return copy.deepcopy(payload["data"])
+
+
+def _output_kanonik() -> OutputL3:
+    return OutputL3(
+        ringkasan_gate=RingkasanGateOutput(final_gate_status="Lolos", decisive_stage=None, kalimat="kalimat gate"),
+        ringkasan_dampak=RingkasanDampakOutput(impact_category="Sedang", impact_score=65, kalimat="kalimat dampak"),
         poin=[
             PoinOutput(
-                poin_id="LP2B-01",
-                kategori="Lokasional LP2B",
-                status="Tidak Aman",
-                kontribusi=20.0,
+                poin_id="itbx",
+                kategori="Klasifikasi Kegiatan (ITBX)",
+                status="I",
                 reasoning_pendek="pendek",
                 reasoning_panjang="panjang",
                 sitasi=[],
-                rekomendasi=RekomendasiOutput(tipe="lokasional", target=None, saran="saran", disclaimer=None),
+                rekomendasi=RekomendasiOutput(tipe="kategorikal", target=None, saran="saran", disclaimer=None),
             )
         ],
+        rekomendasi_sistem="Setuju",
         kesimpulan=KesimpulanOutput(langkah_berdampak=["a"], catatan_lokasi="catatan"),
     )
-
-
-def _request_body() -> dict:
-    return {
-        "skor_total": 20.0,
-        "level": "Tinggi",
-        "zona": "LP2B",
-        "indikator": [
-            {
-                "poin_id": "LP2B-01",
-                "kategori": "Lokasional LP2B",
-                "bobot": 20.0,
-                "skor": 100.0,
-                "kontribusi": 20.0,
-                "nilai_input": "dalam_lp2b",
-                "ambang": "tidak_dalam_lp2b",
-                "operator": "==",
-                "formula": "in_lp2b == True",
-                "referensi_hukum": ["UU No. 41 Tahun 2009 Pasal 44"],
-            }
-        ],
-    }
 
 
 def test_health_returns_ok():
@@ -84,7 +75,7 @@ def test_reasoning_happy_path_mock(monkeypatch):
 
 def test_reasoning_input_buruk_422():
     body = _request_body()
-    del body["indikator"]
+    del body["gate_hukum"]
 
     response = client.post("/reasoning", json=body)
 
