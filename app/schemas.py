@@ -172,6 +172,7 @@ class PoinOutput(BaseModel):
 
 class RingkasanGateOutput(BaseModel):
     final_gate_status: Literal["Lolos", "Lolos Bersyarat", "Tidak Lolos"]
+    decisive_stage: str | None = None
     kalimat: str
 
 

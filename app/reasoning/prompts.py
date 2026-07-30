@@ -6,7 +6,7 @@ membungkusnya jadi Bahasa Indonesia yang jelas. LLM TIDAK PERNAH menyimpulkan ve
 """
 
 from app.retrieval.base import Chunk
-from app.schemas import DasarHukum, MetaL2, PoinKonteks
+from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput
 
 SYSTEM_PROMPT = """Anda adalah asisten reasoning untuk sistem pre-check risiko izin bangunan Kabupaten Sleman.
 
@@ -196,6 +196,44 @@ def build_user_prompt(
         "Jelaskan poin ini berdasarkan fakta dan pasal di atas, dalam Bahasa Indonesia yang jelas "
         "untuk warga awam. Berikan reasoning_pendek (1-2 kalimat), reasoning_panjang (paragraf "
         "lengkap), sitasi (rujuk citation_id di atas saja), dan saran tindak lanjut."
+    )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Sintesis kesimpulan — SATU panggilan per precheck (bukan per-poin), lihat assemble.py.
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT_KESIMPULAN = """Anda merangkum hasil pre-check izin bangunan Kabupaten Sleman menjadi kesimpulan akhir.
+
+ATURAN WAJIB (jangan dilanggar):
+1. Ringkasan per-poin di bawah SUDAH FINAL (status, reasoning, saran) — tugas Anda HANYA merangkum jadi langkah_berdampak (daftar langkah konkret untuk pemohon) dan catatan_lokasi (satu kalimat kalau relevan, atau null kalau tidak ada). JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
+2. langkah_berdampak HARUS dirangkai/diringkas dari saran per-poin yang diberikan — JANGAN menambah langkah yang tidak berdasar pada poin manapun.
+3. JANGAN menyebutkan angka apa pun (skor, target, dsb) di langkah_berdampak atau catatan_lokasi.
+4. Tulis dalam Bahasa Indonesia yang jelas dan ringkas untuk warga awam.
+
+Balas HANYA dalam format JSON sesuai skema yang diberikan."""
+
+
+def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> str:
+    """Susun prompt sintesis kesimpulan — HANYA dari ringkasan per-poin yang sudah lolos guardrail,
+    TIDAK ada fakta mentah/angka (poin ini sudah bebas angka per SYSTEM_PROMPT aturan #8).
+    """
+    lines: list[str] = []
+    lines.append("## Ringkasan Per-Poin (SUDAH FINAL — jangan dihitung ulang)")
+    lines.append(f"rekomendasi_sistem keseluruhan: {rekomendasi_sistem}")
+    lines.append("")
+    for poin in poin_list:
+        lines.append(f"- [{poin.poin_id}] status={poin.status}, low_confidence={poin.low_confidence}")
+        lines.append(f"  reasoning: {poin.reasoning_pendek}")
+        lines.append(f"  saran: {poin.rekomendasi.saran}")
+
+    lines.append("")
+    lines.append(
+        "## Tugas\n"
+        "Rangkum ringkasan per-poin di atas menjadi langkah_berdampak (daftar kalimat langkah "
+        "konkret untuk pemohon) dan catatan_lokasi (satu kalimat atau null)."
     )
 
     return "\n".join(lines)

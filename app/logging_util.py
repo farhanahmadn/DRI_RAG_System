@@ -9,14 +9,14 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.schemas import JejakAturanRequest, OutputPreCheck
+from app.schemas import L2Assessment, OutputL3
 
 DEFAULT_LOG_PATH = Path("logs/precheck.jsonl")
 
 
 def log_precheck(
-    request: JejakAturanRequest,
-    response: OutputPreCheck,
+    request: L2Assessment,
+    response: OutputL3,
     *,
     log_path: Path | str = DEFAULT_LOG_PATH,
 ) -> None:

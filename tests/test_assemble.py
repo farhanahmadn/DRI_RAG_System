@@ -1,95 +1,36 @@
-import os
+import json
 import time
+from pathlib import Path
 
-import pytest
-from dotenv import load_dotenv
-
+from app.adapter import adaptasi
 from app.reasoning import assemble as assemble_module
-from app.reasoning.assemble import _LEVEL_BELUM_TERSEDIA, jalankan_precheck
-from app.retrieval.mock import MockRetriever
-from app.schemas import (
-    FaktaSpasial,
-    IndikatorJejak,
-    JejakAturanRequest,
-    PoinOutput,
-    RekomendasiOutput,
+from app.reasoning.assemble import (
+    _rakit_kalimat_gate,
+    _rakit_kesimpulan,
+    _rakit_kesimpulan_fallback,
+    _rakit_ringkasan_dampak,
+    jalankan_precheck,
 )
+from app.retrieval.mock import MockRetriever
+from app.schemas import L2Assessment, PoinOutput, RekomendasiOutput
 
-load_dotenv()
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-def _indikator_lp2b(**overrides) -> IndikatorJejak:
+def _muat_assessment(nama_file: str) -> L2Assessment:
+    payload = json.loads((FIXTURES_DIR / nama_file).read_text(encoding="utf-8"))
+    return L2Assessment.model_validate(payload["data"])
+
+
+def _poin_output(**overrides) -> PoinOutput:
     defaults = dict(
-        poin_id="LP2B-01",
-        kategori="Lokasional LP2B",
-        bobot=20.0,
-        skor=100.0,
-        kontribusi=20.0,
-        nilai_input="dalam_lp2b",
-        ambang="tidak_dalam_lp2b",
-        operator="==",
-        formula="in_lp2b == True",
-        zona="LP2B",
-        referensi_hukum=["UU No. 41 Tahun 2009 Pasal 44"],
-        fakta_spasial=FaktaSpasial(in_lp2b=True, banjir=False, resapan=False),
-    )
-    defaults.update(overrides)
-    return IndikatorJejak(**defaults)
-
-
-def _indikator_aman(**overrides) -> IndikatorJejak:
-    defaults = dict(
-        poin_id="KDB-01",
-        kategori="KDB",
-        bobot=10.0,
-        skor=0.0,
-        kontribusi=0.0,
-        nilai_input=0.4,
-        ambang=0.6,
-        operator="<=",
-        formula="kdb_aktual <= kdb_maks",
-    )
-    defaults.update(overrides)
-    return IndikatorJejak(**defaults)
-
-
-def _request(**overrides) -> JejakAturanRequest:
-    defaults = dict(
-        skor_total=20.0,
-        level=None,
-        zona="LP2B",
-        indikator=[_indikator_lp2b(), _indikator_aman()],
-    )
-    defaults.update(overrides)
-    return JejakAturanRequest(**defaults)
-
-
-def _poin_berisiko_lokasional(**overrides) -> PoinOutput:
-    defaults = dict(
-        poin_id="LP2B-01",
-        kategori="Lokasional LP2B",
-        status="Tidak Aman",
-        kontribusi=20.0,
-        reasoning_pendek="pendek",
-        reasoning_panjang="panjang",
+        poin_id="itbx",
+        kategori="Klasifikasi Kegiatan (ITBX)",
+        status="I",
+        reasoning_pendek="x",
+        reasoning_panjang="x",
         sitasi=[],
-        rekomendasi=RekomendasiOutput(tipe="lokasional", target=None, saran="Ajukan kajian kelayakan strategis.", disclaimer=None),
-        low_confidence=False,
-    )
-    defaults.update(overrides)
-    return PoinOutput(**defaults)
-
-
-def _poin_aman(**overrides) -> PoinOutput:
-    defaults = dict(
-        poin_id="KDB-01",
-        kategori="KDB",
-        status="Aman",
-        kontribusi=0.0,
-        reasoning_pendek="aman",
-        reasoning_panjang="aman panjang",
-        sitasi=[],
-        rekomendasi=RekomendasiOutput(tipe="numerik", target=None, saran="Tidak diperlukan tindakan khusus.", disclaimer=None),
+        rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Tidak diperlukan tindakan khusus."),
         low_confidence=False,
     )
     defaults.update(overrides)
@@ -99,9 +40,9 @@ def _poin_aman(**overrides) -> PoinOutput:
 def _patch_guardrail(monkeypatch, poin_by_id: dict[str, PoinOutput]):
     dipanggil = []
 
-    def _stub(indikator, retriever, *, max_retry=2):
-        dipanggil.append(indikator.poin_id)
-        return poin_by_id[indikator.poin_id]
+    def _stub(poin, retriever, assessment, *, max_retry=2):
+        dipanggil.append(poin.poin_id)
+        return poin_by_id[poin.poin_id]
 
     monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub)
     return dipanggil
@@ -115,244 +56,225 @@ def _patch_log(monkeypatch):
     return panggilan
 
 
-# --- ringkasan.skor_total & level -------------------------------------------------------
+def _patch_kesimpulan_llm(monkeypatch, hasil_dict=None, raise_exc=None):
+    def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        if raise_exc:
+            raise raise_exc
+        return hasil_dict
+
+    monkeypatch.setattr(assemble_module.llm_client, "generate", _stub)
 
 
-def test_skor_total_pass_through_tidak_dihitung_ulang(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(skor_total=42.0, level="Tinggi")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert output.ringkasan.skor_total == 42.0
-
-
-def test_level_none_jadi_sentinel_todo(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(level=None)
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert output.ringkasan.level == _LEVEL_BELUM_TERSEDIA
-
-
-def test_level_dari_backend_dipakai_apa_adanya(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(level="Tinggi")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert output.ringkasan.level == "Tinggi"
-
-
-# --- kalimat ringkasan -------------------------------------------------------------------
-
-
-def test_kalimat_tidak_ada_berisiko(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_aman(poin_id="LP2B-01", kategori="Lokasional LP2B"), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(level="Rendah")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert "tidak ditemukan" in output.ringkasan.kalimat.lower()
-
-
-def test_kalimat_ada_berisiko_sebut_skor_dan_kategori(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(skor_total=20.0, level="Tinggi")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert "20.0" in output.ringkasan.kalimat
-    assert "Lokasional LP2B" in output.ringkasan.kalimat
-
-
-# --- kesimpulan.langkah_berdampak & catatan_lokasi ----------------------------------------
-
-
-def test_langkah_berdampak_hanya_dari_poin_berisiko(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(level="Tinggi")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert len(output.kesimpulan.langkah_berdampak) == 1
-    assert "Ajukan kajian kelayakan strategis." in output.kesimpulan.langkah_berdampak[0]
-    assert not any("Tidak diperlukan tindakan khusus" in s for s in output.kesimpulan.langkah_berdampak)
-
-
-def test_catatan_lokasi_ada_jika_ada_lokasional_berisiko(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    _patch_log(monkeypatch)
-
-    request = _request(level="Tinggi")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert output.kesimpulan.catatan_lokasi is not None
-    assert "Lokasional LP2B" in output.kesimpulan.catatan_lokasi
-
-
-def test_catatan_lokasi_none_jika_tidak_ada_lokasional_berisiko(monkeypatch):
-    poin_kdb_berisiko = _poin_aman(poin_id="KDB-01", status="Tidak Aman", kontribusi=5.0)
-    poin_kdb_berisiko = poin_kdb_berisiko.model_copy(
-        update={"rekomendasi": RekomendasiOutput(tipe="numerik", target=600.0, saran="Kurangi footprint bangunan.", disclaimer=None)}
-    )
-    _patch_guardrail(
-        monkeypatch,
-        {
-            "LP2B-01": _poin_aman(poin_id="LP2B-01", kategori="Lokasional LP2B"),
-            "KDB-01": poin_kdb_berisiko,
-        },
-    )
-    _patch_log(monkeypatch)
-
-    request = _request(level="Sedang")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert output.kesimpulan.catatan_lokasi is None
-
-
-# --- logging dipanggil ---------------------------------------------------------------------
-
-
-def test_log_precheck_dipanggil_sekali_dengan_data_benar(monkeypatch):
-    _patch_guardrail(monkeypatch, {"LP2B-01": _poin_berisiko_lokasional(), "KDB-01": _poin_aman()})
-    panggilan = _patch_log(monkeypatch)
-
-    request = _request(level="Tinggi")
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert len(panggilan) == 1
-    logged_request, logged_response = panggilan[0]
-    assert logged_request == request
-    assert logged_response == output
-
-
-# --- pemrosesan paralel -------------------------------------------------------------------
-
-
-def _indikator_generik(n: int, **overrides) -> IndikatorJejak:
-    defaults = dict(
-        poin_id=f"IND-{n:02d}",
-        kategori="KDB",
-        bobot=10.0,
-        skor=10.0,
-        kontribusi=10.0,
-        nilai_input=0.7,
-        ambang=0.6,
-        operator="<=",
-        formula="",
-    )
-    defaults.update(overrides)
-    return IndikatorJejak(**defaults)
-
-
-def test_indikator_diproses_paralel_bukan_sekuensial(monkeypatch):
-    jumlah = 5
-    durasi_tidur = 0.2
-
-    def _stub_lambat(indikator, retriever, *, max_retry=2):
-        time.sleep(durasi_tidur)
-        return _poin_aman(poin_id=indikator.poin_id, kategori=indikator.kategori)
-
-    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_lambat)
-    _patch_log(monkeypatch)
-
-    request = JejakAturanRequest(
-        skor_total=0.0,
-        level="Rendah",
-        indikator=[_indikator_generik(i) for i in range(jumlah)],
-    )
-
-    mulai = time.perf_counter()
-    output = jalankan_precheck(request, MockRetriever())
-    durasi_total = time.perf_counter() - mulai
-
-    assert len(output.poin) == jumlah
-    # Sekuensial akan >= jumlah * durasi_tidur (~1.0s). Paralel harus jauh di bawah itu.
-    assert durasi_total < jumlah * durasi_tidur * 0.6
-
-
-def test_urutan_poin_sesuai_urutan_indikator_walau_selesai_out_of_order(monkeypatch):
-    # Indikator pertama tidur PALING LAMA, terakhir tidur PALING CEPAT — kalau eksekusi konkuren,
-    # yang terakhir akan SELESAI duluan. Urutan output harus tetap ikuti urutan request, bukan
-    # urutan selesai.
-    durasi_per_indikator = [0.3, 0.2, 0.1, 0.05]
-
-    def _stub_durasi_bervariasi(indikator, retriever, *, max_retry=2):
-        idx = int(indikator.poin_id.split("-")[1])
-        time.sleep(durasi_per_indikator[idx])
-        return _poin_aman(poin_id=indikator.poin_id, kategori=indikator.kategori)
-
-    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_durasi_bervariasi)
-    _patch_log(monkeypatch)
-
-    request = JejakAturanRequest(
-        skor_total=0.0,
-        level="Rendah",
-        indikator=[_indikator_generik(i) for i in range(len(durasi_per_indikator))],
-    )
-
-    output = jalankan_precheck(request, MockRetriever())
-
-    assert [p.poin_id for p in output.poin] == [ind.poin_id for ind in request.indikator]
-
-
-def test_satu_indikator_gagal_tak_terduga_tidak_menggagalkan_batch(monkeypatch):
-    def _stub_campuran(indikator, retriever, *, max_retry=2):
-        if indikator.poin_id == "IND-01":
-            raise RuntimeError("bug tak terduga di guardrail")
-        return _poin_aman(poin_id=indikator.poin_id, kategori=indikator.kategori)
-
-    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_campuran)
-    _patch_log(monkeypatch)
-
-    request = JejakAturanRequest(
-        skor_total=0.0,
-        level="Rendah",
-        indikator=[_indikator_generik(0), _indikator_generik(1), _indikator_generik(2)],
-    )
-
-    output = jalankan_precheck(request, MockRetriever())  # TIDAK BOLEH raise
-
-    poin_by_id = {p.poin_id: p for p in output.poin}
-    assert poin_by_id["IND-00"].low_confidence is False
-    assert poin_by_id["IND-02"].low_confidence is False
-    assert poin_by_id["IND-01"].low_confidence is True
-    assert poin_by_id["IND-01"].status in ("Aman", "Tidak Aman")  # tetap terisi valid, bukan crash
-
-
-# --- live integration (1x, skip kalau tanpa GROQ_API_KEY) ----------------------------------
-
-
-@pytest.mark.skipif(
-    not os.getenv("GROQ_API_KEY"),
-    reason="GROQ_API_KEY tidak diset — skip integration test panggilan LLM nyata.",
-)
-def test_jalankan_precheck_live_lp2b_dan_aman():
-    request = _request(skor_total=20.0, level="Tinggi")
-    retriever = MockRetriever()
-
-    output = jalankan_precheck(request, retriever)
-
-    assert output.ringkasan.skor_total == request.skor_total
-
-    poin_by_id = {p.poin_id: p for p in output.poin}
-    poin_lp2b = poin_by_id["LP2B-01"]
-    poin_aman = poin_by_id["KDB-01"]
-
-    assert poin_lp2b.status == "Tidak Aman"
-    chunk_ids = {c.id for c in retriever.get_by_reference(["UU No. 41 Tahun 2009 Pasal 44"])}
-    for s in poin_lp2b.sitasi:
-        assert s.citation_id in chunk_ids
-
-    assert poin_aman.status == "Aman"
-    assert poin_aman.low_confidence is False
-
-    assert output.kesimpulan.catatan_lokasi is not None
+# --- _rakit_kalimat_gate: fungsi murni, cakup "Tidak Lolos" TANPA fabrikasi L2Assessment --------
+# CATATAN: kasus "Tidak Lolos" end-to-end (lewat jalankan_precheck sungguhan) DITUNDA — belum ada
+# fixture asli utk kasus ini (dikonfirmasi user: tunggu contoh nyata dari back-end, jangan
+# fabrikasi payload ITBX/Intensitas). Cabang teksnya tetap tercakup di sini via fungsi primitif.
+
+
+class TestRakitKalimatGate:
+    def test_lolos(self):
+        kalimat = _rakit_kalimat_gate("Lolos", None)
+        assert "lolos pemeriksaan" in kalimat.lower()
+        assert "bersyarat" not in kalimat.lower()
+
+    def test_lolos_bersyarat_tanpa_decisive_stage(self):
+        kalimat = _rakit_kalimat_gate("Lolos Bersyarat", None)
+        assert "lolos bersyarat" in kalimat.lower()
+
+    def test_lolos_bersyarat_dengan_decisive_stage(self):
+        kalimat = _rakit_kalimat_gate("Lolos Bersyarat", "intensitas")
+        assert "intensitas bangunan" in kalimat.lower()
+
+    def test_tidak_lolos_tanpa_decisive_stage(self):
+        kalimat = _rakit_kalimat_gate("Tidak Lolos", None)
+        assert "tidak lolos" in kalimat.lower()
+
+    def test_tidak_lolos_dengan_decisive_stage_itbx(self):
+        kalimat = _rakit_kalimat_gate("Tidak Lolos", "itbx")
+        assert "tidak lolos" in kalimat.lower()
+        assert "klasifikasi kegiatan" in kalimat.lower()
+
+    def test_decisive_stage_tak_dikenal_ditampilkan_apa_adanya(self):
+        kalimat = _rakit_kalimat_gate("Lolos Bersyarat", "tahap-baru-belum-dikenal")
+        assert "tahap-baru-belum-dikenal" in kalimat
+
+
+class TestRakitRingkasanDampak:
+    def test_belum_dinilai(self):
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment.impact_assessment.dinilai = False
+        assessment.impact_assessment.impact_category = None
+
+        hasil = _rakit_ringkasan_dampak(assessment)
+        assert hasil.impact_category is None
+        assert hasil.impact_score is None
+        assert "belum dinilai" in hasil.kalimat.lower()
+
+    def test_kategori_ternormalisasi_dan_catatan_invers(self):
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        hasil = _rakit_ringkasan_dampak(assessment)
+
+        assert hasil.impact_category == "Sedang"
+        assert hasil.impact_score == 65
+        assert "sedang" in hasil.kalimat.lower()
+        assert "invers" in hasil.kalimat.lower()
+
+
+class TestRakitKesimpulan:
+    def test_sukses_bersih_dipakai_apa_adanya(self, monkeypatch):
+        _patch_kesimpulan_llm(
+            monkeypatch,
+            hasil_dict={"langkah_berdampak": ["Lengkapi dokumen X.", "Konsultasi ke dinas terkait."], "catatan_lokasi": None},
+        )
+        poin_list = [_poin_output()]
+        hasil = _rakit_kesimpulan(poin_list, "Setuju")
+
+        assert hasil.langkah_berdampak == ["Lengkapi dokumen X.", "Konsultasi ke dinas terkait."]
+        assert hasil.catatan_lokasi is None
+
+    def test_exception_llm_fallback_deterministik(self, monkeypatch):
+        _patch_kesimpulan_llm(monkeypatch, raise_exc=RuntimeError("gagal panggilan LLM"))
+        poin_list = [_poin_output(rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran asli poin."))]
+
+        hasil = _rakit_kesimpulan(poin_list, "Setuju")
+
+        assert hasil.langkah_berdampak == ["Saran asli poin."]
+        assert hasil.catatan_lokasi is None
+
+    def test_llm_sebut_angka_fallback_bukan_diloloskan(self, monkeypatch):
+        _patch_kesimpulan_llm(
+            monkeypatch,
+            hasil_dict={"langkah_berdampak": ["Kurangi KDB hingga 60 persen."], "catatan_lokasi": None},
+        )
+        poin_list = [_poin_output(rekomendasi=RekomendasiOutput(tipe="numerik", saran="Saran asli poin."))]
+
+        hasil = _rakit_kesimpulan(poin_list, "Setuju Bersyarat")
+
+        assert hasil.langkah_berdampak == ["Saran asli poin."]  # fallback, bukan teks LLM ber-angka
+
+
+class TestRakitKesimpulanFallback:
+    def test_saran_kosong_difilter(self):
+        poin_list = [
+            _poin_output(rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran valid.")),
+            _poin_output(poin_id="intensitas", rekomendasi=RekomendasiOutput(tipe="numerik", saran="  ")),
+        ]
+        hasil = _rakit_kesimpulan_fallback(poin_list)
+        assert hasil.langkah_berdampak == ["Saran valid."]
+
+    def test_urutan_dipertahankan(self):
+        poin_list = [
+            _poin_output(poin_id="itbx", rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran 1.")),
+            _poin_output(poin_id="intensitas", rekomendasi=RekomendasiOutput(tipe="numerik", saran="Saran 2.")),
+            _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Saran 3.")),
+        ]
+        hasil = _rakit_kesimpulan_fallback(poin_list)
+        assert hasil.langkah_berdampak == ["Saran 1.", "Saran 2.", "Saran 3."]
+
+
+class TestJalankanPrecheckEndToEnd:
+    """Mock llm_client.generate (cepat/gratis) + MockRetriever. HANYA 2 fixture nyata yang ada —
+    kasus "Tidak Lolos" DITUNDA sampai fixture asli tersedia (lihat TestRakitKalimatGate utk
+    cakupan cabang teksnya tanpa fabrikasi data)."""
+
+    def _stub_llm_generic(self, prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        if schema_name == "kesimpulan":
+            return {"langkah_berdampak": ["Tindak lanjuti sesuai saran per-poin."], "catatan_lokasi": None}
+        return {
+            "reasoning_pendek": "Ringkasan singkat poin ini.",
+            "reasoning_panjang": "Penjelasan lebih lengkap mengenai poin ini berdasarkan data yang tersedia.",
+            "sitasi": [],
+            "saran": "Ikuti prosedur yang berlaku.",
+            "disclaimer": None,
+        }
+
+    def test_fixture_lolos_tiga_poin_dan_rekomendasi_tak_dihitung_ulang(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        assert {p.poin_id for p in output.poin} == {"itbx", "intensitas", "dampak"}
+        assert output.ringkasan_gate.final_gate_status == "Lolos"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju"
+
+    def test_fixture_lolos_bersyarat_rekomendasi_tak_dihitung_ulang(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        assert output.ringkasan_gate.final_gate_status == "Lolos Bersyarat"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju Bersyarat"
+        poin_intensitas = next(p for p in output.poin if p.poin_id == "intensitas")
+        assert poin_intensitas.status == "MELAMPAUI_BATAS"
+
+    def test_log_precheck_dipanggil_sekali(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        panggilan = _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        assert len(panggilan) == 1
+        logged_request, logged_response = panggilan[0]
+        assert logged_request == assessment
+        assert logged_response == output
+
+
+class TestPemrosesanParalel:
+    def test_poin_diproses_paralel_bukan_sekuensial(self, monkeypatch):
+        durasi_tidur = 0.2
+
+        def _stub_lambat(poin, retriever, assessment, *, max_retry=2):
+            time.sleep(durasi_tidur)
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori)
+
+        monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_lambat)
+        _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        mulai = time.perf_counter()
+        output = jalankan_precheck(assessment, MockRetriever())
+        durasi_total = time.perf_counter() - mulai
+
+        assert len(output.poin) == 3
+        # Sekuensial akan >= 3 * durasi_tidur (~0.6s). Paralel harus jauh di bawah itu.
+        assert durasi_total < 3 * durasi_tidur * 0.7
+
+    def test_urutan_poin_sesuai_urutan_adapter(self, monkeypatch):
+        def _stub_durasi_terbalik(poin, retriever, assessment, *, max_retry=2):
+            durasi = {"itbx": 0.3, "intensitas": 0.15, "dampak": 0.05}[poin.poin_id]
+            time.sleep(durasi)
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori)
+
+        monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_durasi_terbalik)
+        _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())
+
+        assert [p.poin_id for p in output.poin] == ["itbx", "intensitas", "dampak"]
+
+    def test_satu_poin_gagal_tak_terduga_tidak_menggagalkan_batch(self, monkeypatch):
+        def _stub_campuran(poin, retriever, assessment, *, max_retry=2):
+            if poin.poin_id == "intensitas":
+                raise RuntimeError("bug tak terduga di guardrail")
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori)
+
+        monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_campuran)
+        _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
+        _patch_log(monkeypatch)
+
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        output = jalankan_precheck(assessment, MockRetriever())  # TIDAK BOLEH raise
+
+        poin_by_id = {p.poin_id: p for p in output.poin}
+        assert poin_by_id["itbx"].low_confidence is False
+        assert poin_by_id["dampak"].low_confidence is False
+        assert poin_by_id["intensitas"].low_confidence is True
