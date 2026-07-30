@@ -62,6 +62,15 @@ def ambil_chunks_pendukung(
     """Retrieval chunk pendukung utk satu poin: dasar_hukum dulu, fallback search kata kunci pendek."""
     referensi = [f"{d.dokumen} {d.pasal}" for d in poin.dasar_hukum if d.pasal]
     chunks = retriever.get_by_reference(referensi) if referensi else []
+    # Investigasi ITBX APP-2026-6191 (live thd DB nyata): `dasar_hukum` back-end kadang berupa label
+    # non-pasal ("Matriks ITBX", tanpa nomor) + dokumen generik ("RDTR Sleman") — get_by_reference
+    # (tidak bisa parse nomor pasal, jatuh ke fallback dokumen-level) bisa mengembalikan RATUSAN chunk
+    # TAK TERBATAS (terbukti live: seluruh korpus, bukan cuma 6 chunk kecil di MockRetriever). Prompt
+    # yang membanjiri LLM bikin ia gagal memilih sitasi sama sekali. Batasi ke top_k_dukungan di sini
+    # (bukan di retriever.py — bukan file saya) — anchor (dasar_hukum asli) tetap utuh dikirim terpisah
+    # ke prompt (lihat build_user_prompt), jadi pembatasan ini TIDAK mengurangi sitasi yang faithful.
+    if len(chunks) > top_k_dukungan:
+        chunks = chunks[:top_k_dukungan]
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
         chunks = retriever.search(query_fallback, RetrievalFilters(), top_k=top_k_dukungan)

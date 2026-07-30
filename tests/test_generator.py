@@ -9,9 +9,10 @@ from app.adapter import adaptasi
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.generator import _QUERY_FALLBACK_PER_POIN, ambil_chunks_pendukung, apakah_aman, generate_poin
 from app.reasoning.templates import template_aman
+from app.retrieval.base import Chunk
 from app.retrieval.mock import MockRetriever
 from app.retrieval.retriever import _expand
-from app.schemas import L2Assessment, PoinKonteks
+from app.schemas import DasarHukum, L2Assessment, PoinKonteks
 
 load_dotenv()
 
@@ -88,6 +89,54 @@ class TestApakahAman:
             fakta={"mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]}},
         )
         assert apakah_aman(poin) is False
+
+
+class TestAmbilChunksPendukungDibatasi:
+    """Investigasi ITBX APP-2026-6191 (live thd DB nyata): dasar_hukum berlabel non-pasal ("Matriks
+    ITBX") + dokumen generik ("RDTR Sleman") bikin get_by_reference sungguhan mengembalikan RATUSAN
+    chunk tak terbatas (seluruh korpus) — bukan cuma sedikit seperti di MockRetriever. Prompt yang
+    membanjiri LLM bikin ia gagal memilih sitasi sama sekali (low_confidence). Cek di sini murni pakai
+    stub Retriever, tanpa DB, supaya regresi kecapatan tetap ketahuan offline."""
+
+    class _RetrieverBanjirReferensi:
+        def __init__(self, jumlah: int):
+            self._jumlah = jumlah
+
+        def search(self, query, filters, top_k=5):
+            return []
+
+        def get_by_reference(self, referensi):
+            return [
+                Chunk(id=f"chunk-{i}", level="pasal", teks=f"teks {i}", dokumen="RDTR Sleman", pasal=str(i))
+                for i in range(self._jumlah)
+            ]
+
+        def get_parent(self, chunk_id):
+            return None
+
+    def test_get_by_reference_ratusan_chunk_dipotong_ke_top_k(self):
+        poin = PoinKonteks(
+            poin_id="itbx",
+            kategori="Klasifikasi Kegiatan (ITBX)",
+            tipe_rekomendasi="kategorikal",
+            status="T",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="x")],
+        )
+        chunks = ambil_chunks_pendukung(poin, self._RetrieverBanjirReferensi(500), top_k_dukungan=3)
+        assert len(chunks) == 3
+
+    def test_get_by_reference_sedikit_chunk_tidak_dipotong(self):
+        poin = PoinKonteks(
+            poin_id="itbx",
+            kategori="Klasifikasi Kegiatan (ITBX)",
+            tipe_rekomendasi="kategorikal",
+            status="T",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="x")],
+        )
+        chunks = ambil_chunks_pendukung(poin, self._RetrieverBanjirReferensi(2), top_k_dukungan=3)
+        assert len(chunks) == 2
 
 
 class TestQueryFallbackDampak:
