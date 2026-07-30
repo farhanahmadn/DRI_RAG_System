@@ -702,6 +702,18 @@
           },
           "kesimpulan": {
             "$ref": "#/components/schemas/KesimpulanOutput"
+          },
+          "catatan_global": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Catatan Global",
+            "default": []
+          },
+          "low_confidence_keseluruhan": {
+            "type": "boolean",
+            "title": "Low Confidence Keseluruhan"
           }
         },
         "type": "object",
@@ -710,7 +722,8 @@
           "ringkasan_dampak",
           "poin",
           "rekomendasi_sistem",
-          "kesimpulan"
+          "kesimpulan",
+          "low_confidence_keseluruhan"
         ],
         "title": "OutputL3"
       },

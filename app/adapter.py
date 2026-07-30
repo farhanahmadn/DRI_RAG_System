@@ -18,7 +18,7 @@ from app.schemas import AdapterResult, L2Assessment, PoinKonteks
 _KATA_KUNCI_FALLBACK_ITBX = ("kosong", "otomatis", "tidak ditemukan", "default")
 
 
-def _deteksi_fallback_itbx(reason: str) -> bool:
+def deteksi_fallback_itbx(reason: str) -> bool:
     reason_lower = reason.lower()
     return any(kata in reason_lower for kata in _KATA_KUNCI_FALLBACK_ITBX)
 
@@ -40,7 +40,7 @@ def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
             "kegiatan_terbatas_bersyarat": itbx.kegiatan_terbatas_bersyarat,
             "keterangan_ketentuan": itbx.keterangan_ketentuan,
             "reason": itbx.reason,
-            "fallback_data_kosong": _deteksi_fallback_itbx(itbx.reason),
+            "fallback_data_kosong": deteksi_fallback_itbx(itbx.reason),
         },
         dasar_hukum=itbx.dasar_hukum,
     )
@@ -56,7 +56,8 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
         # bisa stale/kontradiktif di data nyata) dan BUKAN diturunkan/divalidasi ulang dari
         # `parameter.*.memenuhi`. `parameter.*.memenuhi` di bawah HANYA fakta pendukung di `fakta[]`
         # untuk generator/prompt nanti — cek silang status/parameter/final_gate_status adalah tugas
-        # `cek_konsistensi_intensitas` (stub terpisah, belum dipanggil di jalur utama ini).
+        # `cek_konsistensi_intensitas` (dipanggil dari app/reasoning/guardrail.py::_paksa_field_wajib,
+        # bukan dari adaptasi() di sini).
         status=intensitas.status,
         fakta={
             "parameter": {
@@ -123,9 +124,11 @@ def adaptasi(assessment: L2Assessment) -> AdapterResult:
 
 
 def cek_konsistensi_intensitas(assessment: L2Assessment) -> list[str]:
-    """TODO(pipeline-rewire model L2): stub deteksi ketidakkonsistenan status vs parameter.memenuhi
-    vs final_gate_status. BELUM dipanggil di `adaptasi()` — integrasi ke guardrail.py menyusul setelah
-    generator/guardrail di-rewire ke L2Assessment (lihat TODO di app/reasoning/guardrail.py).
+    """Deteksi ketidakkonsistenan status vs parameter.memenuhi vs final_gate_status.
+
+    Dipanggil dari app/reasoning/guardrail.py::_paksa_field_wajib (Cek #4) untuk poin intensitas —
+    BUKAN dari `adaptasi()` di sini, karena hasilnya cuma dipakai guardrail untuk menandai
+    low_confidence, tidak untuk membentuk PoinKonteks.
 
     Kalau daftar hasil non-kosong, guardrail HARUS menandai low_confidence + log rinciannya — JANGAN
     menimpa/mengoreksi field back-end di sini atau di mana pun (prinsip Faithful, CLAUDE.md).
