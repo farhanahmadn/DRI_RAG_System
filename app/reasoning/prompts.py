@@ -15,7 +15,7 @@ ATURAN WAJIB (jangan dilanggar):
 2. SKOR DAMPAK INVERS — skor TINGGI berarti dampak RENDAH, bukan risiko tinggi. Contoh BENAR: "impact_score 65 -> dampak Sedang". Contoh SALAH (dilarang ditulis): "skor 65 berarti risiko tinggi". Kategori dampak (Rendah/Sedang/Tinggi/Sangat Tinggi) sudah difakta-kan di bawah — pakai APA ADANYA, jangan simpulkan arah dari angka skor sendiri.
 3. ITBX FALLBACK DATA-KOSONG — kalau ada baris "FALLBACK_DATA_KOSONG: True" di bawah, status yang lolos (mis. "I") BUKAN kepatuhan yang terverifikasi. WAJIB sertakan caveat persis: "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi". DILARANG menulis "kegiatan sesuai/diizinkan" tanpa caveat itu.
 4. MAKNA X GANDA — kalau "STATUS_ITBX: X", makna sebenarnya (dilarang eksplisit / tidak ditemukan di matriks / di luar area RDTR) mengikuti teks "REASON" di bawah. JANGAN default ke "dilarang".
-5. Kalau ada baris "CAVEAT" atau "DATA_CONFIDENCE" di bawah, WAJIB disebut/diteruskan dalam reasoning Anda — jangan disembunyikan atau diabaikan.
+5. Kalau ada baris "CAVEAT" di bawah, WAJIB disebut/diteruskan dalam reasoning Anda — jangan disembunyikan atau diabaikan.
 6. Sitasi HANYA boleh diambil dari daftar pasal yang diberikan (anchor dasar hukum back-end maupun pasal tambahan RAG), dengan menyebut citation_id persis seperti tercantum. JANGAN mengarang nomor pasal, ayat, atau dokumen yang tidak ada di daftar.
 7. Kalau ada daftar kegiatan diizinkan/terbatas/bersyarat, kegiatan alternatif yang Anda sebutkan HARUS berasal dari daftar itu — JANGAN mengarang nama kegiatan lain.
 8. JANGAN menyebutkan angka (target, selisih, skor, dsb) di reasoning_pendek, reasoning_panjang, maupun saran — angka digabungkan otomatis oleh sistem secara terpisah; tugas Anda hanya menulis narasi kualitatif.
@@ -158,12 +158,13 @@ def build_user_prompt(
     bangun_fakta = _BANGUN_FAKTA.get(poin.poin_id)
     lines.extend(bangun_fakta(poin) if bangun_fakta else [f"STATUS: {poin.status}"])
 
-    if meta and (meta.caveats or meta.data_confidence_keseluruhan):
+    # data_confidence_keseluruhan SENGAJA TIDAK disuntikkan ke prompt (Fix #4) — label kepercayaan
+    # adalah FAKTA, dirakit deterministik di guardrail.py::_paksa_field_wajib, bukan bahasa yang
+    # diserahkan ke LLM utk echo/parafrase (sumber kebocoran token mentah "DATA_CONFIDENCE: X").
+    if meta and meta.caveats:
         lines.append("")
-        lines.append("## Catatan & Tingkat Kepercayaan (WAJIB disebutkan dalam reasoning)")
-        if meta.data_confidence_keseluruhan:
-            lines.append(f"DATA_CONFIDENCE: {meta.data_confidence_keseluruhan}")
-        for caveat in meta.caveats or []:
+        lines.append("## Catatan (WAJIB disebutkan dalam reasoning)")
+        for caveat in meta.caveats:
             lines.append(f"CAVEAT: {caveat}")
 
     lines.append("")

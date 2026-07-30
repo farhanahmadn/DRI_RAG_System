@@ -38,10 +38,15 @@ def test_system_prompt_memuat_semua_aturan_wajib():
     assert "MAKNA X GANDA" in SYSTEM_PROMPT
     assert "JANGAN default ke" in SYSTEM_PROMPT
     assert "CAVEAT" in SYSTEM_PROMPT
-    assert "DATA_CONFIDENCE" in SYSTEM_PROMPT
     assert "citation_id" in SYSTEM_PROMPT
     assert "JANGAN mengarang" in SYSTEM_PROMPT
     assert "warga awam" in SYSTEM_PROMPT
+
+
+def test_system_prompt_tidak_lagi_suruh_llm_echo_data_confidence():
+    # Fix #4: label kepercayaan data = FAKTA, dirakit deterministik di guardrail.py, BUKAN
+    # diserahkan ke LLM utk echo/parafrase (sumber kebocoran token mentah "DATA_CONFIDENCE: X").
+    assert "DATA_CONFIDENCE" not in SYSTEM_PROMPT
 
 
 class TestFaktaItbx:
@@ -186,10 +191,12 @@ class TestSitasi:
 
 
 class TestMeta:
-    def test_caveat_dan_data_confidence_muncul(self):
+    def test_caveat_muncul_data_confidence_tidak_disuntik_ke_prompt(self):
+        # Fix #4: data_confidence_keseluruhan TIDAK disuntikkan ke prompt sama sekali — label
+        # kepercayaan dirakit deterministik di guardrail.py, bukan diserahkan ke LLM.
         meta = MetaL2(data_confidence_keseluruhan="Medium", caveats=["Data ITBX sebagian estimasi"])
         prompt = build_user_prompt(_poin(), [], meta)
-        assert "DATA_CONFIDENCE: Medium" in prompt
+        assert "DATA_CONFIDENCE" not in prompt
         assert "CAVEAT: Data ITBX sebagian estimasi" in prompt
 
     def test_meta_none_tidak_muncul(self):

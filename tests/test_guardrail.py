@@ -7,6 +7,7 @@ from app.reasoning.guardrail import (
     _cek_invers_skor,
     _cek_konsistensi_numerik,
     _cek_konsistensi_verdict,
+    _kalimat_tingkat_kepercayaan,
     _paksa_field_wajib,
     generate_poin_dengan_guardrail,
     perbaiki_poin,
@@ -181,11 +182,11 @@ class TestCekKonsistensiVerdict:
 class TestCekKonsistensiNumerik:
     def test_ada_angka_di_reasoning(self):
         output = _poin_output(reasoning_panjang="KDB usulan adalah 70 persen.")
-        assert _cek_konsistensi_numerik(output) != []
+        assert _cek_konsistensi_numerik(output, _poin()) != []
 
     def test_ada_angka_desimal_di_saran(self):
         output = _poin_output(rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Kurangi hingga 60.5 persen."))
-        assert _cek_konsistensi_numerik(output) != []
+        assert _cek_konsistensi_numerik(output, _poin()) != []
 
     def test_tanpa_angka_tidak_ada_masalah(self):
         output = _poin_output(
@@ -193,12 +194,60 @@ class TestCekKonsistensiNumerik:
             reasoning_panjang="Usulan KDB melampaui batas yang berlaku di zona ini.",
             rekomendasi=RekomendasiOutput(tipe="numerik", saran="Kurangi proporsi luas bangunan."),
         )
-        assert _cek_konsistensi_numerik(output) == []
+        assert _cek_konsistensi_numerik(output, _poin()) == []
 
     def test_angka_tunggal_tidak_dianggap_mencurigakan(self):
         # angka 1 digit (mis. referensi umum) tidak memicu false-positive.
         output = _poin_output(reasoning_panjang="Ketentuan diatur pada ayat 1 peraturan terkait.")
-        assert _cek_konsistensi_numerik(output) == []
+        assert _cek_konsistensi_numerik(output, _poin()) == []
+
+    def test_angka_terlacak_ke_keterangan_ketentuan_tidak_ditolak(self):
+        # Investigasi ITBX APP-2026-6191: angka ambang yang dikutip verbatim dari keterangan_ketentuan
+        # (fakta sah back-end) TIDAK boleh dianggap pelanggaran — beda dari angka dikarang/dihitung LLM.
+        poin = _poin(
+            status="T",
+            fakta={
+                "lolos": True,
+                "reason": "x",
+                "keterangan_ketentuan": ["Dibatasi maksimum 20 dari luas blok dan atau total subzona."],
+            },
+        )
+        output = _poin_output(
+            reasoning_panjang="Kegiatan diperbolehkan terbatas, dibatasi maksimum 20 dari luas blok.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_angka_tak_terlacak_tetap_ditolak_meski_ada_keterangan_ketentuan(self):
+        # Faithfulness TIDAK dilonggarkan secara umum — angka LAIN yang tak ada di sumber (mis.
+        # dikarang/dihitung LLM sendiri) tetap ditolak walau poin ini punya keterangan_ketentuan.
+        poin = _poin(
+            status="T",
+            fakta={
+                "lolos": True,
+                "reason": "x",
+                "keterangan_ketentuan": ["Dibatasi maksimum 20 dari luas blok dan atau total subzona."],
+            },
+        )
+        output = _poin_output(reasoning_panjang="KDB usulan sebesar 47.5 persen dari luas lahan.")
+        assert _cek_konsistensi_numerik(output, poin) != []
+
+    def test_intensitas_tanpa_keterangan_ketentuan_tetap_ketat_seperti_semula(self):
+        # intensitas tidak pernah punya keterangan_ketentuan/dasar_hukum (lihat app/adapter.py) —
+        # provenance check otomatis tetap melarang SEMUA angka, tidak berubah dari perilaku lama.
+        poin = _poin(poin_id="intensitas", tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS", fakta={})
+        output = _poin_output(poin_id="intensitas", reasoning_panjang="KDB usulan adalah 70 persen.")
+        assert _cek_konsistensi_numerik(output, poin) != []
+
+    def test_angka_terlacak_ke_dasar_hukum_kutipan(self):
+        from app.schemas import DasarHukum
+
+        poin = _poin(
+            status="B",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="1", kutipan="KDB maksimum 80 persen.")],
+        )
+        output = _poin_output(reasoning_panjang="Ketentuan zona ini mengatur KDB maksimum 80 persen.")
+        assert _cek_konsistensi_numerik(output, poin) == []
 
 
 class TestPaksaFieldWajib:
@@ -239,8 +288,61 @@ class TestPaksaFieldWajib:
         output = _poin_output()
         hasil = _paksa_field_wajib(output, poin, assessment)
 
-        assert "Medium" in hasil.rekomendasi.disclaimer
+        assert "Tingkat kepercayaan data: sedang." in hasil.rekomendasi.disclaimer
         assert "Data ITBX sebagian estimasi" in hasil.rekomendasi.disclaimer
+        assert "DATA_CONFIDENCE" not in hasil.rekomendasi.disclaimer
+        assert "Medium" not in hasil.rekomendasi.disclaimer
+
+    def test_data_confidence_konsisten_utk_ketiga_poin(self):
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(update={"meta": MetaL2(data_confidence_keseluruhan="High")})
+
+        for poin_id in ("itbx", "intensitas", "dampak"):
+            poin = _poin(poin_id=poin_id, kategori="x")
+            output = _poin_output(poin_id=poin_id, kategori="x")
+            hasil = _paksa_field_wajib(output, poin, assessment)
+            assert "Tingkat kepercayaan data: tinggi." in hasil.rekomendasi.disclaimer
+            assert "DATA_CONFIDENCE" not in hasil.rekomendasi.disclaimer
+
+    def test_poin_low_confidence_tetap_sertakan_catatan_peninjauan_manual(self):
+        # Fix #4: kalimat kepercayaan (baru) HARUS berdampingan dengan catatan peninjauan manual
+        # yang sudah ada dari template_low_confidence — bukan menimpanya.
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(update={"meta": MetaL2(data_confidence_keseluruhan="Low")})
+        poin = _poin()
+        output = _poin_output(
+            low_confidence=True,
+            rekomendasi=RekomendasiOutput(
+                tipe="kategorikal",
+                saran="x",
+                disclaimer="Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual.",
+            ),
+        )
+        hasil = _paksa_field_wajib(output, poin, assessment)
+
+        assert "perlu verifikasi manual" in hasil.rekomendasi.disclaimer
+        assert "Tingkat kepercayaan data: rendah." in hasil.rekomendasi.disclaimer
+
+
+class TestKalimatTingkatKepercayaan:
+    def test_high_jadi_tinggi(self):
+        assert _kalimat_tingkat_kepercayaan("High") == "Tingkat kepercayaan data: tinggi."
+
+    def test_medium_jadi_sedang(self):
+        assert _kalimat_tingkat_kepercayaan("Medium") == "Tingkat kepercayaan data: sedang."
+
+    def test_low_jadi_rendah(self):
+        assert _kalimat_tingkat_kepercayaan("Low") == "Tingkat kepercayaan data: rendah."
+
+    def test_case_insensitive(self):
+        assert _kalimat_tingkat_kepercayaan("high") == "Tingkat kepercayaan data: tinggi."
+        assert _kalimat_tingkat_kepercayaan("MEDIUM") == "Tingkat kepercayaan data: sedang."
+
+    def test_none_tidak_tampilkan_label(self):
+        assert _kalimat_tingkat_kepercayaan(None) is None
+
+    def test_nilai_tak_dikenal_tidak_tampilkan_label(self):
+        assert _kalimat_tingkat_kepercayaan("Sangat Tinggi Sekali") is None
 
     def test_cek_konsistensi_intensitas_men_trigger_low_confidence(self):
         assessment = _muat_assessment("l2_sample_amplop_6191.json")

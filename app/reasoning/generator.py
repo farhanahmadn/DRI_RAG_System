@@ -42,15 +42,15 @@ _LLM_RESPONSE_SCHEMA = {
 # app/retrieval/retriever.py (RAG asli teman: exact-match lowercase key -> istilah regulasi,
 # TIDAK fuzzy/substring). `poin.kategori` sekarang string deskriptif panjang ("Klasifikasi
 # Kegiatan (ITBX)" dst) yang TIDAK match kunci `_EXPANSION` manapun persis — pakai kata kunci
-# pendek di sini supaya RetrieverAsli tetap dapat manfaat ekspansi query. TIDAK menyentuh
-# app/retrieval/retriever.py (bukan milik saya, lihat CLAUDE.md § Aturan main).
-#
-# CATATAN: "dampak" BELUM ada entri _EXPANSION yg cocok di retriever.py (konsep baru model L2,
-# dict itu masih dari model indikator lama) — pakai poin.kategori apa adanya utk poin ini sampai
-# teman menambah entri baru di sisi mereka.
+# pendek di sini supaya RetrieverAsli tetap dapat manfaat ekspansi query.
 _QUERY_FALLBACK_PER_POIN = {
     "itbx": "kegiatan",
     "intensitas": "kdb",
+    # Fix #5: entri "dampak tata guna lahan" ditambahkan ke _EXPANSION retriever.py (limpasan/
+    # runoff/sumur resapan/kolam retensi/zero delta Q/RTH) — kata kunci pendek di sini persis
+    # match key itu, jangan pakai poin.kategori panjang ("Dampak Tata Guna Lahan" apa adanya
+    # kebetulan lowercase-match juga, tapi eksplisit lebih tahan kalau kategori berubah nanti).
+    "dampak": "dampak tata guna lahan",
 }
 
 

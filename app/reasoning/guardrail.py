@@ -32,6 +32,22 @@ CAVEAT_FALLBACK_ITBX = (
     "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi"
 )
 
+_LABEL_DATA_CONFIDENCE = {"high": "tinggi", "medium": "sedang", "low": "rendah"}
+
+
+def _kalimat_tingkat_kepercayaan(data_confidence: str | None) -> str | None:
+    """Fix #4: label kepercayaan = FAKTA, dirakit DI KODE dari data_confidence — jangan diserahkan
+    ke LLM (token mentah "DATA_CONFIDENCE: X" tak lagi disuntikkan ke prompt, lihat prompts.py).
+    None/tak dikenal -> jangan tampilkan label kepercayaan sama sekali.
+    """
+    if not data_confidence:
+        return None
+    label = _LABEL_DATA_CONFIDENCE.get(data_confidence.strip().lower())
+    if label is None:
+        return None
+    return f"Tingkat kepercayaan data: {label}."
+
+
 _FRASA_DAMPAK_TINGGI = ("risiko tinggi", "dampak tinggi", "sangat berisiko", "risiko sangat tinggi")
 _FRASA_DAMPAK_RENDAH = ("risiko rendah", "dampak rendah", "aman sepenuhnya", "tanpa risiko")
 
@@ -147,17 +163,37 @@ def _cek_konsistensi_verdict(poin_output: PoinOutput, poin: PoinKonteks) -> list
 # ---------------------------------------------------------------------------
 
 
-def _cek_konsistensi_numerik(poin_output: PoinOutput) -> list[str]:
-    """SYSTEM_PROMPT (prompts.py) aturan #8 sudah melarang LLM menyebut angka apa pun di
-    reasoning/saran (angka final dirakit kode dari calculator/back-end). Tidak scan `sitasi[].kutipan`
-    — kutipan pasal boleh memuat angka (nomor pasal/ayat) yang sah.
+def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks) -> bool:
+    """Investigasi ITBX APP-2026-6191: Cek #6 versi lama melarang SEMUA angka tanpa pandang sumber
+    — menangkap angka ambang yang dikutip verbatim dari `keterangan_ketentuan`/`dasar_hukum` back-end
+    (mis. "RTH minimal 20 dari luas persil"), padahal itu FAKTA sah, bukan halusinasi/hitungan LLM.
+
+    Provenance check: angka BOLEH muncul di narasi HANYA kalau tercantum verbatim (word-boundary) di
+    fakta sumber poin ini. `intensitas`/`dampak` tidak punya `keterangan_ketentuan` & `dasar_hukum`
+    selalu kosong utk keduanya (lihat app/adapter.py) — jadi otomatis TETAP seketat sebelumnya (angka
+    apa pun di situ tidak pernah terlacak ke sumber, karena memang tidak boleh ada). Ini MEMPERKETAT
+    presisi cek, bukan melonggarkan: angka yang tak bisa dibuktikan asalnya tetap ditolak.
+    """
+    sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
+    sumber += " " + " ".join(d.kutipan for d in poin.dasar_hukum)
+    return re.search(rf"\b{re.escape(angka)}\b", sumber) is not None
+
+
+def _cek_konsistensi_numerik(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """SYSTEM_PROMPT (prompts.py) aturan #8 melarang LLM menyebut angka yang TIDAK bisa dilacak ke
+    fakta sumber (angka final tetap dirakit kode dari calculator/back-end, tidak pernah dari sini).
+    Tidak scan `sitasi[].kutipan` — kutipan pasal boleh memuat angka (nomor pasal/ayat) yang sah.
     """
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
-    if _RE_ANGKA_MENCURIGAKAN.search(teks):
-        return [
-            "Reasoning/saran menyebutkan angka — dilarang (SYSTEM_PROMPT aturan #8). Angka harus "
-            "berasal dari calculator/back-end via field terpisah, bukan ditulis LLM di narasi."
-        ]
+    for match in _RE_ANGKA_MENCURIGAKAN.finditer(teks):
+        angka = match.group(0)
+        if not _angka_terlacak_ke_sumber(angka, poin):
+            return [
+                f"Reasoning/saran menyebutkan angka {angka!r} yang tidak tercantum di fakta sumber "
+                "poin ini — dilarang (SYSTEM_PROMPT aturan #8). Angka harus berasal dari "
+                "calculator/back-end via field terpisah, atau dikutip verbatim dari "
+                "keterangan_ketentuan/dasar_hukum, bukan dihitung/dikarang LLM."
+            ]
     return []
 
 
@@ -183,11 +219,13 @@ def _paksa_field_wajib(
         if CAVEAT_FALLBACK_ITBX.lower() not in teks_sudah_ada.lower():
             disclaimer_tambahan.append(CAVEAT_FALLBACK_ITBX.capitalize() + ".")
 
-    # Cek #3 — meta.caveats / data_confidence WAJIB muncul.
+    # Cek #3 — meta.caveats / data_confidence WAJIB muncul. Kalimat kepercayaan SELALU dirakit
+    # deterministik (bukan echo raw value LLM/back-end) — konsisten sama persis di ketiga poin.
     meta = assessment.meta
     if meta:
-        if meta.data_confidence_keseluruhan and meta.data_confidence_keseluruhan not in teks_sudah_ada:
-            disclaimer_tambahan.append(f"Tingkat kepercayaan data: {meta.data_confidence_keseluruhan}.")
+        kalimat_confidence = _kalimat_tingkat_kepercayaan(meta.data_confidence_keseluruhan)
+        if kalimat_confidence and kalimat_confidence.lower() not in teks_sudah_ada.lower():
+            disclaimer_tambahan.append(kalimat_confidence)
         for caveat in meta.caveats or []:
             if caveat not in teks_sudah_ada and caveat not in " ".join(disclaimer_tambahan):
                 disclaimer_tambahan.append(f"Catatan: {caveat}")
@@ -265,7 +303,7 @@ def perbaiki_poin(
 
     masalah.extend(_cek_invers_skor(poin_bersih, poin))
     masalah.extend(_cek_konsistensi_verdict(poin_bersih, poin))
-    masalah.extend(_cek_konsistensi_numerik(poin_bersih))
+    masalah.extend(_cek_konsistensi_numerik(poin_bersih, poin))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 

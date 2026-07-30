@@ -7,9 +7,10 @@ from dotenv import load_dotenv
 
 from app.adapter import adaptasi
 from app.reasoning import llm_client as llm_client_module
-from app.reasoning.generator import apakah_aman, generate_poin
+from app.reasoning.generator import _QUERY_FALLBACK_PER_POIN, ambil_chunks_pendukung, apakah_aman, generate_poin
 from app.reasoning.templates import template_aman
 from app.retrieval.mock import MockRetriever
+from app.retrieval.retriever import _expand
 from app.schemas import L2Assessment, PoinKonteks
 
 load_dotenv()
@@ -87,6 +88,51 @@ class TestApakahAman:
             fakta={"mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]}},
         )
         assert apakah_aman(poin) is False
+
+
+class TestQueryFallbackDampak:
+    """Fix #5: poin dampak (dasar_hukum selalu kosong) skrng punya kata kunci fallback pendek
+    yang match entri _EXPANSION baru di app/retrieval/retriever.py — bukan poin.kategori panjang
+    apa adanya. Relevansi sitasi sungguhan (mis. menarik pasal Resapan Air/zero delta Q) butuh
+    run live thd DB nyata — DITANDAI tertunda, bukan diklaim terverifikasi di sini."""
+
+    def test_dampak_ada_di_query_fallback_bukan_kategori_mentah(self):
+        assert "dampak" in _QUERY_FALLBACK_PER_POIN
+        assert _QUERY_FALLBACK_PER_POIN["dampak"] != "Dampak Tata Guna Lahan"
+
+    def test_query_fallback_dampak_tereskpansi_via_retriever_asli(self):
+        query = _QUERY_FALLBACK_PER_POIN["dampak"]
+        hasil_ekspansi = _expand(query)
+
+        assert hasil_ekspansi != query  # benar-benar diperkaya, bukan diteruskan mentah
+        for istilah in ("runoff", "sumur resapan", "kolam retensi", "zero delta q", "rth"):
+            assert istilah in hasil_ekspansi.lower()
+
+    def test_ambil_chunks_pendukung_dampak_pakai_query_pendek_bukan_kategori(self):
+        dipanggil = {}
+
+        class _RetrieverPencatatQuery:
+            def search(self, query, filters, top_k=5):
+                dipanggil["query"] = query
+                return []
+
+            def get_by_reference(self, referensi):
+                return []
+
+            def get_parent(self, chunk_id):
+                return None
+
+        poin = PoinKonteks(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi",
+            fakta={},
+            dasar_hukum=[],
+        )
+        ambil_chunks_pendukung(poin, _RetrieverPencatatQuery())
+
+        assert dipanggil["query"] == "dampak tata guna lahan"
 
 
 def test_generate_poin_aman_pakai_template_tanpa_retrieval_atau_llm(monkeypatch):
