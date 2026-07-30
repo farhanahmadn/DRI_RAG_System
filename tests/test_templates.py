@@ -1,79 +1,80 @@
-import pytest
-
 from app.reasoning.templates import template_aman, template_low_confidence
-from app.schemas import IndikatorJejak
+from app.schemas import PoinKonteks
 
 
-def _indikator(**overrides) -> IndikatorJejak:
+def _poin(**overrides) -> PoinKonteks:
     defaults = dict(
-        poin_id="X-01",
-        kategori="Kegiatan Zonasi",
-        bobot=10.0,
-        skor=0.0,
-        kontribusi=0.0,
-        nilai_input=0.0,
-        ambang=0.0,
-        operator="<=",
-        formula="",
+        poin_id="itbx",
+        kategori="Klasifikasi Kegiatan (ITBX)",
+        tipe_rekomendasi="kategorikal",
+        status="I",
+        fakta={"lolos": True, "reason": "Lolos karena kegiatan Diizinkan (I)"},
+        dasar_hukum=[],
     )
     defaults.update(overrides)
-    return IndikatorJejak(**defaults)
+    return PoinKonteks(**defaults)
 
 
-def test_template_aman_kategori_non_numerik():
-    indikator = _indikator(kategori="Kegiatan Zonasi", skor=0.0)
-    poin = template_aman(indikator)
+class TestTemplateAman:
+    def test_itbx_status_dan_tipe_apa_adanya(self):
+        poin = template_aman(_poin())
+        assert poin.status == "I"
+        assert poin.rekomendasi.tipe == "kategorikal"
+        assert poin.rekomendasi.target is None
+        assert poin.low_confidence is False
+        assert poin.sitasi == []
 
-    assert poin.status == "Aman"
-    assert poin.low_confidence is False
-    assert poin.sitasi == []
-    assert poin.rekomendasi.tipe == "kegiatan"
-    assert poin.rekomendasi.target is None
+    def test_intensitas_tanpa_target_menghasilkan_target_none(self):
+        poin = _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MEMENUHI_SYARAT",
+            fakta={"target": {}},
+        )
+        hasil = template_aman(poin)
+        assert hasil.rekomendasi.tipe == "numerik"
+        assert hasil.rekomendasi.target is None
+
+    def test_intensitas_dengan_target_terisi(self):
+        poin = _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={"target": {"kdb": {"target_kdb": 60.0, "selisih": 10.0}}},
+        )
+        hasil = template_aman(poin)
+        assert hasil.rekomendasi.target == 60.0
+
+    def test_dampak_target_selalu_none(self):
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}},
+        )
+        hasil = template_aman(poin)
+        assert hasil.rekomendasi.target is None
 
 
-def test_template_aman_kategori_numerik_isi_target():
-    indikator = _indikator(
-        kategori="KDB",
-        skor=0.0,
-        nilai_input=500.0,
-        ambang=0.6,
-        operator="<=",
-        luas_lahan=1000.0,
-    )
-    poin = template_aman(indikator)
+class TestTemplateLowConfidence:
+    def test_status_apa_adanya_dan_low_confidence_true(self):
+        poin = _poin(status="X", fakta={"lolos": False, "reason": "Tidak ditemukan di matriks"})
+        hasil = template_low_confidence(poin)
+        assert hasil.status == "X"
+        assert hasil.low_confidence is True
+        assert hasil.sitasi == []
+        assert hasil.rekomendasi.disclaimer is not None
 
-    assert poin.rekomendasi.tipe == "numerik"
-    assert poin.rekomendasi.target == 600.0
-
-
-def test_template_aman_raises_jika_skor_bukan_nol():
-    indikator = _indikator(skor=5.0)
-    with pytest.raises(ValueError):
-        template_aman(indikator)
-
-
-@pytest.mark.parametrize("skor,expected_status", [(0.0, "Aman"), (7.5, "Tidak Aman")])
-def test_template_low_confidence_status_mengikuti_skor(skor, expected_status):
-    indikator = _indikator(skor=skor, kontribusi=skor)
-    poin = template_low_confidence(indikator)
-
-    assert poin.status == expected_status
-    assert poin.low_confidence is True
-    assert poin.sitasi == []
-
-
-def test_template_low_confidence_tetap_hitung_target_numerik():
-    indikator = _indikator(
-        kategori="KDH",
-        skor=3.0,
-        kontribusi=3.0,
-        nilai_input=250.0,
-        ambang=0.3,
-        operator=">=",
-        luas_lahan=1000.0,
-    )
-    poin = template_low_confidence(indikator)
-
-    assert poin.rekomendasi.tipe == "numerik"
-    assert poin.rekomendasi.target == 300.0
-    assert poin.rekomendasi.disclaimer is not None
+    def test_intensitas_tetap_hitung_target_dari_fakta(self):
+        poin = _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={"target": {"kdh": {"target_kdh": 20.0, "selisih": 5.0}}},
+        )
+        hasil = template_low_confidence(poin)
+        assert hasil.rekomendasi.target == 20.0

@@ -12,6 +12,16 @@ from app.reasoning.calculator import (
 from app.reasoning.rekomendasi import turunkan_rekomendasi
 from app.schemas import AdapterResult, L2Assessment, PoinKonteks
 
+# Kata kunci heuristik deteksi fallback ITBX (Blueprint §5.2: "kolom matriks RDTR kosong/otomatis").
+# TIDAK ADA contoh nyata kasus fallback di fixture kita saat ini (keduanya status "I" dgn reason
+# normal) — ini tebakan terbaik dari deskripsi Blueprint, gampang direvisi kalau contoh nyata muncul.
+_KATA_KUNCI_FALLBACK_ITBX = ("kosong", "otomatis", "tidak ditemukan", "default")
+
+
+def _deteksi_fallback_itbx(reason: str) -> bool:
+    reason_lower = reason.lower()
+    return any(kata in reason_lower for kata in _KATA_KUNCI_FALLBACK_ITBX)
+
 
 def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
     itbx = assessment.gate_hukum.tahapan.itbx
@@ -30,6 +40,7 @@ def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
             "kegiatan_terbatas_bersyarat": itbx.kegiatan_terbatas_bersyarat,
             "keterangan_ketentuan": itbx.keterangan_ketentuan,
             "reason": itbx.reason,
+            "fallback_data_kosong": _deteksi_fallback_itbx(itbx.reason),
         },
         dasar_hukum=itbx.dasar_hukum,
     )

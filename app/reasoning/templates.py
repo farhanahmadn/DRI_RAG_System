@@ -1,89 +1,73 @@
 """Template kalimat deterministik — TIDAK ADA panggilan LLM di sini.
 
 Dua kasus dari CLAUDE.md § Konvensi kode:
-- Indikator skor 0 ("Aman") -> template, tanpa memanggil LLM.
+- Poin "aman" (mis. ITBX Diizinkan tanpa fallback, intensitas tanpa pelanggaran, dampak tanpa
+  mitigasi) -> template, tanpa memanggil LLM (hemat kuota — pola dipertahankan dari model lama).
 - Guardrail gagal -> ... -> fallback template + tanda low_confidence.
+
+Status di kedua template SELALU `poin.status` apa adanya (ground truth back-end/adapter) — model L2
+tidak punya skor per-poin lagi, jadi tidak ada `status_dari_skor` seperti versi lama.
 """
 
-from app.reasoning.calculator import (
-    hitung_target_rekomendasi,
-    klasifikasi_tipe_rekomendasi,
-    pilih_target_utama,
-)
-from app.schemas import IndikatorJejak, PoinOutput, RekomendasiOutput
+from app.reasoning.calculator import pilih_target_utama_intensitas
+from app.schemas import PoinKonteks, PoinOutput, RekomendasiOutput
 
 
-def status_dari_skor(skor: float) -> str:
-    return "Aman" if skor <= 0 else "Tidak Aman"
+def _target_untuk_poin(poin: PoinKonteks) -> float | str | None:
+    if poin.tipe_rekomendasi != "numerik":
+        return None
+    return pilih_target_utama_intensitas(poin.fakta.get("target") or {})
 
 
-def template_aman(indikator: IndikatorJejak) -> PoinOutput:
-    """Template untuk indikator yang skornya 0 ('Aman') — tidak memanggil LLM sama sekali."""
-    if indikator.skor != 0:
-        raise ValueError(
-            f"template_aman hanya untuk indikator skor 0, indikator {indikator.poin_id!r} "
-            f"punya skor={indikator.skor}."
-        )
-
-    target = hitung_target_rekomendasi(indikator)
-
-    reasoning_pendek = f"Indikator {indikator.kategori} dinyatakan Aman."
+def template_aman(poin: PoinKonteks) -> PoinOutput:
+    """Template untuk poin yang jelas aman/lolos — tidak memanggil LLM sama sekali."""
+    reasoning_pendek = f"{poin.kategori}: tidak ada catatan berisiko untuk poin ini."
     reasoning_panjang = (
-        f"Berdasarkan jejak aturan, nilai input ({indikator.nilai_input}) untuk indikator "
-        f"{indikator.kategori} ({indikator.poin_id}) memenuhi ambang batas yang berlaku "
-        f"({indikator.operator} {indikator.ambang}), sehingga tidak berkontribusi terhadap risiko."
+        f"Berdasarkan data yang diberikan, poin '{poin.kategori}' berstatus '{poin.status}' dan "
+        "tidak memerlukan tindakan lebih lanjut."
     )
 
     return PoinOutput(
-        poin_id=indikator.poin_id,
-        kategori=indikator.kategori,
-        status="Aman",
-        kontribusi=indikator.kontribusi,
+        poin_id=poin.poin_id,
+        kategori=poin.kategori,
+        status=poin.status,
         reasoning_pendek=reasoning_pendek,
         reasoning_panjang=reasoning_panjang,
         sitasi=[],
         rekomendasi=RekomendasiOutput(
-            tipe=klasifikasi_tipe_rekomendasi(indikator.kategori),
-            target=pilih_target_utama(target),
-            saran="Tidak diperlukan tindakan khusus untuk indikator ini.",
+            tipe=poin.tipe_rekomendasi,
+            target=_target_untuk_poin(poin),
+            saran="Tidak diperlukan tindakan khusus untuk poin ini.",
             disclaimer=None,
         ),
         low_confidence=False,
     )
 
 
-def template_low_confidence(indikator: IndikatorJejak) -> PoinOutput:
+def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
     """Fallback saat generasi LLM gagal validasi guardrail berulang kali.
 
-    Status & target tetap dihitung deterministik dari jejak/calculator (kode, bukan LLM) — yang
-    gagal cuma narasi bahasa, bukan angka.
+    Status & target tetap dari fakta/calculator (kode, bukan LLM) — yang gagal cuma narasi bahasa.
     """
-    status = status_dari_skor(indikator.skor)
-    target = hitung_target_rekomendasi(indikator)
-
-    reasoning_pendek = "Penjelasan otomatis tidak tersedia untuk indikator ini."
+    reasoning_pendek = "Penjelasan otomatis tidak tersedia untuk poin ini."
     reasoning_panjang = (
-        f"Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk "
-        f"indikator {indikator.kategori} ({indikator.poin_id}) setelah beberapa kali percobaan. "
-        f"Skor ({indikator.skor}) dan kontribusi ({indikator.kontribusi}) tetap berdasarkan jejak "
-        "aturan asli; mohon dilakukan peninjauan manual oleh petugas."
+        f"Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin "
+        f"'{poin.kategori}' ({poin.poin_id}) setelah beberapa kali percobaan. Status ({poin.status}) "
+        "tetap berdasarkan data asli dari back-end; mohon dilakukan peninjauan manual oleh petugas."
     )
 
     return PoinOutput(
-        poin_id=indikator.poin_id,
-        kategori=indikator.kategori,
-        status=status,
-        kontribusi=indikator.kontribusi,
+        poin_id=poin.poin_id,
+        kategori=poin.kategori,
+        status=poin.status,
         reasoning_pendek=reasoning_pendek,
         reasoning_panjang=reasoning_panjang,
         sitasi=[],
         rekomendasi=RekomendasiOutput(
-            tipe=klasifikasi_tipe_rekomendasi(indikator.kategori),
-            target=pilih_target_utama(target),
-            saran="Perlu peninjauan manual oleh petugas terkait indikator ini.",
-            disclaimer=(
-                "Penjelasan otomatis tidak tersedia untuk indikator ini; perlu verifikasi manual."
-            ),
+            tipe=poin.tipe_rekomendasi,
+            target=_target_untuk_poin(poin),
+            saran="Perlu peninjauan manual oleh petugas terkait poin ini.",
+            disclaimer="Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual.",
         ),
         low_confidence=True,
     )

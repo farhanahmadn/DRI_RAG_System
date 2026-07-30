@@ -6,6 +6,7 @@ from app.reasoning.calculator import (
     hitung_target_kdh,
     hitung_target_klb,
     normalisasi_kategori_dampak,
+    pilih_target_utama_intensitas,
     sarankan_arah_mitigasi_dampak,
 )
 from app.schemas import ImpactAssessment, IntensitasTahap, ParameterIntensitas
@@ -113,6 +114,15 @@ class TestHitungTargetIntensitas:
             reason="Lolos karena usulan KDB, KLB, dan KDH memenuhi standar regulasi.",
         )
         assert hitung_target_intensitas(intensitas, luas_lahan_m2=850) == {}
+
+
+class TestPilihTargetUtamaIntensitas:
+    def test_satu_parameter_melanggar(self):
+        target_map = {"kdb": {"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0}}
+        assert pilih_target_utama_intensitas(target_map) == 60.0
+
+    def test_kosong_mengembalikan_none(self):
+        assert pilih_target_utama_intensitas({}) is None
 
 
 class TestNormalisasiKategoriDampak:

@@ -72,6 +72,19 @@ def hitung_target_intensitas(intensitas: IntensitasTahap, luas_lahan_m2: float |
     return hasil
 
 
+def pilih_target_utama_intensitas(target_map: dict[str, dict]) -> float | None:
+    """Satu angka representatif dari hasil `hitung_target_intensitas()` untuk `RekomendasiOutput.target`.
+
+    Kalau lebih dari satu parameter melanggar, ambil yang pertama ditemukan (representatif, bukan
+    klaim "paling penting") — narasi lengkap tetap ada di fakta lengkap, ini cuma satu angka ringkas.
+    """
+    for info in target_map.values():
+        for key in ("target_kdb", "target_klb", "target_kdh"):
+            if key in info:
+                return info[key]
+    return None
+
+
 def normalisasi_kategori_dampak(raw: str | None) -> str | None:
     """"SEDANG" -> "Sedang", "SANGAT TINGGI" -> "Sangat Tinggi", None -> None."""
     return raw.strip().title() if raw else None

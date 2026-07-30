@@ -1,34 +1,29 @@
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.retrieval.base import Chunk
-from app.schemas import FaktaSpasial, IndikatorJejak
+from app.schemas import DasarHukum, MetaL2, PoinKonteks
 
 
-def _indikator(**overrides) -> IndikatorJejak:
+def _poin(**overrides) -> PoinKonteks:
     defaults = dict(
-        poin_id="LP2B-01",
-        kategori="Lokasional LP2B",
-        bobot=20.0,
-        skor=20.0,
-        kontribusi=20.0,
-        nilai_input="dalam_lp2b",
-        ambang="tidak_dalam_lp2b",
-        operator="==",
-        formula="in_lp2b == True",
-        zona="LP2B",
-        referensi_hukum=["UU No. 41 Tahun 2009 Pasal 44"],
+        poin_id="itbx",
+        kategori="Klasifikasi Kegiatan (ITBX)",
+        tipe_rekomendasi="kategorikal",
+        status="I",
+        fakta={"lolos": True, "reason": "Lolos karena kegiatan Diizinkan (I) di zona Zona Perumahan"},
+        dasar_hukum=[],
     )
     defaults.update(overrides)
-    return IndikatorJejak(**defaults)
+    return PoinKonteks(**defaults)
 
 
 def _chunk(**overrides) -> Chunk:
     defaults = dict(
-        id="uu41-2009-p44",
-        level="pasal",
-        teks="Pasal 44: dilarang dialihfungsikan.",
-        dokumen="UU No. 41 Tahun 2009",
-        pasal="44",
-        halaman=21,
+        id="rdtr-matriks-itbx",
+        level="tabel",
+        teks="Matriks ITBX zona perumahan.",
+        dokumen="RDTR Sleman",
+        pasal="Matriks ITBX",
+        halaman=12,
     )
     defaults.update(overrides)
     return Chunk(**defaults)
@@ -36,112 +31,180 @@ def _chunk(**overrides) -> Chunk:
 
 def test_system_prompt_memuat_semua_aturan_wajib():
     assert "FINAL" in SYSTEM_PROMPT
-    assert "fakta_spasial" in SYSTEM_PROMPT
+    assert "SKOR DAMPAK INVERS" in SYSTEM_PROMPT
+    assert "impact_score 65" in SYSTEM_PROMPT
+    assert "FALLBACK_DATA_KOSONG" in SYSTEM_PROMPT
+    assert "diloloskan otomatis karena data matriks RDTR kosong" in SYSTEM_PROMPT
+    assert "MAKNA X GANDA" in SYSTEM_PROMPT
+    assert "JANGAN default ke" in SYSTEM_PROMPT
+    assert "CAVEAT" in SYSTEM_PROMPT
+    assert "DATA_CONFIDENCE" in SYSTEM_PROMPT
     assert "citation_id" in SYSTEM_PROMPT
     assert "JANGAN mengarang" in SYSTEM_PROMPT
-    assert "pelanggaran hukum" in SYSTEM_PROMPT
-    assert "risiko alam" in SYSTEM_PROMPT
     assert "warga awam" in SYSTEM_PROMPT
-    assert "STATUS" in SYSTEM_PROMPT
-    assert "FAKTA hasil perhitungan kode" in SYSTEM_PROMPT
-    assert "KLASIFIKASI" in SYSTEM_PROMPT
-    assert "Kegiatan Diizinkan di Zona Ini" in SYSTEM_PROMPT
 
 
-def test_build_user_prompt_memuat_ringkasan_jejak():
-    indikator = _indikator()
-    prompt = build_user_prompt(indikator, [], None)
+class TestFaktaItbx:
+    def test_status_x_tidak_diberi_label_dilarang(self):
+        poin = _poin(status="X", fakta={"lolos": False, "reason": "Tidak ditemukan di matriks RDTR"})
+        prompt = build_user_prompt(poin, [])
+        assert "STATUS_ITBX: X" in prompt
+        assert "Dilarang" not in prompt
+        assert "lihat REASON" in prompt
 
-    assert "LP2B-01" in prompt
-    assert "Lokasional LP2B" in prompt
-    assert "20.0" in prompt
-    assert "dalam_lp2b" in prompt
-    assert "tidak_dalam_lp2b" in prompt
-    assert "==" in prompt
-    assert "in_lp2b == True" in prompt
+    def test_reason_muncul(self):
+        poin = _poin(fakta={"lolos": True, "reason": "Lolos karena kegiatan Diizinkan (I)"})
+        prompt = build_user_prompt(poin, [])
+        assert "REASON: Lolos karena kegiatan Diizinkan (I)" in prompt
 
+    def test_fallback_flag_muncul_true(self):
+        poin = _poin(fakta={"lolos": True, "reason": "x", "fallback_data_kosong": True})
+        prompt = build_user_prompt(poin, [])
+        assert "FALLBACK_DATA_KOSONG: True" in prompt
 
-def test_build_user_prompt_hanya_fakta_spasial_yang_tidak_none():
-    indikator = _indikator(
-        fakta_spasial=FaktaSpasial(in_lp2b=True, banjir=False, resapan=None, nama_sungai=None)
-    )
-    prompt = build_user_prompt(indikator, [], None)
+    def test_fallback_flag_muncul_false_default(self):
+        poin = _poin(fakta={"lolos": True, "reason": "x"})
+        prompt = build_user_prompt(poin, [])
+        assert "FALLBACK_DATA_KOSONG: False" in prompt
 
-    assert "in_lp2b: True" in prompt
-    assert "banjir: False" in prompt
-    assert "resapan" not in prompt
-    assert "nama_sungai" not in prompt
+    def test_daftar_kegiatan_diizinkan_muncul(self):
+        poin = _poin(fakta={"lolos": True, "reason": "x", "kegiatan_diizinkan": ["Rumah Tunggal", "Warung"]})
+        prompt = build_user_prompt(poin, [])
+        assert "Rumah Tunggal" in prompt
+        assert "Warung" in prompt
 
+    def test_keterangan_ketentuan_muncul_utk_status_bersyarat(self):
+        poin = _poin(
+            status="B",
+            fakta={"lolos": True, "reason": "x", "keterangan_ketentuan": ["Syarat 1", "Syarat 2"]},
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "Syarat 1" in prompt
+        assert "Syarat 2" in prompt
 
-def test_build_user_prompt_tanpa_fakta_spasial_tidak_error():
-    indikator = _indikator(fakta_spasial=None)
-    prompt = build_user_prompt(indikator, [], None)
-    assert "Fakta Spasial" not in prompt
+    def test_keterangan_ketentuan_tak_muncul_utk_status_i(self):
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x", "keterangan_ketentuan": ["Syarat 1"]})
+        prompt = build_user_prompt(poin, [])
+        assert "Syarat 1" not in prompt
 
-
-def test_build_user_prompt_daftar_chunk():
-    chunk = _chunk()
-    prompt = build_user_prompt(_indikator(), [chunk], None)
-
-    assert "citation_id=uu41-2009-p44" in prompt
-    assert "UU No. 41 Tahun 2009" in prompt
-    assert "Pasal 44" in prompt
-    assert chunk.teks in prompt
-
-
-def test_build_user_prompt_chunk_kosong_ada_peringatan():
-    prompt = build_user_prompt(_indikator(), [], None)
-    assert "jangan mengarang sitasi" in prompt
-
-
-def test_build_user_prompt_target_none():
-    prompt = build_user_prompt(_indikator(), [], None)
-    assert "Tidak ada target numerik" in prompt
-
-
-def test_build_user_prompt_target_terisi():
-    prompt = build_user_prompt(_indikator(), [], {"target_maks": 600.0, "selisih": 50.0})
-    assert "target_maks: 600.0" in prompt
-    assert "selisih: 50.0" in prompt
+    def test_keterangan_ketentuan_dipotong_15_item(self):
+        ketentuan = [f"Syarat {i}" for i in range(30)]
+        poin = _poin(status="T", fakta={"lolos": True, "reason": "x", "keterangan_ketentuan": ketentuan})
+        prompt = build_user_prompt(poin, [])
+        assert "Syarat 0" in prompt
+        assert "Syarat 14" in prompt
+        assert "Syarat 15" not in prompt
+        assert "dipotong dari 30 item" in prompt
 
 
-def test_build_user_prompt_fakta_verdict_terisi():
-    prompt = build_user_prompt(
-        _indikator(), [], None, fakta_verdict="STATUS: MELEBIHI. Nilai aktual (90.0) > batas (80.0)."
-    )
-    assert "STATUS Perbandingan" in prompt
-    assert "STATUS: MELEBIHI. Nilai aktual (90.0) > batas (80.0)." in prompt
+class TestFaktaIntensitas:
+    def _poin_intensitas(self, target=None) -> PoinKonteks:
+        return _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={
+                "parameter": {
+                    "kdb": {"usulan": 70, "ambang_maks": 60, "ambang_min": None, "memenuhi": False, "satuan": "persen"},
+                },
+                "luas_tapak_m2": 400,
+                "jumlah_lantai": 2,
+                "luas_rth_usulan_m2": 250,
+                "target": target or {},
+            },
+        )
+
+    def test_status_dan_parameter_muncul(self):
+        prompt = build_user_prompt(self._poin_intensitas(), [])
+        assert "STATUS_INTENSITAS: MELAMPAUI_BATAS" in prompt
+        assert "usulan=70" in prompt
+        assert "memenuhi=False" in prompt
+
+    def test_target_muncul_saat_ada(self):
+        target = {"kdb": {"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0}}
+        prompt = build_user_prompt(self._poin_intensitas(target=target), [])
+        assert "TARGET PATUH" in prompt
+        assert "60.0" in prompt
+
+    def test_target_tak_muncul_saat_kosong(self):
+        prompt = build_user_prompt(self._poin_intensitas(target={}), [])
+        assert "TARGET PATUH" not in prompt
 
 
-def test_build_user_prompt_fakta_verdict_none_tidak_muncul():
-    prompt = build_user_prompt(_indikator(), [], None, fakta_verdict=None)
-    assert "STATUS Perbandingan" not in prompt
+class TestFaktaDampak:
+    def _poin_dampak(self, perlu_mitigasi=False) -> PoinKonteks:
+        return _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi" if perlu_mitigasi else "Sedang",
+            fakta={
+                "impact_score": 65,
+                "runoff_change_index": 1.78,
+                "mitigasi": {
+                    "perlu_mitigasi": perlu_mitigasi,
+                    "arah": ["turunkan KDB (proporsi tapak/bangunan)", "sumur resapan"] if perlu_mitigasi else [],
+                },
+            },
+        )
+
+    def test_kategori_dan_skor_invers_note_muncul(self):
+        prompt = build_user_prompt(self._poin_dampak(), [])
+        assert "KATEGORI_DAMPAK: Sedang" in prompt
+        assert "IMPACT_SCORE: 65 (INVERS: skor tinggi = dampak RENDAH)" in prompt
+
+    def test_arah_mitigasi_muncul_saat_perlu(self):
+        prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=True), [])
+        assert "turunkan KDB" in prompt
+        assert "sumur resapan" in prompt
+
+    def test_arah_mitigasi_tak_muncul_saat_tak_perlu(self):
+        prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=False), [])
+        assert "Arah Mitigasi" not in prompt
 
 
-def test_build_user_prompt_chunk_dengan_istilah_kode():
-    chunk = _chunk(
-        id="rdtr-lampiran-vi-c1",
-        pasal=None,
-        istilah_kode="Lampiran VI",
-        dokumen="Peraturan Daerah Kabupaten Sleman tentang RDTR",
-        teks="KDB maksimum 80%.",
-    )
-    prompt = build_user_prompt(_indikator(), [chunk], None)
-    assert "(Lampiran VI)" in prompt
+class TestSitasi:
+    def test_chunk_rag_muncul(self):
+        chunk = _chunk()
+        prompt = build_user_prompt(_poin(), [chunk])
+        assert "citation_id=rdtr-matriks-itbx" in prompt
+        assert chunk.teks in prompt
+
+    def test_anchor_dasar_hukum_muncul_mendahului_chunk(self):
+        anchor = DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")
+        poin = _poin(dasar_hukum=[anchor])
+        prompt = build_user_prompt(poin, [_chunk()])
+        idx_anchor = prompt.index("citation_id=anchor-0")
+        idx_chunk = prompt.index("citation_id=rdtr-matriks-itbx")
+        assert idx_anchor < idx_chunk
+        assert "Data KBLI referensi" in prompt
+
+    def test_tanpa_sitasi_ada_peringatan(self):
+        prompt = build_user_prompt(_poin(), [])
+        assert "jangan mengarang sitasi" in prompt
 
 
-def test_build_user_prompt_kegiatan_diizinkan_terisi():
-    prompt = build_user_prompt(
-        _indikator(), [], None, kegiatan_diizinkan=["Rumah toko (ruko) skala kecil", "Perdagangan eceran"]
-    )
-    assert "Kegiatan Diizinkan di Zona Ini" in prompt
-    assert "Rumah toko (ruko) skala kecil" in prompt
-    assert "Perdagangan eceran" in prompt
+class TestMeta:
+    def test_caveat_dan_data_confidence_muncul(self):
+        meta = MetaL2(data_confidence_keseluruhan="Medium", caveats=["Data ITBX sebagian estimasi"])
+        prompt = build_user_prompt(_poin(), [], meta)
+        assert "DATA_CONFIDENCE: Medium" in prompt
+        assert "CAVEAT: Data ITBX sebagian estimasi" in prompt
+
+    def test_meta_none_tidak_muncul(self):
+        prompt = build_user_prompt(_poin(), [], None)
+        assert "DATA_CONFIDENCE" not in prompt
+        assert "CAVEAT" not in prompt
+
+    def test_meta_kosong_tidak_muncul(self):
+        meta = MetaL2(data_confidence_keseluruhan=None, caveats=None)
+        prompt = build_user_prompt(_poin(), [], meta)
+        assert "DATA_CONFIDENCE" not in prompt
+        assert "CAVEAT" not in prompt
 
 
-def test_build_user_prompt_kegiatan_diizinkan_kosong_tidak_muncul():
-    prompt = build_user_prompt(_indikator(), [], None, kegiatan_diizinkan=None)
-    assert "Kegiatan Diizinkan di Zona Ini" not in prompt
-
-    prompt_kosong = build_user_prompt(_indikator(), [], None, kegiatan_diizinkan=[])
-    assert "Kegiatan Diizinkan di Zona Ini" not in prompt_kosong
+def test_build_user_prompt_catatan_perbaikan_muncul():
+    prompt = build_user_prompt(_poin(), [], catatan_perbaikan="Sitasi sebelumnya tidak grounded.")
+    assert "Catatan Perbaikan" in prompt
+    assert "Sitasi sebelumnya tidak grounded." in prompt
