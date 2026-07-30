@@ -6,6 +6,12 @@ memeriksa ulang PoinOutput apa pun sumbernya, bukan mengandalkan generator.py se
 
 Verifikasi entailment sitasi/verdict (NLI/LLM) DITUNDA sampai eval membuktikan perlu — lihat stub
 `verifikasi_entailment_sitasi` di bawah, tidak dipanggil di alur utama.
+
+TODO(pipeline-rewire model L2): setelah generate_poin_dengan_guardrail dipindah ke L2Assessment,
+panggil app.adapter.cek_konsistensi_intensitas(assessment) di sini. Non-kosong -> tandai
+low_confidence=True + log detail masalah. JANGAN menimpa/mengoreksi field dari back-end
+(final_gate_status/status/parameter tetap dipakai apa adanya, sesuai prinsip Faithful CLAUDE.md) —
+guardrail hanya menurunkan tingkat kepercayaan output, bukan "membetulkan" data back-end.
 """
 
 from app.reasoning.calculator import hitung_target_rekomendasi, pilih_target_utama

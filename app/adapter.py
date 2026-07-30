@@ -41,8 +41,11 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
         poin_id="intensitas",
         kategori="Intensitas Bangunan (KDB/KLB/KDH)",
         tipe_rekomendasi="numerik",
-        # Status diturunkan dari `status` (MEMENUHI_SYARAT/MELAMPAUI_BATAS), BUKAN dari `.lolos` —
-        # terbukti bisa stale/kontradiktif di data back-end nyata.
+        # `status` dikonsumsi APA ADANYA dari back-end (ground truth) — BUKAN dari `.lolos` (terbukti
+        # bisa stale/kontradiktif di data nyata) dan BUKAN diturunkan/divalidasi ulang dari
+        # `parameter.*.memenuhi`. `parameter.*.memenuhi` di bawah HANYA fakta pendukung di `fakta[]`
+        # untuk generator/prompt nanti — cek silang status/parameter/final_gate_status adalah tugas
+        # `cek_konsistensi_intensitas` (stub terpisah, belum dipanggil di jalur utama ini).
         status=intensitas.status,
         fakta={
             "parameter": {
@@ -89,6 +92,8 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
 
 
 def adaptasi(assessment: L2Assessment) -> AdapterResult:
+    # final_gate_status dikonsumsi APA ADANYA (ground truth back-end) — tidak diturunkan ulang dari
+    # status/parameter tahap-tahap di bawahnya.
     kategori_dampak = _normalisasi_kategori_dampak(assessment.impact_assessment.impact_category)
     rekomendasi_sistem = turunkan_rekomendasi(assessment.gate_hukum.final_gate_status, kategori_dampak)
     return AdapterResult(
@@ -99,3 +104,25 @@ def adaptasi(assessment: L2Assessment) -> AdapterResult:
         ],
         rekomendasi_sistem=rekomendasi_sistem,
     )
+
+
+def cek_konsistensi_intensitas(assessment: L2Assessment) -> list[str]:
+    """TODO(pipeline-rewire model L2): stub deteksi ketidakkonsistenan status vs parameter.memenuhi
+    vs final_gate_status. BELUM dipanggil di `adaptasi()` — integrasi ke guardrail.py menyusul setelah
+    generator/guardrail di-rewire ke L2Assessment (lihat TODO di app/reasoning/guardrail.py).
+
+    Kalau daftar hasil non-kosong, guardrail HARUS menandai low_confidence + log rinciannya — JANGAN
+    menimpa/mengoreksi field back-end di sini atau di mana pun (prinsip Faithful, CLAUDE.md).
+    """
+    masalah: list[str] = []
+    intensitas = assessment.gate_hukum.tahapan.intensitas
+    ada_pelanggaran_param = any(not p.memenuhi for p in intensitas.parameter.values())
+
+    if intensitas.status == "MELAMPAUI_BATAS" and not ada_pelanggaran_param:
+        masalah.append("status=MELAMPAUI_BATAS tapi semua parameter.memenuhi=True")
+    if intensitas.status == "MEMENUHI_SYARAT" and ada_pelanggaran_param:
+        masalah.append("status=MEMENUHI_SYARAT tapi ada parameter.memenuhi=False")
+    if intensitas.status == "MELAMPAUI_BATAS" and assessment.gate_hukum.final_gate_status == "Lolos":
+        masalah.append("intensitas MELAMPAUI_BATAS tapi final_gate_status=Lolos (harusnya Lolos Bersyarat)")
+
+    return masalah

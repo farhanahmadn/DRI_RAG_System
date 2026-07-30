@@ -304,7 +304,7 @@
         },
         "intensitas": {
           "status": "MELAMPAUI_BATAS",
-          "lolos": true,
+          "lolos": false,
           "parameter": {
             "kdb": {
               "usulan": 70,
@@ -328,7 +328,7 @@
           "luas_tapak_m2": 400,
           "jumlah_lantai": 2,
           "luas_rth_usulan_m2": 250,
-          "reason": "Lolos karena usulan KDB, KLB, dan KDH memenuhi standar regulasi.",
+          "reason": "Lolos Bersyarat karena usulan KDB (70%) melampaui ambang maksimum (60%); KLB dan KDH memenuhi standar regulasi.",
           "dasar_hukum": []
         }
       }
