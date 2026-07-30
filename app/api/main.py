@@ -13,7 +13,7 @@ from app.api.dependencies import get_retriever
 from app.api.rate_limit import cek_rate_limit
 from app.reasoning.assemble import jalankan_precheck
 from app.retrieval.base import Retriever
-from app.schemas import L2Assessment, OutputL3
+from app.schemas import L2Envelope, OutputL3
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,8 @@ def health() -> dict:
 
 
 @app.post("/reasoning", response_model=OutputL3, dependencies=[Depends(cek_rate_limit)])
-def reasoning(
-    request: L2Assessment,
-    retriever: Retriever = Depends(get_retriever),
-) -> OutputL3:
-    return jalankan_precheck(request, retriever)
+def reasoning(request: L2Envelope, retriever: Retriever = Depends(get_retriever)) -> OutputL3:
+    return jalankan_precheck(request.data, retriever)
 
 
 @app.exception_handler(Exception)

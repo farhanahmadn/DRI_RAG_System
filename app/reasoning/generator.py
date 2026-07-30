@@ -38,16 +38,33 @@ _LLM_RESPONSE_SCHEMA = {
 }
 
 
+# Kata kunci PENDEK utk jalur search fallback — selaras dgn `_EXPANSION` di
+# app/retrieval/retriever.py (RAG asli teman: exact-match lowercase key -> istilah regulasi,
+# TIDAK fuzzy/substring). `poin.kategori` sekarang string deskriptif panjang ("Klasifikasi
+# Kegiatan (ITBX)" dst) yang TIDAK match kunci `_EXPANSION` manapun persis — pakai kata kunci
+# pendek di sini supaya RetrieverAsli tetap dapat manfaat ekspansi query. TIDAK menyentuh
+# app/retrieval/retriever.py (bukan milik saya, lihat CLAUDE.md § Aturan main).
+#
+# CATATAN: "dampak" BELUM ada entri _EXPANSION yg cocok di retriever.py (konsep baru model L2,
+# dict itu masih dari model indikator lama) — pakai poin.kategori apa adanya utk poin ini sampai
+# teman menambah entri baru di sisi mereka.
+_QUERY_FALLBACK_PER_POIN = {
+    "itbx": "kegiatan",
+    "intensitas": "kdb",
+}
+
+
 def ambil_chunks_pendukung(
     poin: PoinKonteks,
     retriever: Retriever,
     top_k_dukungan: int = 3,
 ) -> list[Chunk]:
-    """Retrieval chunk pendukung utk satu poin: dasar_hukum dulu, fallback search teks kategori."""
+    """Retrieval chunk pendukung utk satu poin: dasar_hukum dulu, fallback search kata kunci pendek."""
     referensi = [f"{d.dokumen} {d.pasal}" for d in poin.dasar_hukum if d.pasal]
     chunks = retriever.get_by_reference(referensi) if referensi else []
     if not chunks:
-        chunks = retriever.search(poin.kategori, RetrievalFilters(), top_k=top_k_dukungan)
+        query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
+        chunks = retriever.search(query_fallback, RetrievalFilters(), top_k=top_k_dukungan)
     return chunks
 
 
@@ -124,7 +141,10 @@ def generate_poin(
                 dokumen=chunk.dokumen,
                 pasal=chunk.pasal or "",
                 halaman=chunk.halaman or 0,
-                kutipan=kutipan or chunk.teks,
+                # SELALU chunk.teks apa adanya (BUKAN `kutipan or chunk.teks`) — kutipan dari LLM di
+                # sini cuma dipakai utk MEMILIH chunk mana yang relevan, isi teksnya sendiri wajib
+                # verbatim dari hasil retrieval, LLM tak boleh menulis ulang/mengarang kutipan pasal.
+                kutipan=chunk.teks,
                 terverifikasi=True,
             )
         )

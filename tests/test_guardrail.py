@@ -134,11 +134,26 @@ class TestCekInversSkor:
 
 
 class TestCekKonsistensiVerdict:
-    def test_itbx_x_tapi_teks_bilang_diizinkan(self):
+    def test_itbx_x_tanpa_verdict_larangan_ditegaskan(self):
         poin = _poin(status="X", fakta={"lolos": False, "reason": "x"})
         output = _poin_output(status="X", reasoning_panjang="Kegiatan ini diizinkan di zona tersebut.")
         masalah = _cek_konsistensi_verdict(output, poin)
-        assert any("diizinkan" in m for m in masalah)
+        assert any("larangan" in m for m in masalah)
+
+    def test_itbx_x_menyebut_kegiatan_alternatif_diizinkan_tidak_false_positive(self):
+        # Regresi bug nyata (ditemukan lewat eval/run_eval live): SYSTEM_PROMPT aturan #7
+        # mewajibkan LLM menyebut kegiatan ALTERNATIF yang diizinkan di zona ini saat status=X —
+        # kata "diizinkan" WAJAR muncul merujuk kegiatan lain, bukan kegiatan yang diusulkan.
+        # Cek negatif lama ('diizinkan' dilarang muncul sama sekali) false-positive di kasus ini.
+        poin = _poin(status="X", fakta={"lolos": False, "reason": "x"})
+        output = _poin_output(
+            status="X",
+            reasoning_panjang=(
+                "Kegiatan Industri Besar/Pabrik dilarang di zona perumahan. Sebagai gantinya, "
+                "kegiatan seperti Rumah Tunggal dan Warung dapat diizinkan di zona ini."
+            ),
+        )
+        assert _cek_konsistensi_verdict(output, poin) == []
 
     def test_itbx_i_tidak_dicek(self):
         poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
@@ -228,7 +243,7 @@ class TestPaksaFieldWajib:
         assert "Data ITBX sebagian estimasi" in hasil.rekomendasi.disclaimer
 
     def test_cek_konsistensi_intensitas_men_trigger_low_confidence(self):
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         # rusak jadi tak konsisten: status dipaksa MEMENUHI_SYARAT tapi param kdb tetap memenuhi=False.
         intensitas = assessment.gate_hukum.tahapan.intensitas.model_copy(update={"status": "MEMENUHI_SYARAT"})
         tahapan = assessment.gate_hukum.tahapan.model_copy(update={"intensitas": intensitas})
@@ -298,7 +313,7 @@ class TestGeneratePoinDenganGuardrail:
             return {
                 "reasoning_pendek": "KDB melampaui ambang maksimum.",
                 "reasoning_panjang": "Usulan KDB melampaui ambang maksimum yang berlaku di zona ini.",
-                "sitasi": [],
+                "sitasi": [{"citation_id": "rdtr-lampiran-vi-c1", "kutipan": "KDB maksimum 80%."}],
                 "saran": "Kurangi proporsi luas bangunan terhadap luas lahan.",
                 "disclaimer": None,
             }
@@ -307,12 +322,14 @@ class TestGeneratePoinDenganGuardrail:
 
         poin = _poin(
             poin_id="intensitas",
-            kategori="Qxvwzq-9999 Plarknex Sintetis",  # sengaja tak match chunk mock apa pun
+            # kategori tak lagi menentukan query fallback utk poin_id="intensitas" (selalu "kdb",
+            # lihat generator.py::_QUERY_FALLBACK_PER_POIN) — "kdb" MEMANG match rdtr-lampiran-vi-c1
+            # di MockRetriever, jadi stub sitasi di atas harus mengutip chunk itu (bukan kosong).
             tipe_rekomendasi="numerik",
             status="MELAMPAUI_BATAS",
             fakta={"target": {"kdb": {"target_kdb": 60.0, "selisih": 10.0}}},
         )
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         hasil = generate_poin_dengan_guardrail(poin, MockRetriever(), assessment)
 
         assert panggilan["n"] == 1
@@ -328,14 +345,14 @@ class TestGeneratePoinDenganGuardrail:
                 return {
                     "reasoning_pendek": "KDB usulan adalah 70 persen.",  # angka -> ditolak cek #6
                     "reasoning_panjang": "x",
-                    "sitasi": [],
+                    "sitasi": [{"citation_id": "rdtr-lampiran-vi-c1", "kutipan": "KDB maksimum 80%."}],
                     "saran": "x",
                     "disclaimer": None,
                 }
             return {
                 "reasoning_pendek": "KDB melampaui ambang maksimum.",
                 "reasoning_panjang": "Usulan KDB melampaui ambang maksimum yang berlaku di zona ini.",
-                "sitasi": [],
+                "sitasi": [{"citation_id": "rdtr-lampiran-vi-c1", "kutipan": "KDB maksimum 80%."}],
                 "saran": "Kurangi proporsi luas bangunan terhadap luas lahan.",
                 "disclaimer": None,
             }
@@ -344,12 +361,12 @@ class TestGeneratePoinDenganGuardrail:
 
         poin = _poin(
             poin_id="intensitas",
-            kategori="Qxvwzq-9999 Plarknex Sintetis",  # sengaja tak match chunk mock apa pun
+            # kategori tak lagi menentukan query fallback utk poin_id="intensitas" (selalu "kdb").
             tipe_rekomendasi="numerik",
             status="MELAMPAUI_BATAS",
             fakta={"target": {"kdb": {"target_kdb": 60.0, "selisih": 10.0}}},
         )
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         hasil = generate_poin_dengan_guardrail(poin, MockRetriever(), assessment)
 
         assert panggilan["n"] == 2
@@ -378,7 +395,7 @@ class TestGeneratePoinDenganGuardrail:
             status="MELAMPAUI_BATAS",
             fakta={"target": {"kdb": {"target_kdb": 60.0, "selisih": 10.0}}},
         )
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         hasil = generate_poin_dengan_guardrail(poin, MockRetriever(), assessment, max_retry=2)
 
         assert panggilan["n"] == 3  # max_retry=2 -> 3 percobaan total, JANGAN loop tak terbatas

@@ -14,92 +14,6 @@ from app.retrieval.base import Chunk, RetrievalFilters
 
 
 def _build_mock_chunks() -> list[Chunk]:
-    pasal_44 = Chunk(
-        id="uu41-2009-p44",
-        level="pasal",
-        parent_id=None,
-        teks=(
-            "Pasal 44: Lahan Pertanian Pangan Berkelanjutan yang sudah ditetapkan dilindungi dan "
-            "dilarang dialihfungsikan, kecuali untuk kepentingan umum dengan syarat tertentu "
-            "(kajian kelayakan strategis, penyusunan rencana alih fungsi, dan penyediaan lahan "
-            "pengganti)."
-        ),
-        dokumen="UU No. 41 Tahun 2009 tentang Perlindungan Lahan Pertanian Pangan Berkelanjutan",
-        pasal="44",
-        halaman=21,
-        skor=0.0,
-        tanggal_berlaku=date(2009, 8, 14),
-        zona="LP2B",
-        jenis="UU",
-    )
-    pasal_44_ayat1 = Chunk(
-        id="uu41-2009-p44-a1",
-        level="ayat",
-        parent_id=pasal_44.id,
-        teks="(1) Lahan Pertanian Pangan Berkelanjutan yang sudah ditetapkan dilarang dialihfungsikan.",
-        dokumen=pasal_44.dokumen,
-        pasal="44",
-        ayat="1",
-        halaman=21,
-        skor=0.0,
-        tanggal_berlaku=pasal_44.tanggal_berlaku,
-        zona="LP2B",
-        jenis="UU",
-    )
-    pasal_44_ayat2 = Chunk(
-        id="uu41-2009-p44-a2",
-        level="ayat",
-        parent_id=pasal_44.id,
-        teks=(
-            "(2) Pengalihfungsian sebagaimana dimaksud pada ayat (1) dapat dilakukan karena "
-            "kepentingan umum dengan syarat: kajian kelayakan strategis, rencana alih fungsi lahan, "
-            "pembebasan hak, dan penyediaan lahan pengganti."
-        ),
-        dokumen=pasal_44.dokumen,
-        pasal="44",
-        ayat="2",
-        halaman=21,
-        skor=0.0,
-        tanggal_berlaku=pasal_44.tanggal_berlaku,
-        zona="LP2B",
-        jenis="UU",
-    )
-
-    pasal_50 = Chunk(
-        id="uu41-2009-p50",
-        level="pasal",
-        parent_id=None,
-        teks=(
-            "Pasal 50: Setiap orang yang mengalihfungsikan Lahan Pertanian Pangan Berkelanjutan "
-            "tanpa izin dapat dikenai sanksi administratif berupa penghentian kegiatan, pencabutan "
-            "izin, dan/atau kewajiban pemulihan fungsi lahan."
-        ),
-        dokumen="UU No. 41 Tahun 2009 tentang Perlindungan Lahan Pertanian Pangan Berkelanjutan",
-        pasal="50",
-        halaman=24,
-        skor=0.0,
-        tanggal_berlaku=date(2009, 8, 14),
-        zona="LP2B",
-        jenis="UU",
-    )
-    pasal_50_ayat1 = Chunk(
-        id="uu41-2009-p50-a1",
-        level="ayat",
-        parent_id=pasal_50.id,
-        teks=(
-            "(1) Alih fungsi Lahan Pertanian Pangan Berkelanjutan tanpa izin dikenai sanksi "
-            "administratif berupa penghentian kegiatan dan/atau kewajiban pemulihan fungsi lahan."
-        ),
-        dokumen=pasal_50.dokumen,
-        pasal="50",
-        ayat="1",
-        halaman=24,
-        skor=0.0,
-        tanggal_berlaku=pasal_50.tanggal_berlaku,
-        zona="LP2B",
-        jenis="UU",
-    )
-
     _rdtr_dokumen = "Peraturan Daerah Kabupaten Sleman tentang Rencana Detail Tata Ruang (RDTR)"
     rdtr_p1 = Chunk(
         id="rdtr-p1",
@@ -205,80 +119,13 @@ def _build_mock_chunks() -> list[Chunk]:
         jenis="RDTR",
     )
 
-    banjir_metodologi = Chunk(
-        id="dri2-metodologi-banjir",
-        level="tabel",
-        parent_id=None,
-        teks=(
-            "Metodologi Indeks Risiko Bencana (DRI) Tingkat 2 — Kajian Risiko Bencana Banjir "
-            "Kabupaten Sleman. Klasifikasi tingkat risiko banjir (Tinggi/Sedang/Rendah) mengacu "
-            "pada kedalaman genangan, frekuensi kejadian, dan tingkat kerentanan wilayah. Ini "
-            "adalah dasar METODOLOGIS penilaian risiko, BUKAN merupakan ketentuan hukum atau "
-            "pasal peraturan perundang-undangan."
-        ),
-        dokumen=(
-            "Metodologi Indeks Risiko Bencana (DRI) Tingkat 2 — Kajian Risiko Bencana Banjir "
-            "Kabupaten Sleman"
-        ),
-        pasal=None,
-        halaman=1,
-        skor=0.0,
-        tanggal_berlaku=date(2021, 1, 1),
-        jenis="Metodologi",
-    )
-    resapan_rtrw = Chunk(
-        id="rtrw-kawasan-resapan-air",
-        level="tabel",
-        parent_id=None,
-        teks=(
-            "RTRW Kabupaten Sleman 2011-2031 — Kawasan Resapan Air ditetapkan untuk menjaga "
-            "ketersediaan air tanah dan mencegah banjir/kekeringan. Pembangunan pada kawasan "
-            "resapan air berisiko mengganggu fungsi resapan dan keseimbangan tata air wilayah."
-        ),
-        dokumen="RTRW Kabupaten Sleman 2011-2031",
-        pasal=None,
-        halaman=45,
-        skor=0.0,
-        tanggal_berlaku=date(2011, 1, 1),
-        zona="Kawasan Resapan Air",
-        jenis="RTRW",
-    )
-    sempadan_permen_pupr = Chunk(
-        id="permen-pupr-28-2015-p22",
-        level="pasal",
-        parent_id=None,
-        teks=(
-            "Pasal 22: Garis sempadan sungai tidak bertanggul di kawasan perkotaan ditetapkan "
-            "paling sedikit 15 (lima belas) meter dari tepi sungai, untuk sungai dengan kedalaman "
-            "sedang. (Disederhanakan untuk keperluan pengujian — lihat Permen asli untuk kategori "
-            "kedalaman lengkap.)"
-        ),
-        dokumen=(
-            "Peraturan Menteri PUPR No. 28/PRT/M/2015 tentang Penetapan Garis Sempadan Sungai dan "
-            "Garis Sempadan Danau"
-        ),
-        pasal="22",
-        halaman=14,
-        skor=0.0,
-        tanggal_berlaku=date(2015, 1, 1),
-        jenis="Permen",
-    )
-
     return [
-        pasal_44,
-        pasal_44_ayat1,
-        pasal_44_ayat2,
-        pasal_50,
-        pasal_50_ayat1,
         rdtr_p1,
         rdtr_p1_ayat107,
         rdtr_lampiran_vi_c1,
         rdtr_p1_ayat108,
         rdtr_lampiran_v_c1,
         rdtr_lampiran_vi_r1,
-        banjir_metodologi,
-        resapan_rtrw,
-        sempadan_permen_pupr,
     ]
 
 

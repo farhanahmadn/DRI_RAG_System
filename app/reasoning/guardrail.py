@@ -28,7 +28,7 @@ from app.schemas import L2Assessment, PoinKonteks, PoinOutput
 
 logger = logging.getLogger(__name__)
 
-_CAVEAT_FALLBACK_ITBX = (
+CAVEAT_FALLBACK_ITBX = (
     "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi"
 )
 
@@ -112,12 +112,16 @@ def _cek_konsistensi_verdict(poin_output: PoinOutput, poin: PoinKonteks) -> list
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang}".lower()
 
     if poin.poin_id == "itbx" and poin.status == "X":
-        for frasa in ("diizinkan", "boleh dilaksanakan", "diperbolehkan tanpa syarat"):
-            if frasa in teks:
-                masalah.append(
-                    f"Reasoning menyiratkan kegiatan diizinkan ('{frasa}') padahal status ITBX = X."
-                )
-                break
+        # Cek POSITIF (verdict larangan harus ditegaskan ADA), bukan negatif (kata "diizinkan"
+        # dilarang muncul sama sekali) — SYSTEM_PROMPT aturan #7 mewajibkan LLM menyebut kegiatan
+        # ALTERNATIF yang diizinkan di zona ini, jadi kata "diizinkan" WAJAR muncul (merujuk
+        # kegiatan lain, bukan kegiatan yang diusulkan). Cek negatif lama false-positive di sini.
+        frasa_larangan = ("dilarang", "tidak diizinkan", "tidak diperbolehkan", "tidak boleh")
+        if not any(frasa in teks for frasa in frasa_larangan):
+            masalah.append(
+                "Reasoning tidak menegaskan larangan ('dilarang'/'tidak diizinkan'/dst tidak "
+                "ditemukan) padahal status ITBX = X — verdict harus dinyatakan jelas."
+            )
 
     if poin.poin_id == "intensitas":
         if poin.status == "MEMENUHI_SYARAT":
@@ -176,8 +180,8 @@ def _paksa_field_wajib(
     # Cek #2 — ITBX fallback data-kosong: paksa low_confidence + caveat wajib.
     if poin.poin_id == "itbx" and poin.fakta.get("fallback_data_kosong"):
         update["low_confidence"] = True
-        if _CAVEAT_FALLBACK_ITBX.lower() not in teks_sudah_ada.lower():
-            disclaimer_tambahan.append(_CAVEAT_FALLBACK_ITBX.capitalize() + ".")
+        if CAVEAT_FALLBACK_ITBX.lower() not in teks_sudah_ada.lower():
+            disclaimer_tambahan.append(CAVEAT_FALLBACK_ITBX.capitalize() + ".")
 
     # Cek #3 — meta.caveats / data_confidence WAJIB muncul.
     meta = assessment.meta

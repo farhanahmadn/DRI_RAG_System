@@ -27,6 +27,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 markers = [
     "live: memanggil LLM sungguhan (Groq), butuh GROQ_API_KEY, tak jalan di suite rutin",
 ]

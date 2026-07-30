@@ -19,7 +19,9 @@ from app.schemas import (
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-@pytest.mark.parametrize("nama_file", ["l2_sample_lolos.json", "l2_sample_lolos_bersyarat.json"])
+@pytest.mark.parametrize(
+    "nama_file", ["l2_sample_lolos.json", "l2_sample_amplop_6191.json", "l2_sample_tidak_lolos.json"]
+)
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
     payload = json.loads((FIXTURES_DIR / nama_file).read_text(encoding="utf-8"))
     assessment = L2Assessment.model_validate(payload["data"])
@@ -86,6 +88,8 @@ def test_output_l3_roundtrip():
         ],
         rekomendasi_sistem="Setuju Bersyarat",
         kesimpulan=KesimpulanOutput(langkah_berdampak=["Revisi desain agar KDB memenuhi ambang."]),
+        catatan_global=[],
+        low_confidence_keseluruhan=False,
     )
 
     dumped = output.model_dump()

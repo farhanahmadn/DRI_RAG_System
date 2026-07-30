@@ -158,6 +158,33 @@ def test_generate_poin_sitasi_anchor_diprioritaskan(monkeypatch):
     assert hasil.sitasi[0].terverifikasi is True
 
 
+def test_generate_poin_sitasi_chunk_kutipan_selalu_verbatim_bukan_dari_llm(monkeypatch):
+    # Fix #3: kutipan utk sitasi berbasis chunk WAJIB chunk.teks apa adanya — kutipan yang ditulis
+    # LLM di sini cuma dipakai LLM utk MEMILIH citation_id yang relevan, isinya sendiri diabaikan
+    # (LLM tak boleh mengarang/menulis-ulang teks kutipan pasal).
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x",
+            "reasoning_panjang": "x",
+            "sitasi": [
+                {"citation_id": "rdtr-p1-a108", "kutipan": "Ini kutipan karangan LLM, bukan teks pasal asli."}
+            ],
+            "saran": "x",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})  # tanpa dasar_hukum -> fallback search "kegiatan"
+    retriever = MockRetriever()
+    hasil = generate_poin(poin, retriever)
+
+    assert len(hasil.sitasi) == 1
+    chunk_asli = next(c for c in retriever._chunks if c.id == "rdtr-p1-a108")
+    assert hasil.sitasi[0].kutipan == chunk_asli.teks
+    assert hasil.sitasi[0].kutipan != "Ini kutipan karangan LLM, bukan teks pasal asli."
+
+
 def test_generate_poin_citation_id_halusinasi_dibuang(monkeypatch):
     def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
         return {
@@ -184,7 +211,7 @@ _ALASAN_SKIP_LIVE = "GROQ_API_KEY tidak diset — skip smoke test panggilan LLM 
 @pytest.mark.live
 @pytest.mark.skipif(not os.getenv("GROQ_API_KEY"), reason=_ALASAN_SKIP_LIVE)
 def test_generate_poin_intensitas_melanggar_grounded_live():
-    assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+    assessment = _muat_assessment("l2_sample_amplop_6191.json")
     hasil_adaptasi = adaptasi(assessment)
     poin_intensitas = next(p for p in hasil_adaptasi.poin if p.poin_id == "intensitas")
 

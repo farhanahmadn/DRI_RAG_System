@@ -34,7 +34,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/L2Assessment"
+                "$ref": "#/components/schemas/L2Envelope"
               }
             }
           },
@@ -623,6 +623,41 @@
           "impact_assessment"
         ],
         "title": "L2Assessment"
+      },
+      "L2Envelope": {
+        "properties": {
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuscode"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "data": {
+            "$ref": "#/components/schemas/L2Assessment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "L2Envelope",
+        "description": "Terima L2Assessment polos ATAU amplop back-end {statusCode, message, data} — bentuk asli\nrespons L2 Spatial Risk Assessment sungguhan (lihat tests/fixtures/l2_sample_*.json). Endpoint\n/reasoning pakai model ini sebagai body, lalu teruskan `.data` (lihat app/api/main.py)."
       },
       "Lokasi": {
         "properties": {

@@ -37,6 +37,8 @@ def _response() -> OutputL3:
         ],
         rekomendasi_sistem="Setuju",
         kesimpulan=KesimpulanOutput(langkah_berdampak=["a"], catatan_lokasi="catatan"),
+        catatan_global=[],
+        low_confidence_keseluruhan=False,
     )
 
 

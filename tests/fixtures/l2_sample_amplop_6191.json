@@ -2,38 +2,63 @@
   "statusCode": 200,
   "message": "L2 Spatial Risk Assessment completed successfully",
   "data": {
-    "application_id": 11,
-    "application_number": "APP-2026-3468",
-    "timestamp": "2026-07-29T08:57:51.567Z",
+    "application_id": 21,
+    "application_number": "APP-2026-6191",
+    "timestamp": "2026-07-30T07:25:39.333Z",
     "lokasi": {
       "koordinat": {
-        "lat": -7.783285393499966,
-        "lon": 110.47835268191942
+        "lat": -7.783286326,
+        "lon": 110.478353655
       },
       "geojson": {
         "type": "Point",
         "coordinates": [
-          110.478352682,
-          -7.783285393
+          110.478353655,
+          -7.783286326
         ]
       },
       "rdtr_zone": "Zona Perumahan",
-      "luas_lahan_m2": 850
+      "luas_lahan_m2": 1000
     },
     "gate_hukum": {
       "final_gate_status": "Lolos Bersyarat",
       "rekomendasi_sistem": "Setuju Bersyarat",
-      "decisive_stage": null,
+      "decisive_stage": "intensitas",
       "tahapan": {
         "itbx": {
-          "status": "I",
+          "status": "T",
           "lolos": true,
-          "kbli_diusulkan": "41011",
-          "kegiatan_diusulkan": "Rumah Tunggal",
+          "kbli_diusulkan": "0111",
+          "kegiatan_diusulkan": "WARUNG",
           "kegiatan_diizinkan": [
-            "Rumah Tunggal",
-            "Perumahan Kepadatan Sedang",
-            "Warung"
+            "Rumah tunggal",
+            "Rumah Sederhana/Subsidi",
+            "Rumah deret",
+            "Asrama",
+            "Rumah kost/pemondokan",
+            "Guest house/Pondok Wisata/Homestay",
+            "Rumah dinas/Rumah Negara",
+            "Tanaman (nursery)",
+            "Penitipan anak",
+            "Kantor Kecamatan/Desa",
+            "TK/PAUD/Playgroup",
+            "SD/SMP/MI/MTS",
+            "Puskesmas",
+            "Puskesmas pembantu",
+            "Pos Kesehatan",
+            "Panti Sosial/Rehabilitasi",
+            "Bidan/Dokter umum/Spesialis",
+            "Poliklinik/klinik",
+            "Gedung Pertemuan Kota",
+            "Gedung Pertemuan Lingkungan",
+            "Pusat informasi lingkungan",
+            "Jalur hijau dan pulau jalan",
+            "Taman kota",
+            "Taman lingkungan",
+            "Lapangan Olahraga",
+            "Pertanian lahan basah",
+            "Pertanian lahan kering",
+            "Hortikultura"
           ],
           "kegiatan_terbatas": [
             "Ruko",
@@ -293,7 +318,7 @@
             "Teknik Pengaturan Zonasi dengan TDR (a) dapat dilakukan berupa: Pemilik tanah pada zona perumahan di kawasan perkotaan dapat memberikan haknya untuk pembangunan RTH publik",
             "Teknik Pengaturan Zonasi dengan TDR (a) dapat dilakukan berupa: sehingga pemilik tanah dapat memperoleh ganti berupa hak membangun pada zona pertanian non LP2B."
           ],
-          "reason": "Lolos karena kegiatan Diizinkan (I) di zona Zona Perumahan",
+          "reason": "Lolos karena kegiatan Terbatas (T) di zona Zona Perumahan",
           "dasar_hukum": [
             {
               "dokumen": "RDTR Sleman",
@@ -307,28 +332,28 @@
           "lolos": false,
           "parameter": {
             "kdb": {
-              "usulan": 70,
+              "usulan": 90,
               "ambang_maks": 60,
               "memenuhi": false,
               "satuan": "persen"
             },
             "klb": {
-              "usulan": 0.9411764705882353,
+              "usulan": 0.9,
               "ambang_maks": 1.8,
               "memenuhi": true,
               "satuan": "rasio"
             },
             "kdh": {
-              "usulan": 29.411764705882355,
+              "usulan": 0,
               "ambang_min": 0,
               "memenuhi": true,
               "satuan": "persen"
             }
           },
-          "luas_tapak_m2": 400,
-          "jumlah_lantai": 2,
-          "luas_rth_usulan_m2": 250,
-          "reason": "Lolos Bersyarat karena usulan KDB (70%) melampaui ambang maksimum (60%); KLB dan KDH memenuhi standar regulasi.",
+          "luas_tapak_m2": 900,
+          "jumlah_lantai": 1,
+          "luas_rth_usulan_m2": null,
+          "reason": "Melanggar Aturan: KDB (90 ) Max (60 )",
           "dasar_hukum": []
         }
       }
@@ -336,11 +361,11 @@
     "impact_assessment": {
       "dinilai": true,
       "c_before": 0.3,
-      "c_after": 0.535,
-      "runoff_change_index": 1.7833333333333334,
-      "impact_score": 65,
-      "impact_category": "SEDANG",
-      "calculation_details": "C_Sesudah = (Proporsi KDB x C_Atap) + (Proporsi KDH x C_Taman) = (0.4705882352941176 x 0.95) + (0.29411764705882354 x 0.30) = 0.535",
+      "c_after": 0.855,
+      "runoff_change_index": 2.85,
+      "impact_score": 40,
+      "impact_category": "TINGGI",
+      "calculation_details": "C_Sesudah = (Proporsi KDB x C_Atap) + (Proporsi KDH x C_Taman) = (0.9 x 0.95) + (0 x 0.30) = 0.855",
       "threshold_bands": {
         "Rendah": "index < 1.5",
         "Sedang": "1.5-2.5",
@@ -353,15 +378,15 @@
         "C": 0.3
       },
       "proposed_surface_details": {
-        "Bangunan/Atap": 47.05882352941176,
-        "Taman/RTH": 29.411764705882355
+        "Bangunan/Atap": 90,
+        "Taman/RTH": 0
       },
       "c_coefficients": {
         "C_Atap": 0.95,
         "C_Taman": 0.3,
         "C_Daerah_tak_Terbangun": 0.3
       },
-      "luas_lahan_m2": 850,
+      "luas_lahan_m2": 1000,
       "data_confidence": "High",
       "limitations": null
     },

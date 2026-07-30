@@ -14,11 +14,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from app.adapter import adaptasi
 from app.reasoning.assemble import jalankan_precheck
 from app.reasoning.generator import ambil_chunks_pendukung
 from app.retrieval.base import Retriever
 from app.retrieval.mock import MockRetriever
-from app.schemas import JejakAturanRequest
+from app.schemas import L2Assessment
 from eval.metrics import HasilMetrik, evaluasi_kasus
 
 load_dotenv()
@@ -66,9 +67,10 @@ def jalankan_gold_set(
         nama = kasus["nama"]
         expected = kasus["expected"]
         try:
-            request = JejakAturanRequest.model_validate(kasus["request"])
-            indikator = request.indikator[0]
-            chunks = ambil_chunks_pendukung(indikator, retriever)
+            assessment = L2Assessment.model_validate(kasus["request"])
+            hasil_adaptasi = adaptasi(assessment)
+            poin_fokus = next(p for p in hasil_adaptasi.poin if p.poin_id == expected["poin_id_fokus"])
+            chunks = ambil_chunks_pendukung(poin_fokus, retriever)
 
             diharapkan = set(expected.get("citation_ids_diharapkan") or [])
             tersedia = {c.id for c in chunks}
@@ -79,18 +81,18 @@ def jalankan_gold_set(
                 )
 
             mulai = time.perf_counter()
-            output = jalankan_precheck(request, retriever)
+            output = jalankan_precheck(assessment, retriever)
             latensi = time.perf_counter() - mulai
 
-            poin = output.poin[0]
-            metrik = evaluasi_kasus(poin, indikator, chunks, output, expected)
+            metrik = evaluasi_kasus(output, assessment, chunks, expected)
+            poin_output_fokus = next(p for p in output.poin if p.poin_id == expected["poin_id_fokus"])
             hasil.append(
                 HasilKasus(
                     nama=nama,
                     metrik=metrik,
                     latensi_detik=latensi,
                     error=None,
-                    low_confidence=poin.low_confidence,
+                    low_confidence=poin_output_fokus.low_confidence,
                 )
             )
         except Exception as exc:

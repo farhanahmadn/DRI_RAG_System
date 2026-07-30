@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.adapter import _bangun_poin_intensitas, _deteksi_fallback_itbx, adaptasi, cek_konsistensi_intensitas
+from app.adapter import _bangun_poin_intensitas, deteksi_fallback_itbx, adaptasi, cek_konsistensi_intensitas
 from app.schemas import L2Assessment
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -41,13 +41,10 @@ class TestFixtureLolos:
 
 class TestFixtureLolosBersyarat:
     def test_parse_tanpa_error(self):
-        _muat_assessment("l2_sample_lolos_bersyarat.json")
+        _muat_assessment("l2_sample_amplop_6191.json")
 
     def test_status_dan_parameter_konsisten(self):
-        # Fixture ini sebelumnya punya intensitas.lolos=True yang kontradiktif dgn KDB melampaui
-        # ambang (bug back-end asli, sudah dilaporkan terpisah) — sekarang fixture sudah diperbaiki
-        # jadi internal-konsisten.
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         assert assessment.gate_hukum.tahapan.intensitas.lolos is False
         assert assessment.gate_hukum.tahapan.intensitas.status == "MELAMPAUI_BATAS"
 
@@ -58,13 +55,13 @@ class TestFixtureLolosBersyarat:
         assert cek_konsistensi_intensitas(assessment) == []
 
     def test_rekomendasi_sistem_setuju_bersyarat(self):
-        hasil = adaptasi(_muat_assessment("l2_sample_lolos_bersyarat.json"))
+        hasil = adaptasi(_muat_assessment("l2_sample_amplop_6191.json"))
         assert hasil.rekomendasi_sistem == "Setuju Bersyarat"
 
     def test_status_poin_ikut_status_bukan_lolos_walau_dibuat_berbeda(self):
         # Kasus sintetis (bukan fixture kontradiktif) — buktikan adapter tetap memakai `.status`
         # utk menentukan status poin, terlepas dari nilai `.lolos`, bila suatu saat keduanya beda lagi.
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         intensitas_dibalik = assessment.gate_hukum.tahapan.intensitas.model_copy(
             update={"lolos": not assessment.gate_hukum.tahapan.intensitas.lolos}
         )
@@ -95,7 +92,7 @@ class TestFixtureTidakLolos:
         assessment = _muat_assessment("l2_sample_tidak_lolos.json")
         itbx = assessment.gate_hukum.tahapan.itbx
         assert itbx.status == "X"
-        assert _deteksi_fallback_itbx(itbx.reason) is True
+        assert deteksi_fallback_itbx(itbx.reason) is True
 
         hasil = adaptasi(assessment)
         poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
@@ -124,10 +121,10 @@ class TestCekKonsistensiIntensitas:
         assert cek_konsistensi_intensitas(_muat_assessment("l2_sample_lolos.json")) == []
 
     def test_fixture_lolos_bersyarat_konsisten(self):
-        assert cek_konsistensi_intensitas(_muat_assessment("l2_sample_lolos_bersyarat.json")) == []
+        assert cek_konsistensi_intensitas(_muat_assessment("l2_sample_amplop_6191.json")) == []
 
     def test_melampaui_batas_tapi_semua_parameter_memenuhi(self):
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         parameter_bersih = {
             nama: p.model_copy(update={"memenuhi": True})
             for nama, p in assessment.gate_hukum.tahapan.intensitas.parameter.items()
@@ -153,7 +150,7 @@ class TestCekKonsistensiIntensitas:
         assert any("ada parameter.memenuhi=False" in m for m in masalah)
 
     def test_melampaui_batas_tapi_final_gate_status_lolos(self):
-        assessment = _muat_assessment("l2_sample_lolos_bersyarat.json")
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
         gate = assessment.gate_hukum.model_copy(update={"final_gate_status": "Lolos"})
         assessment = assessment.model_copy(update={"gate_hukum": gate})
 
@@ -162,7 +159,7 @@ class TestCekKonsistensiIntensitas:
 
 
 @pytest.mark.parametrize(
-    "nama_file", ["l2_sample_lolos.json", "l2_sample_lolos_bersyarat.json", "l2_sample_tidak_lolos.json"]
+    "nama_file", ["l2_sample_lolos.json", "l2_sample_amplop_6191.json", "l2_sample_tidak_lolos.json"]
 )
 def test_poin_dampak_tidak_dinilai_fallback(nama_file):
     assessment = _muat_assessment(nama_file)

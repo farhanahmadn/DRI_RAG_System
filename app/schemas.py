@@ -6,7 +6,7 @@ kalkulator deterministik — LLM tidak pernah mengisi field numerik atau menentu
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 # ---------------------------------------------------------------------------
 # Input: L2Assessment (gate_hukum + impact_assessment dari back-end)
@@ -61,8 +61,8 @@ class ParameterIntensitas(BaseModel):
 class IntensitasTahap(BaseModel):
     status: Literal["MEMENUHI_SYARAT", "MELAMPAUI_BATAS"]
     # `lolos` & `reason` disimpan apa adanya (faithful ke payload asli) TAPI TIDAK dipakai sebagai
-    # sumber kebenaran oleh adapter — terbukti bisa stale/kontradiktif dgn `status`/`parameter.*.memenuhi`
-    # (lihat tests/fixtures/l2_sample_lolos_bersyarat.json: lolos=True padahal KDB melampaui ambang).
+    # sumber kebenaran oleh adapter — pernah teramati stale/kontradiktif dgn `status`/
+    # `parameter.*.memenuhi` di data back-end nyata (lolos=True padahal KDB melampaui ambang).
     lolos: bool
     parameter: dict[str, ParameterIntensitas]
     luas_tapak_m2: float | None = None
@@ -119,6 +119,25 @@ class L2Assessment(BaseModel):
     gate_hukum: GateHukum
     impact_assessment: ImpactAssessment
     meta: MetaL2 | None = None
+
+
+class L2Envelope(BaseModel):
+    """Terima L2Assessment polos ATAU amplop back-end {statusCode, message, data} — bentuk asli
+    respons L2 Spatial Risk Assessment sungguhan (lihat tests/fixtures/l2_sample_*.json). Endpoint
+    /reasoning pakai model ini sebagai body, lalu teruskan `.data` (lihat app/api/main.py)."""
+
+    statusCode: int | None = None
+    message: str | None = None
+    data: L2Assessment
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bungkus_kalau_polos(cls, v):
+        # Sudah ber-amplop (ada 'data') -> pakai apa adanya.
+        # Payload polos (langsung lokasi/gate_hukum/...) -> bungkus jadi {'data': v}.
+        if isinstance(v, dict) and "data" in v:
+            return v
+        return {"data": v}
 
 
 # ---------------------------------------------------------------------------
@@ -195,3 +214,5 @@ class OutputL3(BaseModel):
     poin: list[PoinOutput]
     rekomendasi_sistem: str
     kesimpulan: KesimpulanOutput
+    catatan_global: list[str] = []
+    low_confidence_keseluruhan: bool

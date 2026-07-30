@@ -15,11 +15,11 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 
-from app.adapter import adaptasi
+from app.adapter import adaptasi, deteksi_fallback_itbx
 from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
-from app.reasoning.guardrail import generate_poin_dengan_guardrail
+from app.reasoning.guardrail import CAVEAT_FALLBACK_ITBX, generate_poin_dengan_guardrail
 from app.reasoning.prompts import SYSTEM_PROMPT_KESIMPULAN, build_kesimpulan_prompt
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
@@ -67,29 +67,55 @@ def _generate_poin_defensif(poin: PoinKonteks, retriever: Retriever, assessment:
         return template_low_confidence(poin)
 
 
-def _rakit_kalimat_gate(final_gate_status: str, decisive_stage: str | None) -> str:
-    """Fungsi MURNI atas primitif (bukan L2Assessment) — supaya cabang "Tidak Lolos" bisa diuji
-    penuh tanpa perlu fabrikasi payload ITBX/Intensitas lengkap (belum ada contoh nyata)."""
+_KALIMAT_FALLBACK_ITBX = (
+    "klasifikasi kegiatan (ITBX) lolos secara otomatis karena data matriks RDTR belum tersedia — "
+    "status ini belum terverifikasi dan perlu ditinjau manual"
+)
+
+
+def _rakit_kalimat_gate(final_gate_status: str, decisive_stage: str | None, itbx_fallback: bool) -> str:
+    """Fungsi MURNI atas primitif (bukan L2Assessment) — supaya tiap cabang bisa diuji penuh tanpa
+    perlu fabrikasi payload ITBX/Intensitas lengkap.
+
+    Blueprint §5.2: status ITBX yang lolos via fallback (data matriks RDTR kosong/ambigu) BUKAN
+    kepatuhan terverifikasi. `final_gate_status` TETAP apa adanya (TIDAK diubah) — yang disesuaikan
+    HANYA narasi, supaya tidak overclaim ke arah mana pun (baik overclaim "patuh" utk Lolos, maupun
+    overclaim "pelanggaran mutlak" utk Tidak Lolos — dibuktikan perlu oleh fixture nyata
+    l2_sample_tidak_lolos.json yang statusnya X dgn reason ambigu).
+    """
     tahap = _LABEL_TAHAP.get(decisive_stage, decisive_stage) if decisive_stage else None
 
     if final_gate_status == "Lolos":
+        if itbx_fallback:
+            return f"Permohonan lolos pemeriksaan gate hukum, namun {_KALIMAT_FALLBACK_ITBX}."
         return (
             "Permohonan lolos pemeriksaan gate hukum — kegiatan dan intensitas bangunan "
             "memenuhi seluruh ketentuan yang berlaku."
         )
+
     if final_gate_status == "Lolos Bersyarat":
         dasar = f" pada tahap {tahap}" if tahap else ""
-        return f"Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan{dasar} yang perlu ditindaklanjuti."
+        kalimat = f"Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan{dasar} yang perlu ditindaklanjuti."
+        if itbx_fallback:
+            kalimat += f" Selain itu, {_KALIMAT_FALLBACK_ITBX}."
+        return kalimat
+
     dasar = f" pada tahap {tahap}" if tahap else ""
-    return f"Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran{dasar} yang bersifat mutlak."
+    kalimat = f"Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran{dasar} yang bersifat mutlak."
+    if itbx_fallback:
+        kalimat += (
+            " Catatan: penentuan ini didasarkan pada data matriks RDTR yang belum lengkap — "
+            "bukan kepastian pelanggaran, perlu ditinjau manual."
+        )
+    return kalimat
 
 
-def _rakit_ringkasan_gate(assessment: L2Assessment) -> RingkasanGateOutput:
+def _rakit_ringkasan_gate(assessment: L2Assessment, itbx_fallback: bool) -> RingkasanGateOutput:
     gate = assessment.gate_hukum
     return RingkasanGateOutput(
         final_gate_status=gate.final_gate_status,
         decisive_stage=gate.decisive_stage,
-        kalimat=_rakit_kalimat_gate(gate.final_gate_status, gate.decisive_stage),
+        kalimat=_rakit_kalimat_gate(gate.final_gate_status, gate.decisive_stage, itbx_fallback),
     )
 
 
@@ -141,9 +167,37 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> K
         return _rakit_kesimpulan_fallback(poin_list)
 
 
+def _rakit_catatan_global(
+    assessment: L2Assessment, itbx_fallback: bool, poin_list: list[PoinOutput]
+) -> list[str]:
+    """Blueprint §5.4: meta.caveats WAJIB muncul di output, tidak disembunyikan — plus caveat
+    fallback ITBX (§5.2) kalau berlaku. Terpisah dari disclaimer per-poin (guardrail._paksa_field_wajib)
+    supaya caveat level-permohonan tetap terlihat walau pemakai cuma baca ringkasan, bukan tiap poin.
+
+    Tambahan: poin bisa jatuh ke low_confidence lewat jalur LAIN di luar fallback ITBX/meta.caveats
+    (mis. guardrail kehabisan retry karena reasoning terus melanggar aturan teks — lihat investigasi
+    ITBX APP-2026-6191) — kalau begitu, catatan_global tanpa ini akan tetap kosong padahal
+    low_confidence_keseluruhan=True. Sebutkan poin mana yang perlu ditinjau manual, apa pun sebabnya.
+    """
+    catatan = list(assessment.meta.caveats) if assessment.meta and assessment.meta.caveats else []
+    if itbx_fallback:
+        catatan.append(CAVEAT_FALLBACK_ITBX.capitalize() + ".")
+
+    poin_low_confidence = [p.poin_id for p in poin_list if p.low_confidence]
+    if poin_low_confidence:
+        daftar = ", ".join(poin_low_confidence)
+        catatan.append(
+            f"Sebagian penjelasan (poin: {daftar}) tidak dapat dihasilkan otomatis dan perlu "
+            "peninjauan manual."
+        )
+
+    return catatan
+
+
 def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL3:
     """Jalankan precheck penuh: generate tiap poin PARALEL (dengan guardrail), rakit output dua-jalur."""
     hasil_adaptasi = adaptasi(assessment)
+    itbx_fallback = deteksi_fallback_itbx(assessment.gate_hukum.tahapan.itbx.reason)
 
     futures = [
         _executor.submit(_generate_poin_defensif, poin, retriever, assessment)
@@ -152,11 +206,13 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     poin_list = [f.result() for f in futures]  # urutan submit == urutan hasil (itbx, intensitas, dampak)
 
     output = OutputL3(
-        ringkasan_gate=_rakit_ringkasan_gate(assessment),
+        ringkasan_gate=_rakit_ringkasan_gate(assessment, itbx_fallback),
         ringkasan_dampak=_rakit_ringkasan_dampak(assessment),
         poin=poin_list,
         rekomendasi_sistem=hasil_adaptasi.rekomendasi_sistem,
         kesimpulan=_rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem),
+        catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list),
+        low_confidence_keseluruhan=any(p.low_confidence for p in poin_list),
     )
 
     try:
