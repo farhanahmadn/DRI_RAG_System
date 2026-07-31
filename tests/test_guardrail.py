@@ -232,8 +232,8 @@ class TestCekKonsistensiNumerik:
         assert _cek_konsistensi_numerik(output, poin) != []
 
     def test_intensitas_tanpa_keterangan_ketentuan_tetap_ketat_seperti_semula(self):
-        # intensitas tidak pernah punya keterangan_ketentuan/dasar_hukum (lihat app/adapter.py) —
-        # provenance check otomatis tetap melarang SEMUA angka, tidak berubah dari perilaku lama.
+        # fakta={} kosong (tak ada parameter/target sama sekali) -> tidak ada angka ground truth
+        # utk dilacak, provenance check tetap melarang SEMUA angka seperti perilaku lama.
         poin = _poin(poin_id="intensitas", tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS", fakta={})
         output = _poin_output(poin_id="intensitas", reasoning_panjang="KDB usulan adalah 70 persen.")
         assert _cek_konsistensi_numerik(output, poin) != []
@@ -248,6 +248,79 @@ class TestCekKonsistensiNumerik:
         )
         output = _poin_output(reasoning_panjang="Ketentuan zona ini mengatur KDB maksimum 80 persen.")
         assert _cek_konsistensi_numerik(output, poin) == []
+
+    def _poin_intensitas_dgn_fakta(self) -> PoinKonteks:
+        # Fixture nyata APP-2026-6191: KDB usulan=90, ambang_maks=60 -> LOLOS BERSYARAT/MELAMPAUI_BATAS.
+        return _poin(
+            poin_id="intensitas",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={
+                "parameter": {
+                    "kdb": {"usulan": 90, "ambang_maks": 60, "ambang_min": None, "memenuhi": False, "satuan": "persen"},
+                },
+                "target": {"kdb": {"target_kdb": 60.0, "selisih": 30.0, "footprint_maks_m2": 510.0}},
+                "luas_tapak_m2": 400,
+            },
+        )
+
+    def test_diagnosis_intensitas_angka_usulan_ambang_terlacak_lolos(self):
+        # Fix flaky-fallback intensitas: angka usulan/ambang GROUND TRUTH dari fakta poin ini sendiri
+        # (bukan dari keterangan_ketentuan/dasar_hukum, yang memang selalu kosong utk intensitas)
+        # kini boleh disebut verbatim di narasi.
+        poin = self._poin_intensitas_dgn_fakta()
+        output = _poin_output(
+            poin_id="intensitas",
+            reasoning_panjang="KDB usulan 90 persen melampaui batas maksimum 60 persen yang berlaku di zona ini.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_diagnosis_intensitas_angka_target_terlacak_lolos(self):
+        poin = self._poin_intensitas_dgn_fakta()
+        output = _poin_output(
+            poin_id="intensitas",
+            rekomendasi=RekomendasiOutput(tipe="numerik", saran="Turunkan KDB hingga 60.0 persen untuk memenuhi ambang."),
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_diagnosis_intensitas_angka_ngawur_tetap_ditolak(self):
+        # Angka yang TIDAK cocok dengan fakta ground truth manapun (halusinasi/salah kutip dari
+        # pasal zona lain, mis. "50" bukan ambang_maks fixture ini yang sebenarnya 60) tetap ditolak
+        # — memperkuat presisi, bukan melonggarkan.
+        poin = self._poin_intensitas_dgn_fakta()
+        output = _poin_output(
+            poin_id="intensitas",
+            reasoning_panjang="KDB maksimal 50 persen sesuai ketentuan zona yang berlaku.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) != []
+
+    def test_diagnosis_intensitas_angka_tak_terkait_sama_sekali_tetap_ditolak(self):
+        poin = self._poin_intensitas_dgn_fakta()
+        output = _poin_output(poin_id="intensitas", reasoning_panjang="Selisihnya mencapai 12345 persen.")
+        assert _cek_konsistensi_numerik(output, poin) != []
+
+    def test_diagnosis_dampak_angka_impact_score_terlacak_lolos(self):
+        poin = _poin(
+            poin_id="dampak",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi",
+            fakta={"impact_score": 40, "runoff_change_index": 2.85, "c_before": 0.3, "c_after": 0.855},
+        )
+        output = _poin_output(
+            poin_id="dampak",
+            reasoning_panjang="Skor dampak 40 menunjukkan kategori Tinggi, dengan runoff_change_index 2.85.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_diagnosis_dampak_angka_ngawur_tetap_ditolak(self):
+        poin = _poin(
+            poin_id="dampak",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi",
+            fakta={"impact_score": 40, "runoff_change_index": 2.85},
+        )
+        output = _poin_output(poin_id="dampak", reasoning_panjang="Dampaknya diperkirakan mencapai 99 persen dari total kawasan.")
+        assert _cek_konsistensi_numerik(output, poin) != []
 
 
 class TestPaksaFieldWajib:

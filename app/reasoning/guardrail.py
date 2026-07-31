@@ -163,19 +163,63 @@ def _cek_konsistensi_verdict(poin_output: PoinOutput, poin: PoinKonteks) -> list
 # ---------------------------------------------------------------------------
 
 
+def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
+    """Angka GROUND TRUTH dari fakta back-end/calculator poin ini (bukan dihitung/dikarang LLM) —
+    sah dikutip verbatim di narasi. Diagnosis flaky-fallback intensitas (APP-2026-6191, live thd DB
+    nyata): intensitas TAK PERNAH punya keterangan_ketentuan/dasar_hukum (lihat app/adapter.py), jadi
+    _angka_terlacak_ke_sumber versi lama menolak SETIAP angka >=2 digit di narasi — termasuk usulan/
+    ambang yang justru WAJIB disebut LLM utk menjelaskan pelanggaran intensitas. Di sini "sumber"
+    diperluas mencakup angka fakta poin ini sendiri (parameter/target/luasan utk intensitas;
+    impact_score/runoff_change_index/c_before/c_after utk dampak) — angka lain (dihitung/dikarang
+    LLM sendiri) TETAP ditolak seperti semula.
+    """
+    fakta = poin.fakta
+    angka: list[str] = []
+
+    def _tambah(nilai: object) -> None:
+        if nilai is None or isinstance(nilai, bool):
+            return
+        if isinstance(nilai, (int, float)):
+            angka.append(str(nilai))
+            if isinstance(nilai, float) and nilai.is_integer():
+                angka.append(str(int(nilai)))
+            elif isinstance(nilai, int):
+                angka.append(f"{nilai}.0")
+
+    if poin.poin_id == "intensitas":
+        for param in (fakta.get("parameter") or {}).values():
+            _tambah(param.get("usulan"))
+            _tambah(param.get("ambang_maks"))
+            _tambah(param.get("ambang_min"))
+        for target in (fakta.get("target") or {}).values():
+            nilai_target = target.values() if isinstance(target, dict) else [target]
+            for nilai in nilai_target:
+                _tambah(nilai)
+        _tambah(fakta.get("luas_tapak_m2"))
+        _tambah(fakta.get("jumlah_lantai"))
+        _tambah(fakta.get("luas_rth_usulan_m2"))
+    elif poin.poin_id == "dampak":
+        _tambah(fakta.get("impact_score"))
+        _tambah(fakta.get("runoff_change_index"))
+        _tambah(fakta.get("c_before"))
+        _tambah(fakta.get("c_after"))
+
+    return angka
+
+
 def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks) -> bool:
     """Investigasi ITBX APP-2026-6191: Cek #6 versi lama melarang SEMUA angka tanpa pandang sumber
     — menangkap angka ambang yang dikutip verbatim dari `keterangan_ketentuan`/`dasar_hukum` back-end
     (mis. "RTH minimal 20 dari luas persil"), padahal itu FAKTA sah, bukan halusinasi/hitungan LLM.
 
     Provenance check: angka BOLEH muncul di narasi HANYA kalau tercantum verbatim (word-boundary) di
-    fakta sumber poin ini. `intensitas`/`dampak` tidak punya `keterangan_ketentuan` & `dasar_hukum`
-    selalu kosong utk keduanya (lihat app/adapter.py) — jadi otomatis TETAP seketat sebelumnya (angka
-    apa pun di situ tidak pernah terlacak ke sumber, karena memang tidak boleh ada). Ini MEMPERKETAT
-    presisi cek, bukan melonggarkan: angka yang tak bisa dibuktikan asalnya tetap ditolak.
+    fakta sumber poin ini — `keterangan_ketentuan`/`dasar_hukum.kutipan` (ITBX) ATAU angka fakta
+    poin itu sendiri via `_angka_fakta_poin` (intensitas/dampak, lihat diagnosis di sana). Ini
+    MEMPERKETAT presisi cek, bukan melonggarkan: angka yang tak bisa dibuktikan asalnya tetap ditolak.
     """
     sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
     sumber += " " + " ".join(d.kutipan for d in poin.dasar_hukum)
+    sumber += " " + " ".join(_angka_fakta_poin(poin))
     return re.search(rf"\b{re.escape(angka)}\b", sumber) is not None
 
 
