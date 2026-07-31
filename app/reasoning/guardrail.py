@@ -207,19 +207,26 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
     return angka
 
 
-def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks) -> bool:
+def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOutput | None = None) -> bool:
     """Investigasi ITBX APP-2026-6191: Cek #6 versi lama melarang SEMUA angka tanpa pandang sumber
     — menangkap angka ambang yang dikutip verbatim dari `keterangan_ketentuan`/`dasar_hukum` back-end
     (mis. "RTH minimal 20 dari luas persil"), padahal itu FAKTA sah, bukan halusinasi/hitungan LLM.
 
     Provenance check: angka BOLEH muncul di narasi HANYA kalau tercantum verbatim (word-boundary) di
     fakta sumber poin ini — `keterangan_ketentuan`/`dasar_hukum.kutipan` (ITBX) ATAU angka fakta
-    poin itu sendiri via `_angka_fakta_poin` (intensitas/dampak, lihat diagnosis di sana). Ini
-    MEMPERKETAT presisi cek, bukan melonggarkan: angka yang tak bisa dibuktikan asalnya tetap ditolak.
+    poin itu sendiri via `_angka_fakta_poin` (intensitas/dampak) ATAU nomor pasal/ayat yang memang
+    DIRUJUK poin ini (`poin.dasar_hukum[].pasal`) atau disitasi LLM sendiri (`poin_output.sitasi[].pasal`
+    — retry sia-sia lama: LLM menyebut "Pasal 62" di narasi karena itu pasal yang benar-benar
+    disitasi, bukan dikarang, tapi angkanya tak terlacak ke fakta sehingga selalu ditolak & memicu
+    regenerasi tak perlu). Angka non-pasal yang tak cocok sumber manapun TETAP ditolak — ini
+    MEMPERKETAT presisi cek, bukan melonggarkan.
     """
     sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
     sumber += " " + " ".join(d.kutipan for d in poin.dasar_hukum)
     sumber += " " + " ".join(_angka_fakta_poin(poin))
+    sumber += " " + " ".join(d.pasal or "" for d in poin.dasar_hukum)
+    if poin_output is not None:
+        sumber += " " + " ".join(s.pasal or "" for s in poin_output.sitasi)
     return re.search(rf"\b{re.escape(angka)}\b", sumber) is not None
 
 
@@ -231,7 +238,7 @@ def _cek_konsistensi_numerik(poin_output: PoinOutput, poin: PoinKonteks) -> list
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
     for match in _RE_ANGKA_MENCURIGAKAN.finditer(teks):
         angka = match.group(0)
-        if not _angka_terlacak_ke_sumber(angka, poin):
+        if not _angka_terlacak_ke_sumber(angka, poin, poin_output):
             return [
                 f"Reasoning/saran menyebutkan angka {angka!r} yang tidak tercantum di fakta sumber "
                 "poin ini — dilarang (SYSTEM_PROMPT aturan #8). Angka harus berasal dari "

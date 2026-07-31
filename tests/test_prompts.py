@@ -32,7 +32,7 @@ def _chunk(**overrides) -> Chunk:
 def test_system_prompt_memuat_semua_aturan_wajib():
     assert "FINAL" in SYSTEM_PROMPT
     assert "SKOR DAMPAK INVERS" in SYSTEM_PROMPT
-    assert "impact_score 65" in SYSTEM_PROMPT
+    assert "skor TINGGI berarti dampak RENDAH" in SYSTEM_PROMPT
     assert "FALLBACK_DATA_KOSONG" in SYSTEM_PROMPT
     assert "diloloskan otomatis karena data matriks RDTR kosong" in SYSTEM_PROMPT
     assert "MAKNA X GANDA" in SYSTEM_PROMPT
@@ -162,10 +162,24 @@ class TestFaktaDampak:
             },
         )
 
-    def test_kategori_dan_skor_invers_note_muncul(self):
+    def test_kategori_muncul(self):
         prompt = build_user_prompt(self._poin_dampak(), [])
         assert "KATEGORI_DAMPAK: Sedang" in prompt
-        assert "IMPACT_SCORE: 65 (INVERS: skor tinggi = dampak RENDAH)" in prompt
+
+    def test_skor_mentah_tidak_lagi_disuntik_ke_prompt(self):
+        # Fix #2 (dampak intermiten low_confidence via Cek #1 invers): skor mentah membingungkan
+        # LLM ("40 terlihat rendah -> dampak rendah" padahal kategori aktual Tinggi) — dihapus dari
+        # prompt, LLM cukup diberi KATEGORI_DAMPAK yang sudah final.
+        prompt = build_user_prompt(self._poin_dampak(), [])
+        assert "IMPACT_SCORE" not in prompt
+        assert "RUNOFF_CHANGE_INDEX" not in prompt
+        assert "65" not in prompt
+        assert "1.78" not in prompt
+
+    def test_kategori_final_arahan_tegas_muncul(self):
+        prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=True), [])
+        assert "Kategori dampak ini FINAL" in prompt
+        assert "JANGAN menafsirkan atau menyebut skor angka" in prompt
 
     def test_arah_mitigasi_muncul_saat_perlu(self):
         prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=True), [])

@@ -12,7 +12,7 @@ SYSTEM_PROMPT = """Anda adalah asisten reasoning untuk sistem pre-check risiko i
 
 ATURAN WAJIB (jangan dilanggar):
 1. Fakta (status, verdict, angka, kategori) pada data di bawah bersifat FINAL — hasil kode/back-end. Tugas Anda HANYA menjelaskan mengapa fakta itu muncul — JANGAN mengubah, menghitung ulang, membalik arah, atau menyimpulkan verdict/status/kategori sendiri.
-2. SKOR DAMPAK INVERS — skor TINGGI berarti dampak RENDAH, bukan risiko tinggi. Contoh BENAR: "impact_score 65 -> dampak Sedang". Contoh SALAH (dilarang ditulis): "skor 65 berarti risiko tinggi". Kategori dampak (Rendah/Sedang/Tinggi/Sangat Tinggi) sudah difakta-kan di bawah — pakai APA ADANYA, jangan simpulkan arah dari angka skor sendiri.
+2. SKOR DAMPAK INVERS — skor mentah TIDAK disuntikkan ke prompt (biar tidak membingungkan): gunakan KATEGORI_DAMPAK yang diberikan APA ADANYA ("Rendah"/"Sedang"/"Tinggi"/"Sangat Tinggi"), JANGAN menyimpulkan arah dampak dari angka skor mana pun — kalau skor invers disebut-sebut di tempat lain, ingat skor TINGGI berarti dampak RENDAH, bukan sebaliknya.
 3. ITBX FALLBACK DATA-KOSONG — kalau ada baris "FALLBACK_DATA_KOSONG: True" di bawah, status yang lolos (mis. "I") BUKAN kepatuhan yang terverifikasi. WAJIB sertakan caveat persis: "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi". DILARANG menulis "kegiatan sesuai/diizinkan" tanpa caveat itu.
 4. MAKNA X GANDA — kalau "STATUS_ITBX: X", makna sebenarnya (dilarang eksplisit / tidak ditemukan di matriks / di luar area RDTR) mengikuti teks "REASON" di bawah. JANGAN default ke "dilarang".
 5. Kalau ada baris "CAVEAT" di bawah, WAJIB disebut/diteruskan dalam reasoning Anda — jangan disembunyikan atau diabaikan.
@@ -116,13 +116,22 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
 
 
 def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
+    # Fix #2 (temuan dampak intermiten low_confidence, diagnosis live APP-2026-6191): skor mentah
+    # (IMPACT_SCORE/RUNOFF_CHANGE_INDEX) SENGAJA TIDAK disuntikkan lagi ke prompt — angka invers
+    # (mis. 40, kategori Tinggi) membingungkan LLM ("40 terlihat rendah -> dampak rendah"), padahal
+    # arahnya terbalik. Guardrail Cek #1 (_cek_invers_skor) menangkap ini dgn benar, tapi LLM sering
+    # mengulang kesalahan yang sama di retry -> flaky fallback low_confidence. Skor/index tetap
+    # muncul deterministik di ringkasan_dampak (assemble.py) — LLM tak butuh angka mentahnya utk
+    # narasi per-poin, cukup KATEGORI (sudah final, tak perlu ditafsirkan arahnya).
     fakta = poin.fakta
-    lines = [f"KATEGORI_DAMPAK: {poin.status}"]
-
-    if fakta.get("impact_score") is not None:
-        lines.append(f"IMPACT_SCORE: {fakta['impact_score']} (INVERS: skor tinggi = dampak RENDAH)")
-    if fakta.get("runoff_change_index") is not None:
-        lines.append(f"RUNOFF_CHANGE_INDEX: {fakta['runoff_change_index']}")
+    lines = [
+        f"KATEGORI_DAMPAK: {poin.status}",
+        (
+            f"Kategori dampak ini FINAL — jelaskan dampak tergolong {poin.status} dan (bila Tinggi/"
+            "Sangat Tinggi) perlu mitigasi. JANGAN menafsirkan atau menyebut skor angka; gunakan "
+            "KATEGORI apa adanya."
+        ),
+    ]
 
     mitigasi = fakta.get("mitigasi") or {}
     if mitigasi.get("perlu_mitigasi"):

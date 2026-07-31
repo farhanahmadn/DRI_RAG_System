@@ -322,6 +322,59 @@ class TestCekKonsistensiNumerik:
         output = _poin_output(poin_id="dampak", reasoning_panjang="Dampaknya diperkirakan mencapai 99 persen dari total kawasan.")
         assert _cek_konsistensi_numerik(output, poin) != []
 
+    def test_fix1_nomor_pasal_dari_sitasi_llm_terlacak_lolos(self):
+        # Fix #1 (opsional, retry sia-sia "Pasal 62"): nomor pasal yang BENAR-BENAR disitasi LLM
+        # (poin_output.sitasi[].pasal) sah muncul di narasi — bukan dikarang, memang dirujuk.
+        poin = self._poin_intensitas_dgn_fakta()
+        output = _poin_output(
+            poin_id="intensitas",
+            reasoning_panjang="Sesuai Pasal 62 Ayat 4, KDB usulan 90 persen melampaui ambang maksimum 60 persen.",
+            sitasi=[
+                SitasiOutput(
+                    citation_id="rdtr-sleman-tengah-p62-a4",
+                    dokumen="RDTR Sleman Tengah",
+                    pasal="62",
+                    halaman=58,
+                    kutipan="(4) ...",
+                    terverifikasi=True,
+                )
+            ],
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_fix1_nomor_pasal_dari_dasar_hukum_poin_terlacak_lolos(self):
+        from app.schemas import DasarHukum
+
+        poin = _poin(
+            poin_id="intensitas",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="62", kutipan="x")],
+        )
+        output = _poin_output(poin_id="intensitas", reasoning_panjang="Ketentuan ini merujuk Pasal 62 tentang intensitas.")
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_fix1_angka_ngawur_bukan_nomor_pasal_manapun_tetap_ditolak(self):
+        # Angka yang bukan nomor pasal manapun (disitasi atau dasar_hukum) TETAP ditolak — Fix #1
+        # tidak melonggarkan cek utk angka non-pasal.
+        poin = self._poin_intensitas_dgn_fakta()
+        output = _poin_output(
+            poin_id="intensitas",
+            reasoning_panjang="Sesuai Pasal 62, selisihnya mencapai 77 persen.",
+            sitasi=[
+                SitasiOutput(
+                    citation_id="rdtr-sleman-tengah-p62-a4",
+                    dokumen="RDTR Sleman Tengah",
+                    pasal="62",
+                    halaman=58,
+                    kutipan="(4) ...",
+                    terverifikasi=True,
+                )
+            ],
+        )
+        assert _cek_konsistensi_numerik(output, poin) != []
+
 
 class TestPaksaFieldWajib:
     def _assessment_tanpa_meta(self) -> L2Assessment:
