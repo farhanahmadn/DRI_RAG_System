@@ -19,7 +19,7 @@ ATURAN WAJIB (jangan dilanggar):
 6. Sitasi HANYA boleh diambil dari daftar pasal yang diberikan (anchor dasar hukum back-end maupun pasal tambahan RAG), dengan menyebut citation_id persis seperti tercantum. JANGAN mengarang nomor pasal, ayat, atau dokumen yang tidak ada di daftar.
 7. Kalau ada daftar kegiatan diizinkan/terbatas/bersyarat, kegiatan alternatif yang Anda sebutkan HARUS berasal dari daftar itu — JANGAN mengarang nama kegiatan lain.
 8. JANGAN menyebutkan angka (target, selisih, skor, dsb) di reasoning_pendek, reasoning_panjang, maupun saran — angka digabungkan otomatis oleh sistem secara terpisah; tugas Anda hanya menulis narasi kualitatif.
-9. Tulis dalam Bahasa Indonesia yang jelas, ringkas, dan mudah dipahami warga awam, bukan bahasa hukum yang kaku.
+9. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda/pengambil keputusan) yang akan meng-ACC atau memberi feedback atas permohonan — BUKAN nasihat langsung ke pemohon. Sebut pemohon sebagai orang ketiga ("pemohon"/"permohonan ini"), JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, analitis, dan dapat diaudit, agar reviewer dapat menilai dan memutuskan.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -194,9 +194,12 @@ def build_user_prompt(
     lines.append("")
     lines.append(
         "## Tugas\n"
-        "Jelaskan poin ini berdasarkan fakta dan pasal di atas, dalam Bahasa Indonesia yang jelas "
-        "untuk warga awam. Berikan reasoning_pendek (1-2 kalimat), reasoning_panjang (paragraf "
-        "lengkap), sitasi (rujuk citation_id di atas saja), dan saran tindak lanjut."
+        "Jelaskan poin ini berdasarkan fakta dan pasal di atas, untuk reviewer/petugas Pemda "
+        "sebagai bahan pengambilan keputusan. Berikan reasoning_pendek (1-2 kalimat), "
+        "reasoning_panjang (paragraf lengkap), sitasi (rujuk citation_id di atas saja), dan saran "
+        "— yaitu pertimbangan/rekomendasi yang dapat dijadikan syarat atau dasar keputusan reviewer "
+        "(mis. \"pemohon perlu menyesuaikan X agar memenuhi Y\"), ditulis sebagai orang ketiga "
+        "tentang pemohon, BUKAN \"Anda perlu...\"."
     )
 
     return "\n".join(lines)
@@ -209,10 +212,10 @@ def build_user_prompt(
 SYSTEM_PROMPT_KESIMPULAN = """Anda merangkum hasil pre-check izin bangunan Kabupaten Sleman menjadi kesimpulan akhir.
 
 ATURAN WAJIB (jangan dilanggar):
-1. Ringkasan per-poin di bawah SUDAH FINAL (status, reasoning, saran) — tugas Anda HANYA merangkum jadi langkah_berdampak (daftar langkah konkret untuk pemohon) dan catatan_lokasi (satu kalimat kalau relevan, atau null kalau tidak ada). JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
+1. Ringkasan per-poin di bawah SUDAH FINAL (status, reasoning, saran) — tugas Anda HANYA merangkum jadi langkah_berdampak (daftar langkah/pertimbangan untuk REVIEWER dalam mengambil keputusan — ACC / ACC bersyarat / tolak) dan catatan_lokasi (satu kalimat kalau relevan, atau null kalau tidak ada). JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
 2. langkah_berdampak HARUS dirangkai/diringkas dari saran per-poin yang diberikan — JANGAN menambah langkah yang tidak berdasar pada poin manapun.
 3. JANGAN menyebutkan angka apa pun (skor, target, dsb) di langkah_berdampak atau catatan_lokasi.
-4. Tulis dalam Bahasa Indonesia yang jelas dan ringkas untuk warga awam.
+4. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat langsung ke pemohon — sebut pemohon sebagai orang ketiga, JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, dan ringkas.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -233,8 +236,9 @@ def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str
     lines.append("")
     lines.append(
         "## Tugas\n"
-        "Rangkum ringkasan per-poin di atas menjadi langkah_berdampak (daftar kalimat langkah "
-        "konkret untuk pemohon) dan catatan_lokasi (satu kalimat atau null)."
+        "Rangkum ringkasan per-poin di atas menjadi langkah_berdampak (daftar kalimat "
+        "langkah/pertimbangan untuk reviewer dalam mengambil keputusan, pemohon disebut sebagai "
+        "orang ketiga) dan catatan_lokasi (satu kalimat atau null)."
     )
 
     return "\n".join(lines)

@@ -40,7 +40,15 @@ def test_system_prompt_memuat_semua_aturan_wajib():
     assert "CAVEAT" in SYSTEM_PROMPT
     assert "citation_id" in SYSTEM_PROMPT
     assert "JANGAN mengarang" in SYSTEM_PROMPT
-    assert "warga awam" in SYSTEM_PROMPT
+    assert "REVIEWER" in SYSTEM_PROMPT
+    assert '"Anda"' in SYSTEM_PROMPT  # dilarang, bukan diwajibkan — lihat test_voice di bawah
+
+
+def test_system_prompt_suara_reviewer_bukan_pemohon():
+    assert "decision-support" in SYSTEM_PROMPT
+    assert "orang ketiga" in SYSTEM_PROMPT
+    assert "JANGAN memakai \"Anda\"" in SYSTEM_PROMPT
+    assert "warga awam" not in SYSTEM_PROMPT
 
 
 def test_system_prompt_tidak_lagi_suruh_llm_echo_data_confidence():
