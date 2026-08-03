@@ -9,9 +9,13 @@ diretrieve — bukan dipercaya dari output LLM. citation_id yang tidak dikenal (
 from app.reasoning import llm_client
 from app.reasoning.calculator import pilih_target_utama_intensitas
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
-from app.reasoning.templates import template_aman
 from app.retrieval.base import Chunk, RetrievalFilters, Retriever
 from app.schemas import MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
+
+# APP-2026-3468: saran deterministik utk poin aman/lolos — reasoning_pendek/panjang & sitasi TETAP
+# dari LLM (poin aman WAJIB tetap dijelaskan KENAPA lolos, bukan reasoning generik tanpa sitasi),
+# hanya bagian "tidak ada tindakan lanjut" ini yang aman ditemplate (tak ada apa pun utk direkomendasikan).
+_SARAN_AMAN = "Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."
 
 _LLM_RESPONSE_SCHEMA = {
     "type": "object",
@@ -104,10 +108,11 @@ def generate_poin(
     catatan_perbaikan: str | None = None,
     temperature: float = 0.0,
 ) -> PoinOutput:
-    """Hasilkan PoinOutput untuk satu poin. Poin jelas aman -> template (tanpa retrieval/LLM)."""
-    if apakah_aman(poin):
-        return template_aman(poin)
-
+    """Hasilkan PoinOutput untuk satu poin — SELALU lewat retrieval + LLM, termasuk poin aman/lolos
+    (APP-2026-3468: poin aman WAJIB tetap dijelaskan KENAPA lolos + sitasi pasal, bukan reasoning
+    generik tanpa sitasi seperti sebelumnya). Poin aman hanya dapat template pada
+    `rekomendasi.saran`/`target` (lihat apakah_aman di bawah) — reasoning & sitasi TETAP dari LLM.
+    """
     chunks = ambil_chunks_pendukung(poin, retriever, top_k_dukungan)
     chunk_by_id = {chunk.id: chunk for chunk in chunks}
     anchor_by_id = {f"anchor-{i}": d for i, d in enumerate(poin.dasar_hukum)}
@@ -162,6 +167,13 @@ def generate_poin(
     if poin.tipe_rekomendasi == "numerik":
         target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
 
+    saran = llm_out["saran"]
+    if apakah_aman(poin):
+        # Tidak ada pelanggaran utk ditindaklanjuti -> saran & target deterministik, TAPI
+        # reasoning_pendek/panjang & sitasi di atas tetap murni dari LLM (lihat docstring).
+        saran = _SARAN_AMAN
+        target = None
+
     return PoinOutput(
         poin_id=poin.poin_id,
         kategori=poin.kategori,
@@ -172,7 +184,7 @@ def generate_poin(
         rekomendasi=RekomendasiOutput(
             tipe=poin.tipe_rekomendasi,
             target=target,
-            saran=llm_out["saran"],
+            saran=saran,
             disclaimer=llm_out.get("disclaimer"),
         ),
         low_confidence=False,

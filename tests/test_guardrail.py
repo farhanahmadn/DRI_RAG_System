@@ -54,17 +54,6 @@ def _poin_output(**overrides) -> PoinOutput:
     return PoinOutput(**defaults)
 
 
-class _RetrieverYangMelarangDipanggil:
-    def search(self, query, filters, top_k=5):
-        raise AssertionError("search() tidak boleh dipanggil untuk poin yang aman")
-
-    def get_by_reference(self, referensi):
-        raise AssertionError("get_by_reference() tidak boleh dipanggil untuk poin yang aman")
-
-    def get_parent(self, chunk_id):
-        raise AssertionError("get_parent() tidak boleh dipanggil untuk poin yang aman")
-
-
 class TestCariBandUntukIndex:
     def test_format_kurang_dari_dgn_prefix(self):
         bands = {"Rendah": "index < 1.5", "Sedang": "1.5-2.5", "Tinggi": "2.5-4.0", "Sangat Tinggi": "> 4.0"}
@@ -376,6 +365,77 @@ class TestCekKonsistensiNumerik:
         )
         assert _cek_konsistensi_numerik(output, poin) != []
 
+    def test_nomor_dokumen_dari_sitasi_llm_terlacak_lolos(self):
+        # Investigasi live APP-2026-3468: dokumen RAG asli bernama "Peraturan Bupati Sleman Nomor
+        # 80 Tahun 2023...". LLM menyebut "Nomor 80 Tahun 2023" merujuk sumber yang BENAR-BENAR
+        # disitasi -- bukan dikarang -- angkanya sah, jangan ditolak.
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}},
+            dasar_hukum=[],
+        )
+        output = _poin_output(
+            poin_id="dampak",
+            reasoning_panjang=(
+                "Sesuai Peraturan Bupati Sleman Nomor 80 Tahun 2023, kawasan ini termasuk zona resapan air."
+            ),
+            sitasi=[
+                SitasiOutput(
+                    citation_id="rdtr-sleman-tengah-p53-a3",
+                    dokumen="Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah",
+                    pasal="53",
+                    halaman=40,
+                    kutipan="x",
+                    terverifikasi=True,
+                )
+            ],
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_nomor_dokumen_dari_dasar_hukum_poin_terlacak_lolos(self):
+        from app.schemas import DasarHukum
+
+        poin = _poin(
+            poin_id="itbx",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[
+                DasarHukum(dokumen="Peraturan Bupati Sleman Nomor 80 Tahun 2023", pasal="Matriks ITBX", kutipan="x")
+            ],
+        )
+        output = _poin_output(
+            poin_id="itbx",
+            reasoning_panjang="Merujuk Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_nomor_dokumen_ngawur_bukan_dokumen_manapun_tetap_ditolak(self):
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}},
+            dasar_hukum=[],
+        )
+        output = _poin_output(
+            poin_id="dampak",
+            reasoning_panjang="Sesuai Peraturan Nomor 99 Tahun 2023, kawasan ini termasuk zona resapan air.",
+            sitasi=[
+                SitasiOutput(
+                    citation_id="rdtr-sleman-tengah-p53-a3",
+                    dokumen="Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah",
+                    pasal="53",
+                    halaman=40,
+                    kutipan="x",
+                    terverifikasi=True,
+                )
+            ],
+        )
+        assert _cek_konsistensi_numerik(output, poin) != []
+
 
 class TestPaksaFieldWajib:
     def _assessment_tanpa_meta(self) -> L2Assessment:
@@ -548,18 +608,42 @@ class TestPerbaikiPoin:
 
 
 class TestGeneratePoinDenganGuardrail:
-    def test_poin_aman_pakai_template_tanpa_retrieval_atau_llm(self, monkeypatch):
-        dipanggil = {"llm": 0}
-        monkeypatch.setattr(
-            llm_client_module, "generate", lambda *a, **k: dipanggil.__setitem__("llm", dipanggil["llm"] + 1)
+    def test_poin_aman_tetap_lewat_llm_dan_guardrail_saran_ditemplate(self, monkeypatch):
+        # APP-2026-3468: poin aman TIDAK LAGI short-circuit ke template generik — lewat LLM+guardrail
+        # penuh spt poin lain. reasoning_pendek/panjang & sitasi TETAP dari LLM (menjelaskan KENAPA
+        # lolos); hanya saran/target yang ditemplate deterministik.
+        from app.schemas import DasarHukum
+
+        panggilan = {"n": 0}
+
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            panggilan["n"] += 1
+            return {
+                "reasoning_pendek": "Kegiatan termasuk kategori Diizinkan (I) di zona ini.",
+                "reasoning_panjang": (
+                    "Kegiatan yang diusulkan termasuk kategori Diizinkan (I) sesuai Matriks ITBX zona ini."
+                ),
+                "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                "saran": "Saran dari LLM ini HARUS diabaikan/ditimpa oleh template.",
+                "disclaimer": None,
+            }
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+
+        poin = _poin(
+            status="I",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
         )
-
-        poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
         assessment = _muat_assessment("l2_sample_lolos.json")
-        hasil = generate_poin_dengan_guardrail(poin, _RetrieverYangMelarangDipanggil(), assessment)
+        hasil = generate_poin_dengan_guardrail(poin, MockRetriever(), assessment)
 
+        assert panggilan["n"] == 1
         assert hasil.status == "I"
-        assert dipanggil["llm"] == 0
+        assert hasil.reasoning_pendek == "Kegiatan termasuk kategori Diizinkan (I) di zona ini."
+        assert len(hasil.sitasi) == 1
+        assert hasil.rekomendasi.saran == "Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."
+        assert hasil.low_confidence is False
 
     def test_llm_bersih_percobaan_pertama_langsung_return(self, monkeypatch):
         panggilan = {"n": 0}

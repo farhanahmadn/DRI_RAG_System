@@ -7,8 +7,13 @@ from dotenv import load_dotenv
 
 from app.adapter import adaptasi
 from app.reasoning import llm_client as llm_client_module
-from app.reasoning.generator import _QUERY_FALLBACK_PER_POIN, ambil_chunks_pendukung, apakah_aman, generate_poin
-from app.reasoning.templates import template_aman
+from app.reasoning.generator import (
+    _QUERY_FALLBACK_PER_POIN,
+    _SARAN_AMAN,
+    ambil_chunks_pendukung,
+    apakah_aman,
+    generate_poin,
+)
 from app.retrieval.base import Chunk
 from app.retrieval.mock import MockRetriever
 from app.retrieval.retriever import _expand
@@ -35,17 +40,6 @@ def _poin(**overrides) -> PoinKonteks:
     )
     defaults.update(overrides)
     return PoinKonteks(**defaults)
-
-
-class _RetrieverYangMelarangDipanggil:
-    def search(self, query, filters, top_k=5):
-        raise AssertionError("search() tidak boleh dipanggil untuk poin yang aman")
-
-    def get_by_reference(self, referensi):
-        raise AssertionError("get_by_reference() tidak boleh dipanggil untuk poin yang aman")
-
-    def get_parent(self, chunk_id):
-        raise AssertionError("get_parent() tidak boleh dipanggil untuk poin yang aman")
 
 
 class TestApakahAman:
@@ -184,15 +178,88 @@ class TestQueryFallbackDampak:
         assert dipanggil["query"] == "dampak tata guna lahan"
 
 
-def test_generate_poin_aman_pakai_template_tanpa_retrieval_atau_llm(monkeypatch):
+def test_generate_poin_aman_tetap_panggil_llm_untuk_reasoning_dan_sitasi(monkeypatch):
+    # APP-2026-3468: poin aman TIDAK LAGI short-circuit ke template generik — reasoning_pendek/
+    # panjang & sitasi TETAP dihasilkan LLM (menjelaskan KENAPA lolos), hanya saran/target yang
+    # ditemplate deterministik (tak ada tindakan lanjut utk direkomendasikan).
     dipanggil = {"llm": False}
-    monkeypatch.setattr(llm_client_module, "generate", lambda *a, **k: dipanggil.__setitem__("llm", True))
 
-    poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
-    hasil = generate_poin(poin, _RetrieverYangMelarangDipanggil())
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        dipanggil["llm"] = True
+        return {
+            "reasoning_pendek": "Kegiatan termasuk kategori Diizinkan (I) di zona ini.",
+            "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Diizinkan (I) sesuai Matriks ITBX zona perumahan.",
+            "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+            "saran": "Saran dari LLM ini HARUS diabaikan/ditimpa oleh template.",
+            "disclaimer": None,
+        }
 
-    assert hasil == template_aman(poin)
-    assert dipanggil["llm"] is False
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        status="I",
+        fakta={"lolos": True, "reason": "x"},
+        dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+    )
+    assert apakah_aman(poin) is True
+
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert dipanggil["llm"] is True
+    assert hasil.reasoning_pendek == "Kegiatan termasuk kategori Diizinkan (I) di zona ini."
+    assert hasil.reasoning_panjang.strip() != ""
+    assert len(hasil.sitasi) == 1  # sitasi TETAP dari LLM, bukan dikosongkan seperti template lama
+    assert hasil.sitasi[0].citation_id == "anchor-0"
+
+
+def test_generate_poin_aman_saran_dan_target_tetap_ditemplate(monkeypatch):
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x",
+            "reasoning_panjang": "x",
+            "sitasi": [],
+            "saran": "Saran dari LLM ini HARUS diabaikan/ditimpa oleh template.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="intensitas",
+        kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+        tipe_rekomendasi="numerik",
+        status="MEMENUHI_SYARAT",
+        fakta={
+            "parameter": {"kdb": {"usulan": 50, "ambang_maks": 60, "ambang_min": None, "memenuhi": True, "satuan": "persen"}},
+            "target": {},
+        },
+    )
+    assert apakah_aman(poin) is True
+
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert hasil.rekomendasi.saran == _SARAN_AMAN
+    assert hasil.rekomendasi.target is None
+    assert hasil.low_confidence is False
+
+
+def test_generate_poin_tidak_aman_pakai_saran_llm_apa_adanya(monkeypatch):
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x",
+            "reasoning_panjang": "x",
+            "sitasi": [],
+            "saran": "Saran spesifik dari LLM.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+    assert apakah_aman(poin) is False
+
+    hasil = generate_poin(poin, MockRetriever())
+    assert hasil.rekomendasi.saran == "Saran spesifik dari LLM."
 
 
 def test_generate_poin_merakit_dari_respons_llm_palsu(monkeypatch):

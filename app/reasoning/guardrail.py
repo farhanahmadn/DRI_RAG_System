@@ -21,8 +21,8 @@ import re
 
 from app.adapter import cek_konsistensi_intensitas
 from app.reasoning.calculator import pilih_target_utama_intensitas
-from app.reasoning.generator import ambil_chunks_pendukung, apakah_aman, generate_poin
-from app.reasoning.templates import template_aman, template_low_confidence
+from app.reasoning.generator import ambil_chunks_pendukung, generate_poin
+from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk, Retriever
 from app.schemas import L2Assessment, PoinKonteks, PoinOutput
 
@@ -107,7 +107,7 @@ def _cek_invers_skor(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
 
     if kategori in ("Rendah", "Sedang"):
         for frasa in _FRASA_DAMPAK_TINGGI:
-            if frasa in teks:
+            if _frasa_muncul_tanpa_negasi(teks, frasa):
                 masalah.append(
                     f"Reasoning menyiratkan dampak tinggi ('{frasa}') padahal kategori aktual "
                     f"'{kategori}' — cek arah skor invers."
@@ -115,7 +115,7 @@ def _cek_invers_skor(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
                 break
     elif kategori in ("Tinggi", "Sangat Tinggi"):
         for frasa in _FRASA_DAMPAK_RENDAH:
-            if frasa in teks:
+            if _frasa_muncul_tanpa_negasi(teks, frasa):
                 masalah.append(
                     f"Reasoning menyiratkan dampak rendah ('{frasa}') padahal kategori aktual "
                     f"'{kategori}'."
@@ -139,6 +139,23 @@ def _cek_invers_skor(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
 # Cek #5 — Konsistensi verdict (teks)
 # ---------------------------------------------------------------------------
 
+_KATA_NEGASI = ("tidak", "bukan", "belum", "tanpa")
+_JARAK_NEGASI_KARAKTER = 20
+
+
+def _frasa_muncul_tanpa_negasi(teks: str, frasa: str) -> bool:
+    """True kalau `frasa` muncul di `teks` TANPA didahului kata negasi (tidak/bukan/belum/tanpa)
+    dalam jarak dekat. APP-2026-3468: poin aman/lolos sekarang dijelaskan LLM (bukan template
+    generik lagi), jadi wajar reasoning menyebut mis. "usulan TIDAK melampaui ambang maksimum" —
+    match substring naif lama akan salah menganggap ini sebagai kontradiksi verdict.
+    """
+    for match in re.finditer(re.escape(frasa), teks):
+        awal = max(0, match.start() - _JARAK_NEGASI_KARAKTER)
+        konteks_sebelum = teks[awal : match.start()].split()
+        if not any(kata in _KATA_NEGASI for kata in konteks_sebelum):
+            return True
+    return False
+
 
 def _cek_konsistensi_verdict(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     masalah: list[str] = []
@@ -159,14 +176,14 @@ def _cek_konsistensi_verdict(poin_output: PoinOutput, poin: PoinKonteks) -> list
     if poin.poin_id == "intensitas":
         if poin.status == "MEMENUHI_SYARAT":
             for frasa in ("melanggar", "melampaui batas", "melampaui ambang"):
-                if frasa in teks:
+                if _frasa_muncul_tanpa_negasi(teks, frasa):
                     masalah.append(
                         f"Reasoning menyiratkan pelanggaran ('{frasa}') padahal status = MEMENUHI_SYARAT."
                     )
                     break
         elif poin.status == "MELAMPAUI_BATAS":
             for frasa in ("memenuhi seluruh standar", "tidak ada pelanggaran", "sudah sesuai semua"):
-                if frasa in teks:
+                if _frasa_muncul_tanpa_negasi(teks, frasa):
                     masalah.append(
                         f"Reasoning menyiratkan kepatuhan penuh ('{frasa}') padahal status = MELAMPAUI_BATAS."
                     )
@@ -235,15 +252,20 @@ def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOu
     DIRUJUK poin ini (`poin.dasar_hukum[].pasal`) atau disitasi LLM sendiri (`poin_output.sitasi[].pasal`
     — retry sia-sia lama: LLM menyebut "Pasal 62" di narasi karena itu pasal yang benar-benar
     disitasi, bukan dikarang, tapi angkanya tak terlacak ke fakta sehingga selalu ditolak & memicu
-    regenerasi tak perlu). Angka non-pasal yang tak cocok sumber manapun TETAP ditolak — ini
-    MEMPERKETAT presisi cek, bukan melonggarkan.
+    regenerasi tak perlu) ATAU nama dokumen yang disitasi (`poin.dasar_hukum[].dokumen`/
+    `poin_output.sitasi[].dokumen` — investigasi APP-2026-3468 live: dokumen RAG asli bernama
+    "Peraturan Bupati Sleman Nomor 80 Tahun 2023...", LLM menyebut "Nomor 80 Tahun 2023" saat
+    merujuk sumbernya, angka itu bagian nama dokumen yang benar-benar disitasi, bukan karangan).
+    Angka yang tak cocok sumber manapun TETAP ditolak — ini MEMPERKETAT presisi cek, bukan melonggarkan.
     """
     sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
     sumber += " " + " ".join(d.kutipan for d in poin.dasar_hukum)
     sumber += " " + " ".join(_angka_fakta_poin(poin))
     sumber += " " + " ".join(d.pasal or "" for d in poin.dasar_hukum)
+    sumber += " " + " ".join(d.dokumen or "" for d in poin.dasar_hukum)
     if poin_output is not None:
         sumber += " " + " ".join(s.pasal or "" for s in poin_output.sitasi)
+        sumber += " " + " ".join(s.dokumen or "" for s in poin_output.sitasi)
     return re.search(rf"\b{re.escape(angka)}\b", sumber) is not None
 
 
@@ -396,10 +418,13 @@ def generate_poin_dengan_guardrail(
     *,
     max_retry: int = 2,
 ) -> PoinOutput:
-    """Entrypoint utama: generate_poin + guardrail + retry terarah + fallback low_confidence."""
-    if apakah_aman(poin):
-        return _paksa_field_wajib(template_aman(poin), poin, assessment)
+    """Entrypoint utama: generate_poin + guardrail + retry terarah + fallback low_confidence.
 
+    APP-2026-3468: SEMUA poin (termasuk yang aman/lolos) lewat jalur LLM+guardrail penuh — poin
+    aman sebelumnya short-circuit ke template_aman() (reasoning generik, sitasi selalu kosong),
+    padahal reviewer tetap butuh tahu KENAPA poin ini lolos. Saran/target poin aman tetap
+    ditemplate deterministik di dalam generate_poin() sendiri (lihat generator.py).
+    """
     chunks = ambil_chunks_pendukung(poin, retriever)
 
     masalah: list[str] = []
