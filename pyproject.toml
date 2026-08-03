@@ -1,0 +1,49 @@
+[project]
+name = "rdtr-sleman-reasoning"
+version = "0.1.0"
+description = "AI Reasoning component for Sleman building permit pre-check (RAG + reasoning + citations + recommendations)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "openai>=1.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+observability = [
+    "langfuse>=4.0",
+]
+# RAG / retrieval (tim RAG) — install terpisah: pip install -e ".[rag]"
+# Sengaja dipisah supaya env reasoning yang sudah stabil tidak terbebani torch dll.
+rag = [
+    "psycopg[binary]>=3.1",
+    "pgvector>=0.3",
+    "transformers>=4.40",  # bge-m3 (embeddings.py) & bge-reranker-v2-m3 (rerank.py) via AutoModel langsung
+    "torch>=2.1",          # DIHINDARI: sentence-transformers/FlagEmbedding (menarik datasets->pyarrow yg
+    #                        crash di Windows/py3.13). Inferensi cukup transformers+torch.
+]
+# Parser PDF -> markdown (Langkah 3). Kedua backend dipasang saat bake-off; setelah backend
+# dikunci, yang tak dipakai boleh dihapus. Install: pip install -e ".[rag,parse]"
+parse = [
+    "python-dotenv>=1.0",
+    "llama-cloud-services>=0.6.90",  # LlamaParse (cloud) — butuh LLAMA_CLOUD_API_KEY
+    "docling>=2.0",                  # lokal/gratis (fallback / privasi)
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: memanggil LLM sungguhan (Groq), butuh GROQ_API_KEY, tak jalan di suite rutin",
+]

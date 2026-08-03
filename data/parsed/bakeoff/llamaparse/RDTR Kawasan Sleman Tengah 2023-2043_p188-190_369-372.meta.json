@@ -1,0 +1,17 @@
+{
+  "source": "data\\raw\\RDTR Kawasan Sleman Tengah 2023-2043.pdf",
+  "backend": "llamaparse",
+  "mode": "agentic",
+  "pages_arg": "188-190,369-372",
+  "n_pages_out": 7,
+  "page_numbers": [
+    188,
+    189,
+    190,
+    369,
+    370,
+    371,
+    372
+  ],
+  "parsed_at": "2026-07-24T03:31:21.302305+00:00"
+}
