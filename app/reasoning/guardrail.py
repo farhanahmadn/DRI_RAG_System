@@ -28,9 +28,26 @@ from app.schemas import L2Assessment, PoinKonteks, PoinOutput
 
 logger = logging.getLogger(__name__)
 
-CAVEAT_FALLBACK_ITBX = (
+CAVEAT_FALLBACK_ITBX_LOLOS = (
     "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi"
 )
+CAVEAT_FALLBACK_ITBX_NON_LOLOS = (
+    "penentuan status ini didasarkan pada data matriks RDTR yang mungkin belum lengkap — perlu "
+    "verifikasi manual apakah kegiatan benar-benar dilarang atau datanya belum tersedia"
+)
+
+
+def caveat_fallback_itbx(status: str) -> str:
+    """Bug APP-2026-3335: caveat fallback ITBX HARUS sadar status, bukan satu kalimat generik.
+    Status "I" pakai frasa "diloloskan otomatis" (akurat — memang lolos, tapi tak terverifikasi).
+    Status lain (mis. "X" / Tidak Lolos) DILARANG memakai kata "diloloskan" sama sekali — kalimat
+    itu menyiratkan permohonan lolos padahal verdict sebenarnya bisa Tidak Lolos, kontradiktif
+    dengan reasoning yang menyertainya. Framing netral dipakai sebagai gantinya, tidak mengklaim
+    arah keputusan apa pun.
+    """
+    if status == "I":
+        return CAVEAT_FALLBACK_ITBX_LOLOS
+    return CAVEAT_FALLBACK_ITBX_NON_LOLOS
 
 _LABEL_DATA_CONFIDENCE = {"high": "tinggi", "medium": "sedang", "low": "rendah"}
 
@@ -264,11 +281,13 @@ def _paksa_field_wajib(
     disclaimer_tambahan: list[str] = []
     teks_sudah_ada = f"{poin_output.reasoning_panjang} {poin_output.rekomendasi.disclaimer or ''}"
 
-    # Cek #2 — ITBX fallback data-kosong: paksa low_confidence + caveat wajib.
+    # Cek #2 — ITBX fallback data-kosong: paksa low_confidence + caveat wajib, wording sadar status
+    # (APP-2026-3335: status X tak boleh dapat caveat "diloloskan otomatis" — lihat caveat_fallback_itbx).
     if poin.poin_id == "itbx" and poin.fakta.get("fallback_data_kosong"):
         update["low_confidence"] = True
-        if CAVEAT_FALLBACK_ITBX.lower() not in teks_sudah_ada.lower():
-            disclaimer_tambahan.append(CAVEAT_FALLBACK_ITBX.capitalize() + ".")
+        caveat = caveat_fallback_itbx(poin.status)
+        if caveat.lower() not in teks_sudah_ada.lower():
+            disclaimer_tambahan.append(caveat.capitalize() + ".")
 
     # Cek #3 — meta.caveats / data_confidence WAJIB muncul. Kalimat kepercayaan SELALU dirakit
     # deterministik (bukan echo raw value LLM/back-end) — konsisten sama persis di ketiga poin.

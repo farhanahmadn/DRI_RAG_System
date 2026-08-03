@@ -9,6 +9,7 @@ from app.reasoning.guardrail import (
     _cek_konsistensi_verdict,
     _kalimat_tingkat_kepercayaan,
     _paksa_field_wajib,
+    caveat_fallback_itbx,
     generate_poin_dengan_guardrail,
     perbaiki_poin,
     verifikasi_entailment_sitasi,
@@ -404,6 +405,33 @@ class TestPaksaFieldWajib:
         hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
         assert hasil.low_confidence is False
         assert hasil.rekomendasi.disclaimer is None
+
+    def test_fallback_itbx_status_x_caveat_tidak_memuat_diloloskan(self):
+        # APP-2026-3335: status X (Tidak Lolos) + fallback data-kosong TIDAK BOLEH dapat caveat
+        # "diloloskan otomatis" — kata itu kontradiktif dgn verdict Tidak Lolos yang sebenarnya.
+        poin = _poin(
+            poin_id="itbx",
+            status="X",
+            fakta={"lolos": False, "reason": "x", "fallback_data_kosong": True},
+        )
+        output = _poin_output(status="X", low_confidence=False)
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+
+        assert hasil.low_confidence is True
+        assert "diloloskan" not in hasil.rekomendasi.disclaimer.lower()
+        assert "perlu verifikasi manual" in hasil.rekomendasi.disclaimer.lower()
+
+    def test_fallback_itbx_status_i_caveat_lama_tetap(self):
+        # Regresi: status I (satu-satunya status yang benar-benar "lolos") tetap pakai caveat lama.
+        assert caveat_fallback_itbx("I") == (
+            "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi"
+        )
+
+    def test_fallback_itbx_status_non_i_caveat_netral(self):
+        for status in ("T", "B", "TB", "X"):
+            caveat = caveat_fallback_itbx(status)
+            assert "diloloskan" not in caveat.lower()
+            assert "perlu verifikasi manual" in caveat.lower()
 
     def test_meta_caveat_dan_data_confidence_disuntik(self):
         assessment = _muat_assessment("l2_sample_lolos.json")

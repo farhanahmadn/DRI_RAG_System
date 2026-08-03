@@ -118,6 +118,17 @@ class TestRakitKalimatGateFallbackItbx:
         assert "tidak lolos" in kalimat.lower()
         assert "bukan kepastian pelanggaran" in kalimat.lower()
 
+    def test_tidak_lolos_dengan_fallback_tidak_sebut_mutlak(self):
+        # APP-2026-3335: framing "mutlak" (kalimat dasar) dan "bukan kepastian" (caveat) TIDAK
+        # BOLEH muncul bersamaan — kontradiktif. Kalau fallback berlaku, "mutlak" dihapus.
+        kalimat = _rakit_kalimat_gate("Tidak Lolos", "itbx", itbx_fallback=True)
+        assert "mutlak" not in kalimat.lower()
+
+    def test_tidak_lolos_tanpa_fallback_tetap_sebut_mutlak(self):
+        # Regresi: tanpa fallback, framing "mutlak" tetap dipakai (verdict genuinely tegas).
+        kalimat = _rakit_kalimat_gate("Tidak Lolos", "itbx", itbx_fallback=False)
+        assert "mutlak" in kalimat.lower()
+
     def test_tanpa_fallback_kalimat_tak_berubah(self):
         # itbx_fallback=False -> kalimat identik dgn versi non-fallback (regresi tak disengaja).
         assert _rakit_kalimat_gate("Lolos", None, itbx_fallback=False) == (
@@ -174,6 +185,16 @@ class TestRakitCatatanGlobal:
         ]
         catatan = _rakit_catatan_global(assessment, itbx_fallback=False, poin_list=poin_list)
         assert "poin: itbx, dampak" in catatan[0]
+
+    def test_fallback_itbx_status_x_caveat_tidak_memuat_diloloskan(self):
+        # APP-2026-3335: fixture nyata dgn ITBX status X — caveat global TIDAK BOLEH memakai kata
+        # "diloloskan" (kontradiktif dgn verdict Tidak Lolos yang sebenarnya).
+        assessment = _muat_assessment("l2_sample_tidak_lolos.json")
+        assert assessment.gate_hukum.tahapan.itbx.status == "X"
+        catatan = _rakit_catatan_global(assessment, itbx_fallback=True, poin_list=[])
+        assert len(catatan) == 1
+        assert "diloloskan" not in catatan[0].lower()
+        assert "perlu verifikasi manual" in catatan[0].lower()
 
     def test_semua_sumber_caveat_digabung(self):
         # meta.caveats + fallback ITBX + poin low_confidence generik, ketiganya muncul sekaligus.
@@ -321,9 +342,13 @@ class TestJalankanPrecheckEndToEnd:
         poin_itbx = next(p for p in output.poin if p.poin_id == "itbx")
         assert poin_itbx.status == "X"
         assert poin_itbx.low_confidence is True
-        assert "diloloskan otomatis" in poin_itbx.rekomendasi.disclaimer.lower()
+        # APP-2026-3335: status X TIDAK BOLEH dapat caveat "diloloskan otomatis" (kontradiktif dgn
+        # verdict Tidak Lolos) — caveat netral "perlu verifikasi manual" dipakai sebagai gantinya.
+        assert "diloloskan" not in poin_itbx.rekomendasi.disclaimer.lower()
+        assert "perlu verifikasi manual" in poin_itbx.rekomendasi.disclaimer.lower()
         assert output.low_confidence_keseluruhan is True
-        assert any("diloloskan otomatis" in c.lower() for c in output.catatan_global)
+        assert not any("diloloskan" in c.lower() for c in output.catatan_global)
+        assert any("perlu verifikasi manual" in c.lower() for c in output.catatan_global)
 
     def test_fixture_lolos_dengan_itbx_fallback_sintetis_ringkasan_tidak_overclaim(self, monkeypatch):
         # Fixture SINTETIS (mutasi l2_sample_lolos.json, bukan file baru) — itbx.reason mengandung

@@ -51,6 +51,17 @@ def test_system_prompt_suara_reviewer_bukan_pemohon():
     assert "warga awam" not in SYSTEM_PROMPT
 
 
+def test_system_prompt_caveat_fallback_itbx_sadar_status():
+    # APP-2026-3335: caveat fallback ITBX beda tergantung status — "diloloskan" hanya utk status I,
+    # status lain (mis. X/Tidak Lolos) pakai framing netral "perlu verifikasi manual".
+    assert "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi" in SYSTEM_PROMPT
+    assert (
+        "penentuan status ini didasarkan pada data matriks RDTR yang mungkin belum lengkap — perlu "
+        "verifikasi manual apakah kegiatan benar-benar dilarang atau datanya belum tersedia"
+    ) in SYSTEM_PROMPT
+    assert 'JANGAN PERNAH memakai kata "diloloskan"' in SYSTEM_PROMPT
+
+
 def test_system_prompt_tidak_lagi_suruh_llm_echo_data_confidence():
     # Fix #4: label kepercayaan data = FAKTA, dirakit deterministik di guardrail.py, BUKAN
     # diserahkan ke LLM utk echo/parafrase (sumber kebocoran token mentah "DATA_CONFIDENCE: X").

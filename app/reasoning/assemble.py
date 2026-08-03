@@ -19,7 +19,7 @@ from app.adapter import adaptasi, deteksi_fallback_itbx
 from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
-from app.reasoning.guardrail import CAVEAT_FALLBACK_ITBX, generate_poin_dengan_guardrail
+from app.reasoning.guardrail import caveat_fallback_itbx, generate_poin_dengan_guardrail
 from app.reasoning.prompts import SYSTEM_PROMPT_KESIMPULAN, build_kesimpulan_prompt
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
@@ -101,13 +101,16 @@ def _rakit_kalimat_gate(final_gate_status: str, decisive_stage: str | None, itbx
         return kalimat
 
     dasar = f" pada tahap {tahap}" if tahap else ""
-    kalimat = f"Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran{dasar} yang bersifat mutlak."
     if itbx_fallback:
-        kalimat += (
-            " Catatan: penentuan ini didasarkan pada data matriks RDTR yang belum lengkap — "
+        # APP-2026-3335: jangan gabung framing "mutlak" (kalimat dasar) dgn "bukan kepastian"
+        # (caveat) sekaligus — kontradiktif. Kalau fallback berlaku, "mutlak" DIHAPUS dari kalimat
+        # dasar, framing "perlu verifikasi/ditinjau manual" satu-satunya yang dipakai.
+        return (
+            f"Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran{dasar}. "
+            "Catatan: penentuan ini didasarkan pada data matriks RDTR yang belum lengkap — "
             "bukan kepastian pelanggaran, perlu ditinjau manual."
         )
-    return kalimat
+    return f"Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran{dasar} yang bersifat mutlak."
 
 
 def _rakit_ringkasan_gate(assessment: L2Assessment, itbx_fallback: bool) -> RingkasanGateOutput:
@@ -181,7 +184,8 @@ def _rakit_catatan_global(
     """
     catatan = list(assessment.meta.caveats) if assessment.meta and assessment.meta.caveats else []
     if itbx_fallback:
-        catatan.append(CAVEAT_FALLBACK_ITBX.capitalize() + ".")
+        caveat = caveat_fallback_itbx(assessment.gate_hukum.tahapan.itbx.status)
+        catatan.append(caveat.capitalize() + ".")
 
     poin_low_confidence = [p.poin_id for p in poin_list if p.low_confidence]
     if poin_low_confidence:
