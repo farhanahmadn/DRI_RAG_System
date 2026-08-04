@@ -1,0 +1,6 @@
+# Memaksakan normalisasi end-of-line menjadi LF untuk semua file teks
+* text=auto eol=lf
+
+# (Opsional) Tetapkan CRLF hanya untuk script spesifik Windows
+*.bat text eol=crlf
+*.cmd text eol=crlf
