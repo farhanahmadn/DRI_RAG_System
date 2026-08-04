@@ -1,425 +1,599 @@
-# Triplet RAG System
+# 🏛️ DRI RAG System (Digital Triplet - Spatial Governance RAG)
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Framework](https://img.shields.io/badge/RAG-Triplet--Driven-orange.svg)](#workflow--pipeline)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Framework](https://img.shields.io/badge/RAG-Hierarchical%20Legal%20Reasoning-orange.svg)
 
-**Triplet RAG System** is a Retrieval-Augmented Generation (RAG) framework designed to improve factual precision, multi-hop reasoning, and retrieval efficiency. Unlike traditional chunk-based RAG pipelines that retrieve large blocks of unstructured text, this system extracts, indexes, and retrieves structured knowledge in the form of **atomic triplets (`Subject` → `Predicate` → `Object`)**.
+**DRI RAG System (Digital Triplet - Spatial Governance RAG)** adalah sistem **Retrieval-Augmented Generation (RAG)** yang dirancang untuk mendukung proses **tata kelola ruang** serta **monitoring perizinan KKPR dan PBG** di Kabupaten Sleman.
 
----
+Sistem ini mengintegrasikan **Digital Twin berbasis GIS** dengan modul **Intelligent Activity World** sehingga mampu melakukan analisis terhadap dokumen hukum tata ruang, menghubungkannya dengan fakta spasial dari backend, kemudian menghasilkan **legal reasoning**, **sitasi pasal**, dan **rekomendasi penyesuaian desain** secara otomatis.
 
-# 📖 Table of Contents
-
-- [Overview](#triplet-rag-system)
-- [Workflow & Pipeline](#-workflow--pipeline)
-- [Tech Stack](#-tech-stack--dependencies)
-- [Supported Models](#-supported-models)
-- [Environment Variables](#-environment-variables--api-requirements)
-- [Installation](#-how-to-use)
-- [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
-- [License](#-license)
+Pipeline dibangun menggunakan **LlamaIndex**, **Groq AI (Llama 3.3 70B)**, **BAAI/bge-m3 Embedding**, serta **Supabase PGVector** sebagai vector database.
 
 ---
 
-# 🔄 Workflow & Pipeline
+# 📌 System Overview
+
+DRI RAG System memiliki tiga modul utama:
+
+1. **Legal Document Processing**
+   - Parsing PDF regulasi menggunakan LlamaParse
+   - Caching Markdown lokal
+   - Hierarchical Parent-Child Chunking
+
+2. **Knowledge Base Construction**
+   - Embedding menggunakan BAAI/bge-m3
+   - Penyimpanan vector pada Supabase PGVector
+   - Penyimpanan struktur parent-child pada SimpleDocumentStore
+
+3. **Legal Reasoning Engine**
+   - Query Expansion
+   - AutoMerging Retrieval
+   - Fact Injection
+   - Deterministic Recommendation
+   - Groq LLM Reasoning
+   - Structured JSON Output
+
+---
+
+# 🔄 Workflow & Architecture
 
 ```text
-┌─────────────────┐     ┌───────────────────────┐     ┌────────────────────────┐
-│ Raw Documents   │ ──► │  Triplet Extractor    │ ──► │ Vector & Graph Stores  │
-│ (PDF/TXT/Doc)   │     │ (Subject-Rel-Object)  │     │ (Embeddings & Graph)   │
-└─────────────────┘     └───────────────────────┘     └────────────────────────┘
-                                                                   │
-                                                                   ▼
-┌─────────────────┐     ┌───────────────────────┐     ┌────────────────────────┐
-│ LLM Generation  │ ◄── │ Hybrid Retriever &    │ ◄── │ User Query &           │
-│ (with Evidence) │     │ Re-Ranker             │     │ Placeholder Expansion  │
-└─────────────────┘     └───────────────────────┘     └────────────────────────┘
+                    PDF Regulasi Hukum
+                            │
+                            ▼
+               LlamaParse Document Parsing
+                            │
+                            ▼
+               Local Markdown Cache System
+                            │
+                            ▼
+          Parent-Child Hierarchical Chunking
+      ┌──────────────────────────────────────┐
+      │ Parent Node (2048 Token)             │
+      │ Middle Node (512 Token)              │
+      │ Leaf Node (128 Token)                │
+      └──────────────────────────────────────┘
+                            │
+                            ▼
+          Embedding (BAAI/bge-m3 Local Model)
+                            │
+                            ▼
+            Supabase PostgreSQL (PGVector)
+                            │
+                            ▼
+       Backend Payload (JejakAturan + FaktaSpasial)
+                            │
+                            ▼
+      Query Expansion & Guardrail Bypass Logic
+                            │
+                            ▼
+            AutoMergingRetriever (Top-k Search)
+                            │
+                            ▼
+             Fact Injection & Target Calculator
+                            │
+                            ▼
+          Groq Llama-3.3-70B-Versatile LLM
+                            │
+                            ▼
+         Structured JSON (Pydantic Validation)
+                            │
+                            ▼
+             Interactive Gradio Dashboard
 ```
 
-## 1. Document Ingestion & Parsing
+---
 
-Raw documents (PDF, DOCX, TXT, Markdown, etc.) are parsed and segmented into clean text passages suitable for downstream processing.
+# ⚙️ Pipeline Detail
 
-## 2. Triplet Extraction
+## 1. Document Parsing & Local Caching
 
-Each document segment is transformed into structured factual knowledge using either:
+**Notebook**
 
-- Prompt-engineered LLMs
-- Relation extraction models
-- Named Entity Recognition (NER)
+```
+RAG.ipynb
+RAG_chunk.ipynb
+```
 
-Output format:
+Tahapan pertama membaca dokumen hukum berbentuk PDF menggunakan **LlamaParse API**.
+
+Dokumen dikonversi menjadi Markdown yang lebih mudah diproses.
+
+Hasil parsing kemudian disimpan pada folder lokal:
+
+```
+cache_markdown/
+```
+
+Keuntungan caching:
+
+- Menghemat kuota LlamaCloud API
+- Mempercepat ingestion berikutnya
+- Menghindari parsing ulang dokumen yang sama
+
+---
+
+## 2. Parent-Child Hierarchical Legal Chunking
+
+**Notebook**
+
+```
+RAG_chunk.ipynb
+```
+
+Dokumen hukum diproses menggunakan parser khusus **LegalDocumentChunker**.
+
+Regex digunakan untuk mengenali struktur hukum seperti:
+
+- BAB
+- Bagian
+- Paragraf
+- Pasal
+- Ayat
+- Penjelasan
+
+Selain itu dilakukan pembersihan:
+
+- Header OCR
+- Footer OCR
+- Nomor halaman
+- Noise parsing
+
+Selanjutnya digunakan **HierarchicalNodeParser** dari LlamaIndex.
+
+Struktur node yang dibentuk:
+
+| Node | Ukuran | Fungsi |
+|-------|---------|--------|
+| Parent | 2048 Token | Konteks BAB / Bagian |
+| Middle | 512 Token | Konteks Pasal |
+| Leaf | 128 Token | Konteks Ayat / Huruf |
+
+Seluruh struktur parent-child kemudian disimpan pada:
+
+```
+SimpleDocumentStore
+```
+
+---
+
+## 3. Embedding & Vector Storage
+
+**Notebook**
+
+```
+RAG.ipynb
+```
+
+Hanya **Leaf Nodes** yang dibuat embedding.
+
+Model embedding:
+
+```
+BAAI/bge-m3
+```
+
+Karakteristik:
+
+- Multilingual
+- Embedding Dimension: **1024**
+- Sangat baik untuk dokumen Bahasa Indonesia
+
+Vector kemudian disimpan pada:
+
+```
+Supabase PostgreSQL
+PGVector
+```
+
+Table:
+
+```
+regulasi_sleman_hierarchical
+```
+
+Menggunakan:
+
+```
+Connection Pooler Port 6543
+```
+
+---
+
+## 4. Query Expansion & Guardrail Bypass
+
+**Notebook**
+
+```
+LLM_as_a_Reasoner.ipynb
+```
+
+Modul menerima payload backend berupa:
+
+- JejakAturan
+- FaktaSpasial
+
+### Guardrail Bypass
+
+Apabila:
+
+```
+indikator == 0
+```
+
+maka proses LLM dilewati sehingga:
+
+- lebih cepat
+- hemat biaya API
+- tidak melakukan reasoning yang tidak diperlukan
+
+### Query Expansion
+
+Singkatan teknis diubah menjadi kalimat natural.
+
+Contoh:
+
+| Singkatan | Expanded Query |
+|------------|----------------|
+| KDB | Koefisien Dasar Bangunan |
+| KLB | Koefisien Lantai Bangunan |
+| KDH | Koefisien Dasar Hijau |
+| KTB | Koefisien Tapak Basement |
+| SMP | Sempadan |
+| LP2B | Lahan Pertanian Pangan Berkelanjutan |
+
+---
+
+## 5. Hierarchical Auto-Merging Retrieval
+
+**Notebook**
+
+```
+LLM_as_a_Reasoner.ipynb
+```
+
+Tahapan retrieval menggunakan dua level:
+
+### Base Retriever
+
+Mengambil:
+
+```
+Top-6 Child Nodes
+```
+
+berdasarkan similarity embedding.
+
+### AutoMergingRetriever
+
+Jika beberapa child berasal dari parent yang sama maka otomatis digabung kembali menjadi parent.
+
+Keuntungan:
+
+- konteks hukum tetap utuh
+- reasoning lebih akurat
+- mengurangi kehilangan konteks
+
+---
+
+## 6. Fact Injection & Legal Reasoning
+
+**Notebook**
+
+```
+LLM_as_a_Reasoner.ipynb
+```
+
+Sebelum memanggil LLM dilakukan:
+
+### Fact Injection
+
+Mengunci fakta hasil backend melalui:
+
+```
+susun_fakta_pelanggaran()
+```
+
+LLM tidak diperbolehkan mengubah fakta tersebut.
+
+---
+
+### Deterministic Target Calculator
+
+Dilakukan menggunakan:
+
+```
+hitung_target_rekomendasi()
+```
+
+Contoh:
+
+- Selisih KDB
+- Selisih KDH
+- Kekurangan sempadan
+- Target penyesuaian numerik
+
+Perhitungan dilakukan di luar LLM sehingga hasil selalu deterministik.
+
+---
+
+### Groq LLM Reasoning
+
+Model:
+
+```
+llama-3.3-70b-versatile
+```
+
+Output dipaksa menggunakan:
+
+```python
+response_format={
+    "type":"json_object"
+}
+```
+
+Sehingga selalu menghasilkan JSON valid.
+
+---
+
+### Structured Output
+
+Output mengikuti schema Pydantic:
+
+- Ringkasan
+- Reasoning Pendek
+- Reasoning Panjang
+- Sitasi Pasal
+- Rekomendasi
+
+---
+
+## 7. Interactive Gradio Dashboard
+
+Notebook:
+
+```
+LLM_as_a_Reasoner.ipynb
+```
+
+Dashboard digunakan untuk:
+
+- Simulasi data backend
+- Menampilkan reasoning
+- Menampilkan HTML Executive Summary
+- Menampilkan JSON Output
+- Debug hasil retrieval
+
+---
+
+# 📂 Project Structure
 
 ```text
-(Subject, Predicate, Object)
+DRI_RAG_System/
+│
+├── RAG_chunk.ipynb
+│     Module 1
+│     Hierarchical Legal Chunking
+│
+├── RAG.ipynb
+│     Module 2
+│     LlamaParse
+│     Embedding
+│     PGVector Upload
+│
+├── LLM_as_a_Reasoner.ipynb
+│     Module 3
+│     AutoMergingRetriever
+│     Fact Injection
+│     Groq Reasoning
+│     Gradio Dashboard
+│
+├── data_hukum_sleman/
+│
+│   ├── cache_markdown/
+│   │     Markdown cache hasil parsing
+│   │
+│   └── docstore_hierarchical/
+│         Parent-child document store
+│
+├── requirements.txt
+│
+└── README.md
 ```
 
-Example:
+---
 
-```text
-(Telkom University, located_in, Bandung)
-(Python, supports, Object-Oriented Programming)
-```
+# 🚀 Features
+
+## 📜 Parent-Child Hierarchical Legal Chunking
+
+Mempertahankan hubungan antar BAB, Pasal, Ayat, dan Huruf sehingga konteks hukum tetap utuh.
 
 ---
 
-## 3. Indexing & Vectorization
+## ⚡ Local Markdown Cache
 
-Every extracted triplet is embedded into a semantic vector representation using embedding models.
-
-Each record stores:
-
-- Subject
-- Predicate
-- Object
-- Source document
-- Metadata
-- Embedding vector
-
-The embeddings are stored inside a Vector Database such as:
-
-- Qdrant
-- ChromaDB
-- FAISS
-
-Optionally, triplets are also inserted into a graph database (Neo4j or NetworkX) to enable graph traversal and multi-hop reasoning.
+Menyimpan hasil parsing PDF sehingga tidak perlu memanggil API berulang kali.
 
 ---
 
-## 4. Query Decomposition & Retrieval
+## 🔗 Auto-Merging Retrieval
 
-Instead of searching long chunks of text, the user query is decomposed into triplet patterns.
-
-Example:
-
-```text
-Question:
-Where is Telkom University located?
-
-↓
-
-Triplet Pattern:
-(Telkom University, located_in, ?)
-```
-
-Hybrid retrieval combines:
-
-- Dense vector similarity
-- Sparse keyword matching
-- Graph neighborhood expansion
+Menggabungkan child node menjadi parent node secara otomatis ketika berasal dari konteks yang sama.
 
 ---
 
-## 5. Re-Ranking & Evidence Assembly
+## 🛡️ Fact Injection Guardrail
 
-Candidate triplets are ranked according to:
-
-- Semantic similarity
-- Predicate alignment
-- Entity overlap
-- Graph connectivity
-- Source confidence
-
-Only the highest-quality evidence is passed to the language model.
+Mencegah hallucination dengan mengunci fakta hasil backend.
 
 ---
 
-## 6. Grounded LLM Generation
+## 🧮 Deterministic Target Calculator
 
-The LLM receives structured evidence rather than raw documents, enabling:
-
-- Higher factual accuracy
-- Lower hallucination rate
-- Better explainability
-- Source-backed answers
+Menghitung target numerik secara deterministic di luar LLM.
 
 ---
 
-# 🛠️ Tech Stack & Dependencies
+## 🎯 Intelligent Guardrail Bypass
 
-| Component | Technology | Version |
-|------------|------------|----------|
-| Language | Python | >=3.10 |
-| LLM Framework | LangChain / LlamaIndex | >=0.1 |
-| Vector Database | Qdrant / ChromaDB / FAISS | Latest |
-| Graph Store | NetworkX / Neo4j | Optional |
-| Embeddings | HuggingFace / OpenAI | sentence-transformers >=2.5 |
-| API | FastAPI | >=0.110 |
-| UI | Streamlit | Latest |
+Apabila seluruh indikator memenuhi aturan maka proses LLM dilewati untuk menghemat biaya API.
 
 ---
 
-# 🤖 Supported Models
+## 📄 Structured JSON Output
 
-## Large Language Models
-
-### OpenAI
-
-- GPT-4o
-- GPT-4 Turbo
-- GPT-3.5 Turbo
-
-### Google Gemini
-
-- Gemini 1.5 Pro
-- Gemini 1.5 Flash
-
-### Local Models
-
-- Llama 3 (8B)
-- Mistral 7B
-- Any Ollama-compatible model
-- vLLM deployments
+Seluruh output tervalidasi menggunakan Pydantic sehingga siap dikonsumsi Front-End maupun Backend.
 
 ---
 
-## Embedding Models
+## 📊 Interactive Gradio Dashboard
 
-### OpenAI
-
-- text-embedding-3-small
-- text-embedding-3-large
-
-### Hugging Face
-
-- BAAI/bge-m3
-- sentence-transformers/all-MiniLM-L6-v2
-- Other SentenceTransformer models
+Dashboard interaktif untuk simulasi berbagai skenario tata ruang.
 
 ---
 
-# 🔑 Environment Variables & API Requirements
+# 💻 Tech Stack
 
-Create a `.env` file:
+## Programming Language
+
+- Python 3.10+
+
+---
+
+## Core Framework
+
+- LlamaIndex
+- StorageContext
+- VectorStoreIndex
+- HierarchicalNodeParser
+- AutoMergingRetriever
+- SimpleDocumentStore
+
+---
+
+## Document Parsing
+
+- LlamaParse
+- LlamaCloud
+
+---
+
+## Embedding
+
+- llama-index-embeddings-huggingface
+
+---
+
+## Large Language Model
+
+- Groq API
+- OpenAI SDK
+
+---
+
+## Database
+
+- PostgreSQL
+- Supabase PGVector
+- SQLAlchemy
+- asyncpg
+- psycopg2
+
+---
+
+## Validation
+
+- Pydantic V2
+
+---
+
+## User Interface
+
+- Gradio
+
+---
+
+## Utilities
+
+- pandas
+- requests
+- python-dotenv
+- nest-asyncio
+- urllib.parse
+- re
+
+---
+
+# 🤖 Models
+
+| Component | Model | Description |
+|------------|-------|-------------|
+| Embedding | **BAAI/bge-m3** | Multilingual embedding model (1024 dimensions) optimized for Indonesian legal documents |
+| LLM | **llama-3.3-70b-versatile** | Groq-hosted LLM used for legal reasoning and structured response generation |
+| Document Parser | **LlamaParse** | AI-powered PDF parser from LlamaCloud for extracting structured Markdown from legal documents |
+
+---
+
+# 🔑 Environment Variables
 
 ```env
-# -------------------------
-# LLM API Keys
-# -------------------------
+# LlamaCloud API Key
+LLAMA_CLOUD_API_KEY=your_llamacloud_api_key
 
-OPENAI_API_KEY=your_openai_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
+# Groq API Key
+LLM_API_KEY=your_groq_api_key
 
-# -------------------------
-# Model Configuration
-# -------------------------
+# OpenAI API Key (Optional)
+OPENAI_API_KEY=your_openai_api_key
 
-LLM_MODEL_NAME=gpt-4o
-EMBEDDING_MODEL_NAME=text-embedding-3-small
-
-# -------------------------
-# Vector Database
-# -------------------------
-
-VECTOR_DB_TYPE=qdrant
-
-QDRANT_HOST=localhost
-QDRANT_PORT=6333
-
-# Optional
-# QDRANT_API_KEY=your_api_key
-
-# -------------------------
-# Neo4j (Optional)
-# -------------------------
-
-# NEO4J_URI=bolt://localhost:7687
-# NEO4J_USER=neo4j
-# NEO4J_PASSWORD=password
+# Supabase PostgreSQL Connection
+SUPABASE_DB_URL=postgresql://postgres.<project_ref>:<password>@<region>.pooler.supabase.com:6543/postgres
 ```
+
+> **Note**
+>
+> Gunakan **Supabase Connection Pooler Port 6543 (Session Mode)** agar koneksi dari Google Colab maupun server IPv4 berjalan stabil.
 
 ---
 
-# 🚀 How to Use
+# 📦 Installation
 
-## 1. Clone Repository
+Clone repository:
 
 ```bash
-git clone https://github.com/farhanahmadn/Triplet_RAG_System.git
-
-cd Triplet_RAG_System
+git clone https://github.com/yourusername/DRI_RAG_System.git
+cd DRI_RAG_System
 ```
 
----
-
-## 2. Create Virtual Environment
-
-Linux / macOS
-
-```bash
-python -m venv venv
-
-source venv/bin/activate
-```
-
-Windows
-
-```powershell
-python -m venv venv
-
-venv\Scripts\activate
-```
-
----
-
-## 3. Install Dependencies
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+Atur environment variables sesuai kebutuhan.
 
-## 4. Build Knowledge Index
+Jalankan notebook sesuai urutan:
 
-Extract triplets from documents:
-
-```bash
-python main.py \
-    --mode ingest \
-    --data-path ./data/sample.pdf
-```
-
----
-
-## 5. Query the RAG System
-
-Example:
-
-```bash
-python main.py \
-    --mode query \
-    --prompt "What is the relation between Component A and Component B?"
-```
-
----
-
-## 6. Run FastAPI Server
-
-```bash
-uvicorn app.api:app \
-    --host 0.0.0.0 \
-    --port 8000 \
-    --reload
-```
-
----
-
-## 7. Run Streamlit UI
-
-```bash
-streamlit run app/ui.py
-```
-
----
-
-# 📁 Project Structure
-
-```text
-Triplet_RAG_System/
-│
-├── app/
-│   ├── api.py
-│   └── ui.py
-│
-├── data/
-│
-├── src/
-│   ├── extraction/
-│   │   ├── parser.py
-│   │   └── triplet_extractor.py
-│   │
-│   ├── indexing/
-│   │   ├── vector_store.py
-│   │   └── graph_store.py
-│   │
-│   ├── retrieval/
-│   │   ├── hybrid_retriever.py
-│   │   └── reranker.py
-│   │
-│   └── pipeline.py
-│
-├── main.py
-├── requirements.txt
-├── .env.example
-├── README.md
-└── LICENSE
-```
-
----
-
-# ⭐ Features
-
-- 📄 Multi-format document ingestion
-- 🧠 Automatic Subject–Predicate–Object extraction
-- 🔎 Hybrid retrieval (Vector + Graph)
-- 📚 Dense semantic embeddings
-- 🌐 Optional Knowledge Graph
-- 🎯 Re-ranking for better evidence quality
-- 🤖 LLM-grounded answer generation
-- 📖 Source-aware responses
-- ⚡ FastAPI REST API
-- 🖥️ Streamlit Web UI
-- 🔌 Supports OpenAI, Gemini, Ollama, and local models
-
----
-
-# 📊 Advantages Over Traditional RAG
-
-| Traditional RAG | Triplet RAG |
-|-----------------|------------|
-| Retrieves long chunks | Retrieves atomic facts |
-| More hallucination | Better factual grounding |
-| Hard multi-hop reasoning | Native graph reasoning |
-| Large context window | Compact structured evidence |
-| Weak explainability | Explainable triplets |
-
----
-
-# 🤝 Contributing
-
-Contributions, feature requests, and pull requests are welcome.
-
-If you would like to contribute:
-
-1. Fork the repository.
-2. Create a feature branch.
-
-```bash
-git checkout -b feature/new-feature
-```
-
-3. Commit your changes.
-
-```bash
-git commit -m "Add new feature"
-```
-
-4. Push to your branch.
-
-```bash
-git push origin feature/new-feature
-```
-
-5. Open a Pull Request.
+1. `RAG_chunk.ipynb`
+2. `RAG.ipynb`
+3. `LLM_as_a_Reasoner.ipynb`
 
 ---
 
 # 📜 License
 
-This project is distributed under the **MIT License**.
-
-See the **LICENSE** file for more information.
+This project is licensed under the **MIT License**.
 
 ---
 
-# 👨‍💻 Author
+# 👤 Author
 
-**Farhan Ahmad**
+**Farhan Ahmad Naufal**
 
-- GitHub: https://github.com/farhanahmadn
+**Aspiring AI/ML Developer | Computer Vision Enthusiast | Informatics Researcher**
 
----
-
-## ⭐ If you find this project useful, don't forget to give it a Star!
+- GitHub: **@farhanahmadn**
