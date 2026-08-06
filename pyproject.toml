@@ -20,12 +20,22 @@ observability = [
 ]
 # RAG / retrieval (tim RAG) — install terpisah: pip install -e ".[rag]"
 # Sengaja dipisah supaya env reasoning yang sudah stabil tidak terbebani torch dll.
+# Dipakai EMBEDDING_PROVIDER=local / RERANK_PROVIDER=local (bge-m3 + bge-reranker-v2-m3).
 rag = [
     "psycopg[binary]>=3.1",
     "pgvector>=0.3",
+    "httpx>=0.24",          # provider serverless (Jina) — juga transitif via openai, dipin eksplisit
     "transformers>=4.40",  # bge-m3 (embeddings.py) & bge-reranker-v2-m3 (rerank.py) via AutoModel langsung
     "torch>=2.1",          # DIHINDARI: sentence-transformers/FlagEmbedding (menarik datasets->pyarrow yg
     #                        crash di Windows/py3.13). Inferensi cukup transformers+torch.
+]
+# RAG tanpa model lokal — utk VPS produksi ber-memori terbatas: EMBEDDING_PROVIDER=jina,
+# RERANK_PROVIDER=jina (tanpa transformers/torch, hemat ~2-3GB RAM saat startup/inferensi).
+# Akses DB tetap butuh psycopg/pgvector. Install: pip install -e ".[rag-serverless]"
+rag-serverless = [
+    "psycopg[binary]>=3.1",
+    "pgvector>=0.3",
+    "httpx>=0.24",
 ]
 # Parser PDF -> markdown (Langkah 3). Kedua backend dipasang saat bake-off; setelah backend
 # dikunci, yang tak dipakai boleh dihapus. Install: pip install -e ".[rag,parse]"
@@ -45,5 +55,5 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "live: memanggil LLM sungguhan (Groq), butuh GROQ_API_KEY, tak jalan di suite rutin",
+    "live: memanggil API eksternal sungguhan (Groq LLM dan/atau provider embedding/rerank spt Jina), butuh API key terkait (GROQ_API_KEY/JINA_API_KEY), tak jalan di suite rutin",
 ]

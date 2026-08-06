@@ -5,6 +5,7 @@ dari model lama: fakta (status/verdict/angka/kategori) DISUNTIKKAN sebagai groun
 membungkusnya jadi Bahasa Indonesia yang jelas. LLM TIDAK PERNAH menyimpulkan verdict sendiri.
 """
 
+from app import sanitize
 from app.retrieval.base import Chunk
 from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput
 
@@ -54,7 +55,10 @@ def _format_anchor(index: int, dasar_hukum: DasarHukum) -> str:
 
 
 def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
-    fakta = poin.fakta
+    # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
+    # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
+    # pola PII. Pagar ini, bukan asumsi "fakta pasti bersih", yang mencegah field baru bocor nanti.
+    fakta = sanitize.sanitize_fakta(poin.poin_id, poin.fakta)
     label = _LABEL_ITBX.get(poin.status, poin.status)
     lines = [f"STATUS_ITBX: {poin.status} ({label})"]
 
@@ -92,7 +96,10 @@ def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
 
 
 def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
-    fakta = poin.fakta
+    # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
+    # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
+    # pola PII. Pagar ini, bukan asumsi "fakta pasti bersih", yang mencegah field baru bocor nanti.
+    fakta = sanitize.sanitize_fakta(poin.poin_id, poin.fakta)
     lines = [f"STATUS_INTENSITAS: {poin.status}"]
 
     target_map = fakta.get("target") or {}
@@ -124,7 +131,10 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     # mengulang kesalahan yang sama di retry -> flaky fallback low_confidence. Skor/index tetap
     # muncul deterministik di ringkasan_dampak (assemble.py) — LLM tak butuh angka mentahnya utk
     # narasi per-poin, cukup KATEGORI (sudah final, tak perlu ditafsirkan arahnya).
-    fakta = poin.fakta
+    # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
+    # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
+    # pola PII. Pagar ini, bukan asumsi "fakta pasti bersih", yang mencegah field baru bocor nanti.
+    fakta = sanitize.sanitize_fakta(poin.poin_id, poin.fakta)
     lines = [
         f"KATEGORI_DAMPAK: {poin.status}",
         (

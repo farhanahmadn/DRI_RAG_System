@@ -27,6 +27,79 @@ swap dari `MockRetriever` = satu baris tanpa mengubah kode reasoning.
 Eval set: `tests/eval_set.jsonl` (22 query kategori indikator → chunk otoritatif Tengah; ground-truth
 dari isi dokumen, termasuk tabel-chunk Lampiran V.B/VI). **Dev-seeded — perlu validasi ahli tata ruang.**
 
+## Keputusan provider embedding/rerank: Jina (Agustus 2026)
+
+**Keputusan: `EMBEDDING_PROVIDER=jina` + `RERANK_PROVIDER=jina` jadi default di `.env.example`**
+(`jina-embeddings-v3` + `jina-reranker-v3`), menggantikan `local` (bge-m3 + bge-reranker-v2-m3).
+Tetap bisa di-override via `.env` (baris `EMBEDDING_PROVIDER`/`RERANK_PROVIDER`) — TIDAK ada
+perubahan kode utk berpindah provider, `local` dipertahankan penuh sebagai jalur rollback/self-host.
+
+**Alasan** (VPS produksi tidak cukup memori utk `transformers`+`torch` lokal — motivasi migrasi
+dari awal — lihat prinsip provider-agnostic di `app/retrieval/embeddings.py`/`rerank.py`):
+
+1. **Retrieval gate eval (22 query, Sleman Tengah, `tests/test_retrieval.py`)** — dijalankan utk
+   kedua stack atas korpus Tengah yang SAMA (440 chunk, full parity):
+
+   | Metrik | bge-m3 (local) | Jina | Ambang gerbang |
+   |---|---|---|---|
+   | Hit-Rate@5 | 100.00% (22/22) | **100.00%** (22/22) | ≥ 80% |
+   | MRR | 0.936 | **0.875** | ≥ 0.60 |
+   | exact-match `get_by_reference` | 100% | **100%** | 100% |
+
+   Keduanya lulus gerbang. Hit-Rate identik; MRR Jina sedikit di bawah bge-m3 tapi jauh di atas
+   ambang — pada 4/22 query (`intensitas pemanfaatan ruang`, `Kegiatan`, `Banjir`, `rawan bencana
+   banjir lahar`) chunk yang benar turun dari rank 1 ke rank 2, TETAP selalu masuk top-5.
+
+2. **Smoke test nyata** (`scripts/test_integrasi.py`, fixture `l2_sample_amplop_6191.json`,
+   `DEMO_WILAYAH="Sleman Tengah"`, panggilan Groq sungguhan) — 3 poin non-aman (itbx/intensitas/
+   dampak) dibandingkan local vs Jina: **faithfulness & grounding konsisten** — tidak ada
+   `low_confidence` di kedua stack, semua sitasi `terverifikasi=True` di kedua stack, status/arah
+   rekomendasi selalu sama. Satu-satunya beda: poin `intensitas` mengutip chunk pendukung berbeda
+   (local → Pasal 61 Ayat 4; Jina → Lampiran VI Zona KT) — KEDUANYA tetap relevan & terverifikasi,
+   cuma pilihan pasal beda, bukan kegagalan. Poin `itbx` & `dampak`: sitasi identik persis di kedua
+   stack. Pola ini selaras dgn temuan MRR di atas (retrieval indikator "intensitas"/"dampak" adalah
+   satu-satunya area Jina sedikit kurang tajam dibanding bge-m3, tapi tidak sampai salah/gagal).
+
+3. **Alasan operasional**: menghapus kebutuhan `transformers`+`torch` (~2-3GB) di VPS produksi
+   (extra `rag-serverless` di `pyproject.toml`), tanpa DPA administratif terpisah dgn Jina — mitigasi
+   privasi jadi TEKNIS (lihat `app/sanitize.py`, Tahap 6: data sensitif tidak pernah terbentuk jadi
+   teks yang dikirim ke provider eksternal), bukan kontraktual.
+
+**Kalau perlu rollback**: set `EMBEDDING_PROVIDER=local`/`RERANK_PROVIDER=local` di `.env` — tidak
+ada migrasi/perubahan kode, baseline bge-m3 tetap utuh di `chunks.embedding` (tak pernah ditimpa
+selama proses A/B, lihat § Skema `chunk_embeddings_ab` kalau ditambahkan).
+
+**Belum diuji/diputuskan** (di luar 2 stack di atas): perbandingan lewat `eval/gold_set.jsonl` (6
+kasus) — TIDAK BISA dijalankan lewat `RetrieverAsli` sama sekali, gap desain terpisah (lihat §
+"Ditunda" di bawah), jadi keputusan ini murni berdasar retrieval gate eval + smoke test, bukan gold
+set reasoning formal.
+
+### Pembatas concurrency panggilan Jina (`PROVIDER_MAX_CONCURRENT`)
+
+**Default: `PROVIDER_MAX_CONCURRENT=2`** (`.env.example`/`.env`) — semaphore di
+`app/retrieval/_provider_http.py`, membatasi berapa banyak panggilan HTTP ke Jina (embed+rerank,
+satu semaphore dibagi lintas keduanya) yang boleh IN-FLIGHT bersamaan. Panggilan ke-N+1 **antre**,
+bukan gagal. Sengaja **terpisah total** dari `REASONING_MAX_WORKERS` (itu paralelisme thread
+reasoning umum lintas SEMUA permohonan yang bersamaan lewat satu `ThreadPoolExecutor` global,
+bukan cuma panggilan Jina).
+
+Ditambahkan proaktif setelah observasi live (Agustus 2026): 1 permohonan penuh via `/reasoning`
+(3 poin, DB+Groq+Jina sungguhan) DAN stress-test 3x paralel murni Jina (3 kategori sekaligus per
+putaran) **sama sekali tidak memicu 429** — tapi cakupan uji itu terbatas ke maks 3 panggilan Jina
+bersamaan dari SATU permohonan; beban produksi sungguhan (beberapa permohonan datang nyaris
+bersamaan, semua berbagi `REASONING_MAX_WORKERS` yang sama) belum teruji. Semaphore ini jaring
+pengaman murah dipasang sebelum sinyal 429 nyata muncul, bukan reaksi ke bug yang sudah terjadi.
+
+**Batasan yang perlu diketahui — semaphore ini PER-PROSES, bukan terdistribusi.** Kalau nanti
+deployment produksi menjalankan lebih dari satu worker/proses Python (mis. beberapa `uvicorn`
+worker, atau beberapa instance di belakang load balancer), **setiap proses punya semaphore sendiri**
+(state in-memory Python biasa, bukan Redis/DB) — batas efektif SEBENARNYA jadi
+`PROVIDER_MAX_CONCURRENT × jumlah_proses`, bukan `PROVIDER_MAX_CONCURRENT` secara global. Kalau
+concurrency lintas-proses jadi masalah nyata nanti (429 tetap muncul walau tiap proses sudah dibatasi
+2), opsinya: (a) turunkan `PROVIDER_MAX_CONCURRENT` per proses sebanding jumlah worker, atau
+(b) ganti semaphore in-memory dengan yang terdistribusi (mis. Redis semaphore) — belum diperlukan
+sekarang (deployment saat ini 1 proses), dicatat di sini supaya tidak jadi kejutan nanti.
+
 ## Isi korpus Tengah (yang di-embed & bisa disitasi)
 
 - **Prosa pasal** (Pasal 1–68) → chunk Pasal(induk)/Ayat(anak). Definisi Pasal 1 dipecah per butir
@@ -101,3 +174,13 @@ ke daerah itu. Tak perlu DB terpisah / re-embed.
 - **Validasi ahli** utk `tests/eval_set.jsonl`.
 - **Tabel ketinggian KKOP & Indikasi Program (Lampiran IV)** — belum dipakai 8 indikator; bisa
   ditambah (relasional/tabel-chunk) bila indikatornya muncul.
+- **Gap ketahuan (migrasi embedding/rerank serverless, Agu 2026)**: `eval/gold_set.jsonl` (6 kasus)
+  hardcode `MockRetriever()` di `eval/run_eval.py::main()`, dan `citation_ids_diharapkan` di gold set
+  itu (mis. `rdtr-p1-a107`, `rdtr-lampiran-vi-c1`) cocok PERSIS dengan fixture ID di
+  `app/retrieval/mock.py`, bukan skema ID chunk nyata (`rdtr-sleman-tengah-p1-a117` dst di DB). Gold
+  set ini **tidak bisa dijalankan lewat `RetrieverAsli`** (local maupun provider lain) — `sitasi_grounded`
+  akan gagal utk KEDUA provider karena mismatch ID, bukan sinyal kualitas retrieval. Jadi gold set 6
+  kasus TIDAK BISA dipakai membandingkan provider embedding/rerank sampai `citation_ids_diharapkan`
+  di-relabel ke ID chunk nyata (atau `jalankan_gold_set()` diberi param retriever eksplisit + gold set
+  baru yang selaras korpus asli). Bukan blocker — regresi jangka panjang, layak dibahas kalau gold set
+  mau dipakai lagi utk perbandingan retrieval, bukan cuma reasoning/LLM murni.

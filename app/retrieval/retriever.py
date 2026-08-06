@@ -12,9 +12,11 @@ file reasoning lain yang perlu berubah (SEAM). Lihat docs/INTEGRASI_RETRIEVER.md
 
 from __future__ import annotations
 
+import os
 import re
 
-from app.retrieval import db, fusion, rerank
+from app import sanitize
+from app.retrieval import cache, db, fusion, rerank
 from app.retrieval.base import Chunk, RetrievalFilters
 from app.retrieval.embeddings import encode_dense_one
 
@@ -62,6 +64,9 @@ class RetrieverAsli:
         self._default_wilayah = default_wilayah  # mis. "Sleman Timur" -> filters.dokumen default
         self._candidate_k = candidate_k
         self._rerank_pool = rerank_pool
+        # Cache hasil retrieval+rerank final — per instance (bukan singleton modul) supaya beberapa
+        # RetrieverAsli dgn candidate_k/rerank_pool berbeda tak saling salah pakai cache satu sama lain.
+        self._cache = cache.from_env()
 
     # -- koneksi (lazy, reuse; reconnect bila putus) --
     def _c(self):
@@ -76,12 +81,34 @@ class RetrieverAsli:
 
     # ---------------------------------------------------------------- search
     def search(self, query: str, filters: RetrievalFilters, top_k: int = 5) -> list[Chunk]:
+        # Pagar PII di titik pembentukan query retrieval (app/sanitize.py) — raise kalau query
+        # (seharusnya selalu kategori indikator pendek) kebetulan membawa pola PII, SEBELUM query
+        # dipakai apa pun (termasuk masuk cache key) atau dikirim ke provider embedding eksternal.
+        query = sanitize.sanitize_query_text(query, context="retriever.search")
         filters = self._apply_default_wilayah(filters or RetrievalFilters())
+        # Kunci cache: (kategori, zona, dokumen_versi) sesuai desain — DIPERLUAS dgn jenis/as_of/top_k
+        # dan provider embed+rerank aktif, supaya BENAR (bukan cuma cepat): tanpa provider di kunci,
+        # ganti EMBEDDING_PROVIDER/RERANK_PROVIDER pada instance retriever yang sama (mis. eval
+        # perbandingan 3 stack Tahap 5) bisa menyajikan hasil provider LAMA yang ke-cache secara diam-diam.
+        cache_key = (
+            query.strip().lower(), filters.zona, filters.dokumen, filters.jenis, filters.as_of, top_k,
+            os.getenv("EMBEDDING_PROVIDER", "local"), os.getenv("RERANK_PROVIDER", "local"),
+        )
+        return list(self._cache.get_or_compute(cache_key, lambda: self._search_uncached(query, filters, top_k)))
+
+    def _search_uncached(self, query: str, filters: RetrievalFilters, top_k: int) -> list[Chunk]:
         q = _expand(query)
         conn = self._c()
 
         qvec = encode_dense_one(q)
-        dense = db.dense_search(conn, qvec, filters, self._candidate_k)
+        embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local").strip().lower()
+        if embedding_provider == "local":
+            dense = db.dense_search(conn, qvec, filters, self._candidate_k)
+        else:
+            # Query di-embed model `embedding_provider` (encode_dense_one di atas) -> vektor dokumen
+            # HARUS dari model yang sama, jadi baca `chunk_embeddings_ab` (kandidat A/B), BUKAN
+            # `chunks.embedding` (baseline bge-m3) yang ruang vektornya tak sepadan/tak bermakna.
+            dense = db.dense_search_ab(conn, qvec, embedding_provider, filters, self._candidate_k)
         lexical = db.fts_search(conn, q, filters, self._candidate_k)
 
         fused = fusion.reciprocal_rank_fusion([[i for i, _ in dense], [i for i, _ in lexical]])
@@ -99,10 +126,14 @@ class RetrieverAsli:
 
     # ------------------------------------------------------- get_by_reference
     def get_by_reference(self, referensi: list[str]) -> list[Chunk]:
+        # Sanitasi SELURUH daftar dulu, SEBELUM buka koneksi DB apa pun — raise cepat kalau ada
+        # pola PII, tanpa DB sempat tersentuh (bukan cuma sebelum query, sebelum connect sekalipun).
+        referensi = [sanitize.sanitize_query_text(r, context="retriever.get_by_reference")
+                     for r in (referensi or [])]
         conn = self._c()
         found: list[Chunk] = []
         seen: set[str] = set()
-        for ref in referensi or []:
+        for ref in referensi:
             m_pasal = _RE_PASAL.search(ref)
             pasal = m_pasal.group(1) if m_pasal else None
             m_ayat = _RE_AYAT.search(ref)

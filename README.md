@@ -531,9 +531,19 @@ Dashboard interaktif untuk simulasi berbagai skenario tata ruang.
 
 | Component | Model | Description |
 |------------|-------|-------------|
-| Embedding | **BAAI/bge-m3** | Multilingual embedding model (1024 dimensions) optimized for Indonesian legal documents |
+| Embedding | **jina-embeddings-v3** (default) / **BAAI/bge-m3** (local) | 1024-dim, provider-agnostic — pilih via `EMBEDDING_PROVIDER` di `.env`, tanpa ubah kode |
+| Reranker | **jina-reranker-v3** (default) / **BAAI/bge-reranker-v2-m3** (local) | Cross-encoder, pilih via `RERANK_PROVIDER` di `.env` |
 | LLM | **llama-3.3-70b-versatile** | Groq-hosted LLM used for legal reasoning and structured response generation |
 | Document Parser | **LlamaParse** | AI-powered PDF parser from LlamaCloud for extracting structured Markdown from legal documents |
+
+> **Catatan (Agustus 2026):** embedding & reranker sekarang provider-agnostic — bisa jalan tanpa
+> `transformers`/`torch` (VPS ber-memori terbatas) dgn `EMBEDDING_PROVIDER=jina`/`RERANK_PROVIDER=jina`
+> (default sejak migrasi ini), atau kembali ke `local` (bge-m3/bge-reranker-v2-m3, self-host) sebagai
+> jalur rollback — nol perubahan kode di kedua arah. Implementasi asli: `app/retrieval/embeddings.py`
+> & `app/retrieval/rerank.py`. Alasan pemilihan Jina (angka Hit-Rate@5/MRR, hasil smoke test
+> faithfulness) didokumentasikan di `docs/STATUS_RAG.md` § *Keputusan provider embedding/rerank*.
+> Konfigurasi lengkap & terkini (env var apa saja yang benar-benar dipakai) ada di `.env.example` —
+> daftar env var pada bagian "Environment Variables" di bawah ini sudah usang, jangan dipakai acuan.
 
 ---
 

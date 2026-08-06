@@ -71,13 +71,32 @@ def _vec_literal(v: list[float]) -> str:
 
 
 def dense_search(conn, query_vec: list[float], filters: RetrievalFilters | None, limit: int) -> list[tuple[str, float]]:
-    """KNN cosine (pgvector HNSW). Return [(id, cosine_sim)] terurut menurun."""
+    """KNN cosine (pgvector HNSW) atas vektor BASELINE (`chunks.embedding`, provider 'local').
+    Return [(id, cosine_sim)] terurut menurun."""
     w, params = _where(filters)
     lit = _vec_literal(query_vec)
     sql = (f"SELECT id, 1 - (embedding <=> %s::vector) AS sim FROM chunks "
            f"WHERE embedding IS NOT NULL{w} ORDER BY embedding <=> %s::vector LIMIT %s")
     with conn.cursor() as cur:
         cur.execute(sql, [lit, *params, lit, limit])
+        return [(r[0], float(r[1])) for r in cur.fetchall()]
+
+
+def dense_search_ab(conn, query_vec: list[float], provider: str, filters: RetrievalFilters | None,
+                    limit: int) -> list[tuple[str, float]]:
+    """KNN cosine atas vektor kandidat A/B (`chunk_embeddings_ab`, provider != 'local') — dipakai
+    RetrieverAsli saat EMBEDDING_PROVIDER != 'local', supaya query vector & document vector berasal
+    dari model YANG SAMA (bandingkan qvec-jina lawan chunks.embedding-bge-m3 akan salah/tak bermakna).
+    Return [(id, cosine_sim)] terurut menurun; `id` = id di tabel `chunks` (join lewat chunk_id)."""
+    w, params = _where(filters)
+    lit = _vec_literal(query_vec)
+    sql = (
+        f"SELECT c.id, 1 - (ab.embedding <=> %s::vector) AS sim "
+        f"FROM chunk_embeddings_ab ab JOIN chunks c ON c.id = ab.chunk_id "
+        f"WHERE ab.embedding_provider = %s{w} ORDER BY ab.embedding <=> %s::vector LIMIT %s"
+    )
+    with conn.cursor() as cur:
+        cur.execute(sql, [lit, provider, *params, lit, limit])
         return [(r[0], float(r[1])) for r in cur.fetchall()]
 
 

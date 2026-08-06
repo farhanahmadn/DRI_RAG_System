@@ -11,6 +11,10 @@
 --  * Matriks ITBX & intensitas KDB/KLB/KDH = tabel relasional OTORITATIF
 --    (dipakai rule engine); chunk level='tabel' di-GENERATE dari baris ini.
 --  * Hybrid = dense (pgvector HNSW cosine) + lexical (Postgres FTS/GIN) -> RRF.
+--  * Embedding provider-agnostic (local bge-m3 / Jina, lihat app/retrieval/embeddings.py):
+--    `chunks.embedding` = vektor BASELINE produksi, ditandai `chunks.embedding_provider`/
+--    `embedding_model`; kandidat A/B (jina) hidup berdampingan di `chunk_embeddings_ab`
+--    tanpa menimpa baseline, sampai salah satu dikunci jadi default (keputusan manusia, bukan skema).
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -50,16 +54,28 @@ CREATE TABLE IF NOT EXISTS chunks (
     jenis           text,
     tanggal_berlaku date,
     tanggal_dicabut date,
-    embedding       vector(1024),              -- bge-m3 dense
+    embedding       vector(1024),              -- vektor dense BASELINE produksi (lihat embedding_provider)
+    embedding_provider text NOT NULL DEFAULT 'local', -- 'local'|'jina' — penghasil `embedding` di atas
+    embedding_model text,                      -- mis. 'BAAI/bge-m3'|'jina-embeddings-v3'
     sparse          jsonb,                     -- bge-m3 lexical weights (disimpan; jalur query menyusul)
     fts             tsvector GENERATED ALWAYS AS (to_tsvector('simple', coalesce(teks, ''))) STORED,
     source_version  text,                      -- versi parse (data/parsed/vN)
     created_at      timestamptz NOT NULL DEFAULT now()
 );
 
+-- Migrasi utk DB yang sudah ada sebelum embedding_provider/embedding_model ditambahkan (idempoten;
+-- reapply manual: `docker compose exec -T db psql -U rdtr -d rdtr < sql/schema.sql`, lihat sql/apply.md).
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding_provider text NOT NULL DEFAULT 'local';
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding_model text;
+-- Backfill baris lama (di-embed sebelum kolom ini ada): satu-satunya provider yang pernah dipakai = local/bge-m3.
+UPDATE chunks SET embedding_model = 'BAAI/bge-m3'
+    WHERE embedding IS NOT NULL AND embedding_model IS NULL AND embedding_provider = 'local';
+
 -- Index retrieval
 CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
     ON chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS chunks_embedding_provider
+    ON chunks (embedding_provider);
 CREATE INDEX IF NOT EXISTS chunks_fts_gin
     ON chunks USING gin (fts);
 -- get_by_reference & get_parent: lookup pasal/ayat presisi
@@ -75,6 +91,26 @@ CREATE INDEX IF NOT EXISTS chunks_level
     ON chunks (level);
 CREATE INDEX IF NOT EXISTS chunks_istilah_kode
     ON chunks (istilah_kode);
+
+-- ---------------------------------------------------------------------
+-- Vektor kandidat A/B (Jina) — HIDUP BERDAMPINGAN dgn baseline `chunks.embedding` (local/
+-- bge-m3), TIDAK MENIMPANYA. Satu baris per (chunk, provider kandidat). `scripts/reembed.py` yang
+-- mengisi (upsert idempoten); dipakai evaluasi perbandingan (Tahap 5), BUKAN jalur produksi
+-- RetrieverAsli.search() — provider produksi tetap baca `chunks.embedding` (ditandai
+-- `chunks.embedding_provider`) sampai salah satu provider dikunci jadi default & di-promote ke sana.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS chunk_embeddings_ab (
+    chunk_id           text NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+    embedding_provider text NOT NULL,           -- 'jina' (kandidat; 'local' sudah ada di chunks)
+    embedding_model    text NOT NULL,
+    embedding          vector(1024) NOT NULL,
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (chunk_id, embedding_provider)
+);
+CREATE INDEX IF NOT EXISTS chunk_embeddings_ab_hnsw
+    ON chunk_embeddings_ab USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS chunk_embeddings_ab_provider
+    ON chunk_embeddings_ab (embedding_provider);
 
 -- ---------------------------------------------------------------------
 -- Tabel relasional OTORITATIF (rule engine). BUKAN di-embed.
