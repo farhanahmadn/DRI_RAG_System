@@ -1,0 +1,37 @@
+name: Deploy DRISleman-ai ke VPS1 (ml)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: rsync source ke VPS (ml user)
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avz --delete --exclude '.venv/' --exclude '.git/' --exclude '__pycache__/' --exclude '.env' --exclude 'data/'
+          path: .
+          remote_path: /home/ml/project-2026-07-DRISleman-ai/
+          remote_host: ${{ secrets.ML_HOST }}
+          remote_user: ${{ secrets.ML_USER }}
+          remote_key: ${{ secrets.ML_SSH_KEY }}
+
+      - name: Install deps + restart PM2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.ML_HOST }}
+          username: ${{ secrets.ML_USER }}
+          key: ${{ secrets.ML_SSH_KEY }}
+          script: |
+            cd /home/ml/project-2026-07-DRISleman-ai
+            if [ -f .venv/bin/activate ]; then
+              . .venv/bin/activate
+              pip install -q -e ".[rag-serverless]" || pip install -q -e ".[rag]" || true
+            else
+              python -m venv .venv && . .venv/bin/activate && pip install -q -e ".[rag-serverless]"
+            fi
+            pm2 restart 4005-drisman-ai --update-env
