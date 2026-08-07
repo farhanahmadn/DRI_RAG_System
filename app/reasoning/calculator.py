@@ -8,6 +8,8 @@ dengan mengembalikan `None` (parameter dilewati), BUKAN raise — kontrak L2 eks
 bisa null sementara.
 """
 
+import re
+
 from app.reasoning.rekomendasi import KATEGORI_DAMPAK_BERSYARAT
 from app.schemas import ImpactAssessment, IntensitasTahap, ParameterIntensitas
 
@@ -116,3 +118,68 @@ def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment) -> dict:
     if impact.calculation_details:
         hasil["calculation_details_referensi"] = impact.calculation_details
     return hasil
+
+
+# ---------------------------------------------------------------------------
+# Target mitigasi dampak — angka ambang (BUKAN rumus C/index dihitung ulang).
+# ---------------------------------------------------------------------------
+
+# Urutan RINGAN -> BERAT. Dipakai HANYA utk mencari kategori "satu tingkat lebih ringan" dari
+# threshold_bands yang SUDAH DIBERI back-end — bukan definisi baru, cuma label yang sudah dipakai
+# di seluruh sistem (app/reasoning/prompts.py, rekomendasi.py::KATEGORI_DAMPAK_BERSYARAT).
+_URUTAN_KATEGORI_DAMPAK = ("Rendah", "Sedang", "Tinggi", "Sangat Tinggi")
+
+# Pola sama seperti app/reasoning/guardrail.py::_RE_BAND (dipakai utk cek konsistensi, BUKAN target)
+# — sengaja diduplikasi kecil di sini alih-alih di-impor, supaya calculator.py tidak balik bergantung
+# ke guardrail.py (arah dependency yang ada sekarang: guardrail -> calculator, bukan sebaliknya).
+_RE_BAND_DAMPAK = re.compile(r"(?P<op>[<>])?\s*(?P<n1>\d+(?:\.\d+)?)\s*(?:-\s*(?P<n2>\d+(?:\.\d+)?))?")
+
+
+def hitung_target_mitigasi_dampak(impact: ImpactAssessment) -> dict:
+    """Ambang `runoff_change_index` yang perlu dicapai (turun DI BAWAH ambang ini) supaya kategori
+    dampak pindah ke SATU TINGKAT LEBIH RINGAN — murni aritmatika ambang atas `threshold_bands`
+    (SUDAH diberi back-end) vs `runoff_change_index` (SUDAH diberi back-end). TIDAK menghitung ulang
+    rumus C/index sama sekali (itu wewenang back-end, lihat docstring `sarankan_arah_mitigasi_dampak`
+    di atas — rumus itu masih volatile & DILARANG di-hardcode di sini).
+
+    Return {} (bukan angka) kalau: index/threshold_bands tidak ada, kategori sudah 'Rendah' (tak ada
+    yang lebih ringan), band kategori target tak bisa di-parse, atau band target berbentuk "> n"
+    (tak ada batas atas terhingga utk dijadikan target).
+    """
+    index = impact.runoff_change_index
+    bands = impact.threshold_bands
+    kategori = normalisasi_kategori_dampak(impact.impact_category)
+    if index is None or not bands or kategori not in _URUTAN_KATEGORI_DAMPAK:
+        return {}
+
+    posisi = _URUTAN_KATEGORI_DAMPAK.index(kategori)
+    if posisi == 0:
+        return {}  # sudah kategori paling ringan, tak ada target lebih rendah
+
+    kategori_target = _URUTAN_KATEGORI_DAMPAK[posisi - 1]
+    rentang_target = bands.get(kategori_target)
+    if not rentang_target:
+        return {}
+
+    m = _RE_BAND_DAMPAK.search(rentang_target)
+    if not m:
+        return {}
+    op, n1_str, n2_str = m.group("op"), m.group("n1"), m.group("n2")
+    if n2_str is not None:
+        ambang = float(n2_str)  # rentang "a-b" -> ambang atas = b
+    elif op == "<":
+        ambang = float(n1_str)  # "< n" -> ambang atas = n
+    else:
+        return {}  # "> n" (band target tak berbatas atas) -> tak ada target berarti
+
+    return {
+        "runoff_change_index_maks": ambang,
+        "kategori_target": kategori_target,
+        "index_saat_ini": index,
+    }
+
+
+def pilih_target_mitigasi_dampak(target_mitigasi: dict) -> float | None:
+    """Satu angka representatif dari `hitung_target_mitigasi_dampak()` utk `RekomendasiOutput.target`
+    — pola sama seperti `pilih_target_utama_intensitas`."""
+    return target_mitigasi.get("runoff_change_index_maks")

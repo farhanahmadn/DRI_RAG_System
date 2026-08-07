@@ -58,7 +58,7 @@ ALLOWED_FAKTA_FIELDS: dict[str, frozenset[str]] = {
     "dampak": frozenset({
         "dinilai", "impact_score", "runoff_change_index", "c_before", "c_after", "threshold_bands",
         "existing_surface_details", "proposed_surface_details", "c_coefficients", "data_confidence",
-        "limitations", "mitigasi",
+        "limitations", "mitigasi", "target_mitigasi",
     }),
 }
 

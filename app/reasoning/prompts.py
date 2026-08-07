@@ -22,6 +22,7 @@ ATURAN WAJIB (jangan dilanggar):
 8. JANGAN MENGHITUNG atau MENGARANG angka apa pun. Kamu BOLEH menyebut angka FAKTA yang diberikan di atas (usulan/ambang/target/skor) secara verbatim di reasoning_pendek, reasoning_panjang, maupun saran untuk memperjelas narasi (contoh BENAR: "KDB usulan 90% melampaui batas maksimum 60%") — SELAMA angka itu persis tercantum di fakta yang diberikan, bukan dihitung/diperkirakan/dikarang sendiri. Angka final rekomendasi (target) tetap dirakit sistem di field terpisah.
 9. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda/pengambil keputusan) yang akan meng-ACC atau memberi feedback atas permohonan — BUKAN nasihat langsung ke pemohon. Sebut pemohon sebagai orang ketiga ("pemohon"/"permohonan ini"), JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, analitis, dan dapat diaudit, agar reviewer dapat menilai dan memutuskan.
 10. POIN AMAN/LOLOS TETAP WAJIB DIJELASKAN — kalau fakta di atas menunjukkan poin ini lolos/memenuhi (mis. STATUS_ITBX "I", STATUS_INTENSITAS "MEMENUHI_SYARAT", atau KATEGORI_DAMPAK "Rendah"/"Sedang"), JANGAN menulis reasoning generik seperti "tidak ada catatan berisiko" atau "tidak ada tindakan lebih lanjut" tanpa alasan. WAJIB jelaskan KONKRET mengapa poin ini lolos — sebut fakta relevan (mis. kategori kegiatan di zona ini, angka usulan dibanding ambang, kategori dampak) dan sitasi pasal yang tersedia — sama persis seperti menjelaskan poin yang tidak lolos.
+11. SARAN HARUS KONKRET & DAPAT DITINDAKLANJUTI, bukan pernyataan terbuka/umum. "saran" adalah bahan reviewer memutuskan syarat ACC — JANGAN menulis kalimat umum seperti "menyesuaikan desain agar memenuhi ketentuan" TANPA menyebutkan APA yang disesuaikan dan (kalau ada FAKTA angka target/ambang di atas) angka targetnya persis. Kalau ada LEBIH DARI SATU langkah/opsi konkret yang tersedia di fakta (mis. beberapa "Arah Mitigasi", beberapa syarat di "Keterangan Ketentuan"), tulis "saran" sebagai daftar bernomor ("1. ...\\n2. ...") satu opsi per baris — JANGAN digabung jadi satu kalimat panjang. Kalau ada FAKTA "TARGET_MITIGASI_KUANTITATIF" atau target numerik lain, WAJIB sebutkan angkanya persis di salah satu baris saran (bukan cuma di reasoning).
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -148,6 +149,21 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     if mitigasi.get("perlu_mitigasi"):
         lines.append("\nArah Mitigasi (FAKTA kualitatif, bukan angka pasti):")
         lines.extend(f"- {arah}" for arah in mitigasi.get("arah", []))
+
+    # Target kuantitatif (ambang runoff_change_index, dari app/reasoning/calculator.py) — BEDA dgn
+    # skor invers yang dilarang Aturan #2 di atas (skor TINGGI = dampak RENDAH): angka di sini arahnya
+    # LURUS (index turun = dampak membaik), sudah diinterpretasikan penuh di sini, LLM tinggal kutip.
+    target_mitigasi = fakta.get("target_mitigasi") or {}
+    ambang = target_mitigasi.get("runoff_change_index_maks")
+    if ambang is not None:
+        lines.append(
+            f"\nTARGET_MITIGASI_KUANTITATIF: indikator limpasan air (runoff) perlu ditekan hingga "
+            f"DI BAWAH {ambang} (saat ini {target_mitigasi['index_saat_ini']}) supaya kategori dampak "
+            f"turun dari {poin.status} ke {target_mitigasi['kategori_target']}. Angka ini BUKAN skor "
+            "invers (beda dari Aturan #2) — arah SELALU 'turunkan sampai di bawah angka ini', jangan "
+            "ditafsirkan arah lain. WAJIB sebutkan angka target ini secara eksplisit & konkret di "
+            "reasoning_pendek dan saran (kutip apa adanya, JANGAN dihitung ulang)."
+        )
 
     return lines
 

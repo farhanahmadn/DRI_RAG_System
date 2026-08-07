@@ -293,6 +293,62 @@ def test_generate_poin_merakit_dari_respons_llm_palsu(monkeypatch):
     assert hasil.low_confidence is False
 
 
+def test_generate_poin_dampak_dapat_target_mitigasi_numerik(monkeypatch):
+    """Poin dampak (tipe_rekomendasi='numerik-mitigasi') kini juga dapat `target` numerik dari
+    `fakta['target_mitigasi']` (app/reasoning/calculator.py::hitung_target_mitigasi_dampak) — bukan
+    None lagi selamanya seperti sebelumnya. Angka dari calculator, BUKAN dari LLM."""
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "Dampak tergolong Tinggi, perlu mitigasi.",
+            "reasoning_panjang": "Indikator limpasan perlu ditekan di bawah 2.5.",
+            "sitasi": [],
+            "saran": "1. Turunkan KDB.\n2. Naikkan KDH hingga indikator limpasan di bawah 2.5.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="dampak",
+        kategori="Dampak Tata Guna Lahan",
+        tipe_rekomendasi="numerik-mitigasi",
+        status="Tinggi",
+        fakta={
+            "dinilai": True,
+            "mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB", "naikkan KDH/RTH"]},
+            "target_mitigasi": {
+                "runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.85,
+            },
+        },
+    )
+
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert hasil.rekomendasi.tipe == "numerik-mitigasi"
+    assert hasil.rekomendasi.target == 2.5  # dari calculator, BUKAN dari LLM
+    assert hasil.low_confidence is False
+
+
+def test_generate_poin_dampak_tanpa_target_mitigasi_tetap_none(monkeypatch):
+    """Kalau target_mitigasi kosong (mis. threshold_bands tak lengkap) -> target tetap None, TIDAK
+    error/crash — perilaku fallback aman dipertahankan."""
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x", "reasoning_panjang": "x", "sitasi": [], "saran": "x", "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+        status="Tinggi",
+        fakta={"dinilai": True, "mitigasi": {"perlu_mitigasi": True, "arah": []}, "target_mitigasi": {}},
+    )
+
+    hasil = generate_poin(poin, MockRetriever())
+    assert hasil.rekomendasi.target is None
+
+
 def test_generate_poin_sitasi_anchor_diprioritaskan(monkeypatch):
     def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
         return {

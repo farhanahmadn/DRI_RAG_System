@@ -5,7 +5,9 @@ from app.reasoning.calculator import (
     hitung_target_kdb,
     hitung_target_kdh,
     hitung_target_klb,
+    hitung_target_mitigasi_dampak,
     normalisasi_kategori_dampak,
+    pilih_target_mitigasi_dampak,
     pilih_target_utama_intensitas,
     sarankan_arah_mitigasi_dampak,
 )
@@ -181,3 +183,73 @@ class TestSarankanArahMitigasiDampak:
         hasil = sarankan_arah_mitigasi_dampak(self._impact(impact_category="Tinggi"))
         assert "c_coefficients_referensi" not in hasil
         assert "calculation_details_referensi" not in hasil
+
+
+_THRESHOLD_BANDS_STANDAR = {
+    "Rendah": "index < 1.5",
+    "Sedang": "1.5-2.5",
+    "Tinggi": "2.5-4.0",
+    "Sangat Tinggi": "> 4.0",
+}
+
+
+class TestHitungTargetMitigasiDampak:
+    def _impact(self, **override) -> ImpactAssessment:
+        default = dict(
+            dinilai=True, impact_category="Tinggi", runoff_change_index=2.85,
+            threshold_bands=_THRESHOLD_BANDS_STANDAR,
+        )
+        default.update(override)
+        return ImpactAssessment(**default)
+
+    def test_kasus_nyata_app_2026_6191_tinggi_ke_sedang(self):
+        # Fixture nyata: index=2.85 (band Tinggi 2.5-4.0) -> target turun ke bawah 2.5 (band Sedang).
+        hasil = hitung_target_mitigasi_dampak(self._impact())
+        assert hasil == {
+            "runoff_change_index_maks": 2.5,
+            "kategori_target": "Sedang",
+            "index_saat_ini": 2.85,
+        }
+
+    def test_sangat_tinggi_ke_tinggi(self):
+        hasil = hitung_target_mitigasi_dampak(
+            self._impact(impact_category="Sangat Tinggi", runoff_change_index=5.0)
+        )
+        assert hasil["runoff_change_index_maks"] == 4.0
+        assert hasil["kategori_target"] == "Tinggi"
+
+    def test_kategori_rendah_tak_ada_target_lebih_ringan(self):
+        hasil = hitung_target_mitigasi_dampak(
+            self._impact(impact_category="Rendah", runoff_change_index=1.0)
+        )
+        assert hasil == {}
+
+    def test_index_none_return_kosong(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact(runoff_change_index=None))
+        assert hasil == {}
+
+    def test_threshold_bands_none_return_kosong(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact(threshold_bands=None))
+        assert hasil == {}
+
+    def test_kategori_tak_dikenal_return_kosong(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact(impact_category="Entah Apa"))
+        assert hasil == {}
+
+    def test_tidak_menghitung_ulang_rumus_c_murni_aritmatika_threshold(self):
+        # Ganti threshold_bands custom -> hasil HARUS ikut angka baru (bukan hardcode), membuktikan
+        # ini murni baca `threshold_bands` yang diberi, bukan rumus C yang di-hardcode.
+        bands_custom = {"Rendah": "index < 1.0", "Sedang": "1.0-9.0", "Tinggi": "9.0-20.0",
+                        "Sangat Tinggi": "> 20.0"}
+        hasil = hitung_target_mitigasi_dampak(
+            self._impact(threshold_bands=bands_custom, runoff_change_index=10.0)
+        )
+        assert hasil["runoff_change_index_maks"] == 9.0
+
+
+class TestPilihTargetMitigasiDampak:
+    def test_ambil_runoff_change_index_maks(self):
+        assert pilih_target_mitigasi_dampak({"runoff_change_index_maks": 2.5}) == 2.5
+
+    def test_dict_kosong_return_none(self):
+        assert pilih_target_mitigasi_dampak({}) is None

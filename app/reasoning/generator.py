@@ -7,7 +7,7 @@ diretrieve — bukan dipercaya dari output LLM. citation_id yang tidak dikenal (
 """
 
 from app.reasoning import llm_client
-from app.reasoning.calculator import pilih_target_utama_intensitas
+from app.reasoning.calculator import pilih_target_mitigasi_dampak, pilih_target_utama_intensitas
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.retrieval.base import Chunk, RetrievalFilters, Retriever
 from app.schemas import MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
@@ -166,6 +166,8 @@ def generate_poin(
     target: float | str | None = None
     if poin.tipe_rekomendasi == "numerik":
         target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+    elif poin.tipe_rekomendasi == "numerik-mitigasi":
+        target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
 
     saran = llm_out["saran"]
     if apakah_aman(poin):

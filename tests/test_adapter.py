@@ -73,6 +73,19 @@ class TestFixtureLolosBersyarat:
         poin_dibalik = _bangun_poin_intensitas(assessment_dibalik)
         assert poin_asli.status == poin_dibalik.status == "MELAMPAUI_BATAS"
 
+    def test_poin_dampak_dapat_target_mitigasi_kuantitatif(self):
+        # Fixture nyata: impact_category=TINGGI, runoff_change_index=2.85, threshold_bands standar
+        # -> target_mitigasi WAJIB terisi (bukan {}), angka persis sesuai kasus live yang mendasari
+        # perbaikan ini (analisis output APP-2026-6191).
+        hasil = adaptasi(_muat_assessment("l2_sample_amplop_6191.json"))
+        poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
+        assert poin_dampak.status == "Tinggi"
+        assert poin_dampak.fakta["target_mitigasi"] == {
+            "runoff_change_index_maks": 2.5,
+            "kategori_target": "Sedang",
+            "index_saat_ini": 2.85,
+        }
+
 
 class TestFixtureTidakLolos:
     def test_parse_tanpa_error(self):

@@ -6,6 +6,7 @@ berikutnya). Lihat CLAUDE.md § Kontrak Input untuk kontrak gate_hukum/impact_as
 
 from app.reasoning.calculator import (
     hitung_target_intensitas,
+    hitung_target_mitigasi_dampak,
     normalisasi_kategori_dampak,
     sarankan_arah_mitigasi_dampak,
 )
@@ -103,6 +104,9 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "limitations": impact.limitations,
             # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
             "mitigasi": sarankan_arah_mitigasi_dampak(impact),
+            # Target kuantitatif (ambang runoff_change_index utk turun 1 kategori) — murni aritmatika
+            # threshold_bands vs index yang SUDAH diberi back-end, bukan hitung ulang rumus C.
+            "target_mitigasi": hitung_target_mitigasi_dampak(impact),
         },
         dasar_hukum=[],
     )

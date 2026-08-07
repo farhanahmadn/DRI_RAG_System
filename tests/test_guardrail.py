@@ -3,10 +3,12 @@ from pathlib import Path
 
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.guardrail import (
+    _bersihkan_disclaimer_fallback_palsu,
     _cari_band_untuk_index,
     _cek_invers_skor,
     _cek_konsistensi_numerik,
     _cek_konsistensi_verdict,
+    _gabung_kalimat,
     _kalimat_tingkat_kepercayaan,
     _paksa_field_wajib,
     caveat_fallback_itbx,
@@ -220,6 +222,20 @@ class TestCekKonsistensiNumerik:
         )
         output = _poin_output(reasoning_panjang="KDB usulan sebesar 47.5 persen dari luas lahan.")
         assert _cek_konsistensi_numerik(output, poin) != []
+
+    def test_kbli_itbx_terlacak_bukan_dianggap_karangan(self):
+        # Bug ditemukan live (APP-2026-6191): kbli_diusulkan="0111" itu FAKTA sah (persis di
+        # fakta['kbli_diusulkan']), tapi SEBELUM diperbaiki, itbx tak pernah dimasukkan
+        # _angka_fakta_poin sama sekali -> LLM yang menyebut "KBLI 0111" SELALU ditolak, memicu
+        # retry sia-sia (bahkan exhaust sampai low_confidence kalau kuota LLM habis di tengah retry).
+        poin = _poin(
+            status="T",
+            fakta={"lolos": True, "reason": "x", "kbli_diusulkan": "0111", "kegiatan_diusulkan": "WARUNG"},
+        )
+        output = _poin_output(
+            reasoning_panjang="Pemohon mengusulkan kegiatan WARUNG (KBLI 0111) di zona perumahan.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
 
     def test_intensitas_tanpa_keterangan_ketentuan_tetap_ketat_seperti_semula(self):
         # fakta={} kosong (tak ada parameter/target sama sekali) -> tidak ada angka ground truth
@@ -435,6 +451,82 @@ class TestCekKonsistensiNumerik:
             ],
         )
         assert _cek_konsistensi_numerik(output, poin) != []
+
+
+class TestGabungKalimat:
+    def test_tambah_titik_kalau_belum_ada(self):
+        # Bug live APP-2026-6191: fragmen tanpa titik trailing (mis. disclaimer LLM) nyambung ke
+        # fragmen berikutnya tanpa pemisah kalau cuma " ".join(...) polos.
+        hasil = _gabung_kalimat(["kalimat pertama tanpa titik", "kalimat kedua."])
+        assert hasil == "kalimat pertama tanpa titik. kalimat kedua."
+
+    def test_tidak_dobel_titik_kalau_sudah_ada(self):
+        hasil = _gabung_kalimat(["kalimat pertama.", "kalimat kedua."])
+        assert hasil == "kalimat pertama. kalimat kedua."
+
+    def test_tanda_tanya_dan_seru_tidak_ditimpa(self):
+        hasil = _gabung_kalimat(["Sudah benar?", "Ya!", "kalimat ketiga"])
+        assert hasil == "Sudah benar? Ya! kalimat ketiga"
+
+    def test_fragmen_kosong_dilewati(self):
+        assert _gabung_kalimat(["", None, "satu-satunya isi"]) == "satu-satunya isi"
+
+    def test_list_kosong_return_string_kosong(self):
+        assert _gabung_kalimat([]) == ""
+
+    def test_satu_fragmen_tak_berubah(self):
+        assert _gabung_kalimat(["cuma satu tanpa titik"]) == "cuma satu tanpa titik"
+
+
+class TestBersihkanDisclaimerFallbackPalsu:
+    def test_buang_kalimat_yang_mirip_caveat_fallback(self):
+        # Kasus nyata APP-2026-6191: reason bersih ("Lolos karena kegiatan Terbatas (T)...") tidak
+        # memicu deteksi_fallback_itbx (dikonfirmasi False), tapi LLM tetap menulis disclaimer mirip
+        # caveat fallback atas inisiatifnya sendiri — kalimat itu harus terbuang, SISANYA tetap ada.
+        disclaimer = (
+            "Penentuan status ini didasarkan pada data matriks RDTR yang mungkin belum lengkap — "
+            "perlu verifikasi manual apakah kegiatan benar-benar dilarang. Tingkat kepercayaan data: sedang."
+        )
+        hasil = _bersihkan_disclaimer_fallback_palsu(disclaimer)
+        assert "matriks rdtr" not in hasil.lower()
+        assert "Tingkat kepercayaan data: sedang." in hasil
+
+    def test_disclaimer_bersih_tak_berubah(self):
+        assert _bersihkan_disclaimer_fallback_palsu("Tingkat kepercayaan data: sedang.") == "Tingkat kepercayaan data: sedang."
+
+    def test_disclaimer_none_tetap_none(self):
+        assert _bersihkan_disclaimer_fallback_palsu(None) is None
+
+    def test_seluruh_disclaimer_cocok_pola_return_none(self):
+        assert _bersihkan_disclaimer_fallback_palsu(
+            "data matriks rdtr kosong dan perlu verifikasi manual."
+        ) is None
+
+
+class TestPaksaFieldWajibScrubFallbackPalsu:
+    def _assessment_tanpa_meta(self) -> L2Assessment:
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        return assessment.model_copy(update={"meta": None})
+
+    def test_disclaimer_caveat_palsu_di_scrub_bukan_dibiarkan(self):
+        poin = _poin(status="T", fakta={"lolos": True, "reason": "x", "fallback_data_kosong": False})
+        output = _poin_output(
+            status="T",
+            rekomendasi=RekomendasiOutput(
+                tipe="kategorikal", saran="x",
+                disclaimer="Data matriks RDTR yang mungkin belum lengkap, perlu verifikasi manual.",
+            ),
+        )
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+        assert hasil.rekomendasi.disclaimer is None  # cuma itu isi disclaimer-nya, jadi habis di-scrub
+        assert hasil.low_confidence is False  # scrub TIDAK menjatuhkan poin ke low_confidence
+
+    def test_fallback_data_kosong_true_caveat_tidak_di_scrub(self):
+        # Kalau fallback_data_kosong MEMANG True, caveat itu WAJIB ada (Cek #2) — bukan "palsu".
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x", "fallback_data_kosong": True})
+        output = _poin_output(status="I")
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+        assert "diloloskan otomatis" in hasil.rekomendasi.disclaimer.lower()
 
 
 class TestPaksaFieldWajib:

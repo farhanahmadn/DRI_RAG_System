@@ -20,7 +20,7 @@ import logging
 import re
 
 from app.adapter import cek_konsistensi_intensitas
-from app.reasoning.calculator import pilih_target_utama_intensitas
+from app.reasoning.calculator import pilih_target_mitigasi_dampak, pilih_target_utama_intensitas
 from app.reasoning.generator import ambil_chunks_pendukung, generate_poin
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk, Retriever
@@ -220,7 +220,15 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
             elif isinstance(nilai, int):
                 angka.append(f"{nilai}.0")
 
-    if poin.poin_id == "intensitas":
+    if poin.poin_id == "itbx":
+        # kbli_diusulkan itu STRING ("0111"), bukan angka Python — lewat `_tambah` (int/float only)
+        # tak akan pernah tertangkap. Ditemukan live (APP-2026-6191): LLM menyebut "KBLI 0111"
+        # (FAKTA sah, ada persis di fakta['kbli_diusulkan']) di reasoning/saran, tapi sebelumnya
+        # SELALU ditolak Cek #6 sbg "angka tak terlacak" krn itbx tak pernah dimasukkan ke sini.
+        kbli = fakta.get("kbli_diusulkan")
+        if kbli:
+            angka.append(str(kbli))
+    elif poin.poin_id == "intensitas":
         for param in (fakta.get("parameter") or {}).values():
             _tambah(param.get("usulan"))
             _tambah(param.get("ambang_maks"))
@@ -237,6 +245,9 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
         _tambah(fakta.get("runoff_change_index"))
         _tambah(fakta.get("c_before"))
         _tambah(fakta.get("c_after"))
+        target_mitigasi = fakta.get("target_mitigasi") or {}
+        _tambah(target_mitigasi.get("runoff_change_index_maks"))
+        _tambah(target_mitigasi.get("index_saat_ini"))
 
     return angka
 
@@ -288,8 +299,63 @@ def _cek_konsistensi_numerik(poin_output: PoinOutput, poin: PoinKonteks) -> list
 
 
 # ---------------------------------------------------------------------------
+# Scrub deterministik — disclaimer fallback PALSU (LLM mengarang caveat "data matriks RDTR belum
+# lengkap" sendiri). BUKAN cek pemicu-retry (lihat catatan di bawah kenapa).
+# ---------------------------------------------------------------------------
+
+# Ditemukan live (APP-2026-6191, poin itbx status T): reason "Lolos karena kegiatan Terbatas (T) di
+# zona Zona Perumahan" TIDAK memicu deteksi_fallback_itbx() (dikonfirmasi False) — tapi LLM tetap
+# menulis disclaimer yang nyaris identik dgn CAVEAT_FALLBACK_ITBX_NON_LOLOS atas inisiatifnya
+# sendiri. Bukan bug di heuristik deteksi (sudah diverifikasi benar), tapi LLM "meniru" pola caveat
+# yang dilihatnya di SYSTEM_PROMPT (aturan #3) padahal FALLBACK_DATA_KOSONG=False di fakta poin ini
+# — menyesatkan reviewer (menyiratkan data tak lengkap padahal lengkap).
+#
+# PERCOBAAN PERTAMA (dibuang): jadikan ini cek pemicu-retry (`perbaiki_poin`) supaya LLM
+# meregenerasi. TERBUKTI SALAH live: LLM mengulang pola yang SAMA di ketiga percobaan retry, retry
+# exhaust, poin JATUH ke low_confidence penuh (reasoning/sitasi valid ikut terbuang) — lebih buruk
+# drpd disclaimer yang cuma salah 1 kalimat. Diganti scrub DETERMINISTIK (`_paksa_field_wajib`,
+# TIDAK memicu retry) — hapus fragmen kalimat yang cocok pola, sisa disclaimer/reasoning/sitasi tetap
+# utuh. Faithful principle: ini bukan "mengoreksi fakta back-end" (dilarang), murni membuang kalimat
+# TAMBAHAN yang LLM karang sendiri di luar fakta yang diberikan.
+_FRASA_CAVEAT_FALLBACK = (
+    "matriks rdtr yang mungkin belum lengkap",
+    "data matriks rdtr kosong",
+    "data matriks rdtr yang tidak lengkap",
+)
+
+_RE_PEMISAH_KALIMAT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _bersihkan_disclaimer_fallback_palsu(disclaimer: str | None) -> str | None:
+    """Buang kalimat yang menyerupai caveat fallback-data-kosong dari `disclaimer` — dipanggil HANYA
+    saat `fallback_data_kosong` benar-benar False (kalau True, caveat itu WAJIB ada, lihat Cek #2)."""
+    if not disclaimer:
+        return disclaimer
+    kalimat = _RE_PEMISAH_KALIMAT.split(disclaimer)
+    bersih = [k for k in kalimat if not any(frasa in k.lower() for frasa in _FRASA_CAVEAT_FALLBACK)]
+    hasil = " ".join(k.strip() for k in bersih if k.strip())
+    return hasil or None
+
+
+# ---------------------------------------------------------------------------
 # Paksaan wajib — cek #2, #3, #4. Diterapkan ke SEMUA jalur keluar, TIDAK memicu retry.
 # ---------------------------------------------------------------------------
+
+
+def _gabung_kalimat(bagian: list[str]) -> str:
+    """Gabung beberapa kalimat/fragmen disclaimer jadi satu string, PASTIKAN ada pemisah kalimat
+    (titik) antar fragmen — bug ditemukan live (APP-2026-6191): `" ".join(...)` polos bisa
+    menyambung 2 kalimat tanpa titik kalau fragmen sebelumnya (mis. teks bebas dari LLM) tidak
+    diakhiri tanda baca, menghasilkan disclaimer yang terbaca nyambung/rusak."""
+    hasil: list[str] = []
+    for b in bagian:
+        b = (b or "").strip()
+        if not b:
+            continue
+        if hasil and not hasil[-1].endswith((".", "!", "?")):
+            hasil[-1] += "."
+        hasil.append(b)
+    return " ".join(hasil)
 
 
 def _paksa_field_wajib(
@@ -301,6 +367,7 @@ def _paksa_field_wajib(
     """
     update: dict = {}
     disclaimer_tambahan: list[str] = []
+    disclaimer_dasar = poin_output.rekomendasi.disclaimer
     teks_sudah_ada = f"{poin_output.reasoning_panjang} {poin_output.rekomendasi.disclaimer or ''}"
 
     # Cek #2 — ITBX fallback data-kosong: paksa low_confidence + caveat wajib, wording sadar status
@@ -310,6 +377,11 @@ def _paksa_field_wajib(
         caveat = caveat_fallback_itbx(poin.status)
         if caveat.lower() not in teks_sudah_ada.lower():
             disclaimer_tambahan.append(caveat.capitalize() + ".")
+    elif poin.poin_id == "itbx":
+        # fallback_data_kosong MEMANG False -> scrub kalau LLM sempat menulis caveat serupa sendiri
+        # (ditemukan live APP-2026-6191; deterministik, TIDAK memicu retry — lihat catatan di atas
+        # fungsi _bersihkan_disclaimer_fallback_palsu kenapa bukan cek pemicu-retry).
+        disclaimer_dasar = _bersihkan_disclaimer_fallback_palsu(disclaimer_dasar)
 
     # Cek #3 — meta.caveats / data_confidence WAJIB muncul. Kalimat kepercayaan SELALU dirakit
     # deterministik (bukan echo raw value LLM/back-end) — konsisten sama persis di ketiga poin.
@@ -333,10 +405,9 @@ def _paksa_field_wajib(
                 masalah_konsistensi,
             )
 
-    if disclaimer_tambahan:
-        existing = poin_output.rekomendasi.disclaimer
-        gabungan = " ".join(([existing] if existing else []) + disclaimer_tambahan)
-        update["rekomendasi"] = poin_output.rekomendasi.model_copy(update={"disclaimer": gabungan})
+    if disclaimer_tambahan or disclaimer_dasar != poin_output.rekomendasi.disclaimer:
+        gabungan = _gabung_kalimat(([disclaimer_dasar] if disclaimer_dasar else []) + disclaimer_tambahan)
+        update["rekomendasi"] = poin_output.rekomendasi.model_copy(update={"disclaimer": gabungan or None})
 
     if update:
         poin_output = poin_output.model_copy(update=update)
@@ -372,6 +443,8 @@ def perbaiki_poin(
     target = None
     if poin.tipe_rekomendasi == "numerik":
         target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+    elif poin.tipe_rekomendasi == "numerik-mitigasi":
+        target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
 
     poin_bersih = poin_output.model_copy(
         update={
