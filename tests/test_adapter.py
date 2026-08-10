@@ -34,6 +34,15 @@ class TestFixtureLolos:
         assert poin_by_id["dampak"].status == "Sedang"
         assert poin_by_id["dampak"].tipe_rekomendasi == "numerik-mitigasi"
 
+    def test_ketiga_poin_bawa_zona_pemohon(self):
+        # APP-2026-6191: zona pemohon (apa adanya dari lokasi.rdtr_zone) HARUS ikut ke ketiga poin —
+        # dipakai app/reasoning/generator.py::ambil_chunks_pendukung utk filter keluarga zona.
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        hasil = adaptasi(assessment)
+        poin_by_id = {p.poin_id: p for p in hasil.poin}
+        for poin_id in ("itbx", "intensitas", "dampak"):
+            assert poin_by_id[poin_id].zona == assessment.lokasi.rdtr_zone
+
     def test_rekomendasi_sistem_setuju(self):
         hasil = adaptasi(_muat_assessment("l2_sample_lolos.json"))
         assert hasil.rekomendasi_sistem == "Setuju"

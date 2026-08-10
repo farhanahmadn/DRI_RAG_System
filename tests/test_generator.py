@@ -10,6 +10,7 @@ from app.reasoning import llm_client as llm_client_module
 from app.reasoning.generator import (
     _QUERY_FALLBACK_PER_POIN,
     _SARAN_AMAN,
+    _zona_prefix_dari_nama,
     ambil_chunks_pendukung,
     apakah_aman,
     generate_poin,
@@ -131,6 +132,76 @@ class TestAmbilChunksPendukungDibatasi:
         )
         chunks = ambil_chunks_pendukung(poin, self._RetrieverBanjirReferensi(2), top_k_dukungan=3)
         assert len(chunks) == 2
+
+
+class TestZonaPrefixDariNama:
+    """Mapping nama zona induk -> kode prefix, dari Pasal 17/23 dokumen sumber (data/raw/*.pdf,
+    diverifikasi via data/parsed/v1/*.md — lihat APP-2026-6191)."""
+
+    def test_zona_perumahan_ke_r(self):
+        assert _zona_prefix_dari_nama("Zona Perumahan") == "R"
+
+    def test_zona_perkantoran_ke_kt(self):
+        assert _zona_prefix_dari_nama("Zona Perkantoran") == "KT"
+
+    def test_case_insensitive_dan_strip_spasi(self):
+        assert _zona_prefix_dari_nama("  zona PERUMAHAN  ") == "R"
+
+    def test_none_return_none(self):
+        assert _zona_prefix_dari_nama(None) is None
+
+    def test_string_kosong_return_none(self):
+        assert _zona_prefix_dari_nama("") is None
+
+    def test_nama_tak_dikenal_return_none_bukan_menebak(self):
+        assert _zona_prefix_dari_nama("Zona Antah Berantah") is None
+
+
+class TestAmbilChunksPendukungZonaFilter:
+    """APP-2026-6191: fallback search() HARUS bawa zona_prefix poin, supaya tak lintas-keluarga
+    zona (mis. Lampiran VI Zona Perkantoran "KT" ikut terkutip utk pemohon Zona Perumahan "R")."""
+
+    class _RetrieverPerekamFilter:
+        def __init__(self):
+            self.filters_diterima = None
+
+        def search(self, query, filters, top_k=5):
+            self.filters_diterima = filters
+            return []
+
+        def get_by_reference(self, referensi):
+            return []
+
+        def get_parent(self, chunk_id):
+            return None
+
+    def test_zona_poin_diteruskan_sbg_zona_prefix(self):
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi", fakta={}, dasar_hukum=[], zona="Zona Perumahan",
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.filters_diterima.zona_prefix == "R"
+
+    def test_zona_none_hasilkan_filter_tanpa_zona_prefix(self):
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi", fakta={}, dasar_hukum=[], zona=None,
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.filters_diterima.zona_prefix is None
+
+    def test_zona_tak_dikenal_hasilkan_filter_tanpa_zona_prefix(self):
+        # Nama zona yang tak ada di mapping -> JANGAN menebak, search tanpa filter zona (perilaku lama).
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi", fakta={}, dasar_hukum=[], zona="Zona Misterius",
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.filters_diterima.zona_prefix is None
 
 
 class TestQueryFallbackDampak:

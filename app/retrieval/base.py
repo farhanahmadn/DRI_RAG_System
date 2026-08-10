@@ -35,6 +35,12 @@ class RetrievalFilters(BaseModel):
     zona: str | None = None
     dokumen: str | None = None
     jenis: str | None = None
+    # Filter KELUARGA zona (mis. "R" utk cocok "R-2"/"R-3"/"R-4") — TERPISAH dari `zona` (exact
+    # match). Ditambahkan setelah bukti live (APP-2026-6191): input back-end (`lokasi.rdtr_zone`)
+    # cuma kasih nama zona induk ("Zona Perumahan"), bukan kode sub-zona presisi, jadi filter exact
+    # `zona` tak bisa dipakai — prefix ini cukup utk cegah kontaminasi lintas-KELUARGA zona (mis.
+    # Lampiran Zona Perkantoran "KT" ikut kepentar utk pemohon Zona Perumahan "R").
+    zona_prefix: str | None = None
 
 
 @runtime_checkable

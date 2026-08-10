@@ -44,6 +44,7 @@ def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
             "fallback_data_kosong": deteksi_fallback_itbx(itbx.reason),
         },
         dasar_hukum=itbx.dasar_hukum,
+        zona=assessment.lokasi.rdtr_zone,
     )
 
 
@@ -79,6 +80,7 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
             "target": hitung_target_intensitas(intensitas, assessment.lokasi.luas_lahan_m2),
         },
         dasar_hukum=intensitas.dasar_hukum,
+        zona=assessment.lokasi.rdtr_zone,
     )
 
 
@@ -109,6 +111,7 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "target_mitigasi": hitung_target_mitigasi_dampak(impact),
         },
         dasar_hukum=[],
+        zona=assessment.lokasi.rdtr_zone,
     )
 
 

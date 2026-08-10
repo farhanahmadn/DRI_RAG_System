@@ -194,6 +194,10 @@ class MockRetriever:
                 return False
         if filters.zona is not None and chunk.zona is not None and chunk.zona != filters.zona:
             return False
+        if filters.zona_prefix is not None and chunk.zona is not None:
+            cocok = chunk.zona == filters.zona_prefix or chunk.zona.startswith(f"{filters.zona_prefix}-")
+            if not cocok:
+                return False
         if filters.dokumen is not None and filters.dokumen.lower() not in chunk.dokumen.lower():
             return False
         if filters.jenis is not None and chunk.jenis is not None and chunk.jenis != filters.jenis:

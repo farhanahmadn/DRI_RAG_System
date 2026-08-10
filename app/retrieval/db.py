@@ -56,6 +56,13 @@ def _where(filters: RetrievalFilters | None) -> tuple[str, list]:
     if filters.zona is not None:
         conds.append("(zona IS NULL OR zona = %s)")
         params.append(filters.zona)
+    if filters.zona_prefix is not None:
+        # Cocok kode zona persis SAMA dgn prefix (mis. "R") ATAU berawalan "PREFIX-" (mis. "R-3") —
+        # kode sub-zona di DB selalu format "{PREFIX}-{n}" (lihat Pasal 23 dokumen sumber), tak
+        # pernah "{PREFIX}n" tanpa strip.
+        conds.append("(zona IS NULL OR zona = %s OR zona LIKE %s)")
+        params.append(filters.zona_prefix)
+        params.append(f"{filters.zona_prefix}-%")
     if filters.dokumen is not None:
         conds.append("dokumen ILIKE %s")
         params.append(f"%{filters.dokumen}%")

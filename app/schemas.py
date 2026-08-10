@@ -152,6 +152,10 @@ class PoinKonteks(BaseModel):
     status: str
     fakta: dict[str, Any]
     dasar_hukum: list[DasarHukum] = []
+    # Nama zona pemohon APA ADANYA dari `assessment.lokasi.rdtr_zone` (mis. "Zona Perumahan") — BUKAN
+    # kode sub-zona presisi (back-end tak menyediakannya). Dipakai app/reasoning/generator.py utk
+    # filter KELUARGA zona saat retrieval fallback (cegah kontaminasi lintas-zona, lihat APP-2026-6191).
+    zona: str | None = None
 
 
 class AdapterResult(BaseModel):

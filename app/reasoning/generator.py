@@ -57,6 +57,47 @@ _QUERY_FALLBACK_PER_POIN = {
     "dampak": "dampak tata guna lahan",
 }
 
+# Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
+# Pasal 17 (Zona Lindung) & Pasal 23 (Zona Budi Daya), "RDTR Kawasan Sleman Tengah 2023-2043.md"
+# (data/parsed/v1/) — diverifikasi thd `data/raw/*.pdf` langsung, BUKAN ditebak. Dipakai
+# `ambil_chunks_pendukung` sbg `RetrievalFilters.zona_prefix` saat search() fallback, supaya
+# Lampiran V.B/VI yang dikutip TIDAK lintas KELUARGA zona (bug nyata: APP-2026-6191, pemohon
+# "Zona Perumahan" tapi Lampiran VI Zona Perkantoran "KT" ikut terkutip krn search() sebelumnya
+# tanpa filter zona sama sekali). CATATAN: back-end cuma kasih nama zona INDUK, bukan kode
+# sub-zona presisi (mis. "Zona Perumahan" tanpa tahu R-2/R-3/R-4 yang mana) — prefix ini cegah
+# kontaminasi ANTAR-keluarga, TIDAK menjamin sub-zona presisi di DALAM satu keluarga.
+_ZONA_KODE_PREFIX = {
+    "zona badan air": "BA",
+    "zona perlindungan setempat": "PS",
+    "zona ruang terbuka hijau": "RTH",
+    "zona konservasi": "KS",
+    "zona cagar budaya": "CB",
+    "zona badan jalan": "BJ",
+    "zona pertanian": "P",
+    "zona pembangkitan tenaga listrik": "PTL",
+    "zona kawasan peruntukan industri": "KPI",
+    "zona pariwisata": "W",
+    "zona perumahan": "R",
+    "zona sarana pelayanan umum": "SPU",
+    "zona ruang terbuka non hijau": "RTNH",
+    "zona campuran": "C",
+    "zona perdagangan dan jasa": "K",
+    "zona perkantoran": "KT",
+    "zona peruntukan lainnya": "PL",
+    "zona pengelolaan persampahan": "PP",
+    "zona transportasi": "TR",
+    "zona pertahanan dan keamanan": "HK",
+}
+
+
+def _zona_prefix_dari_nama(nama_zona: str | None) -> str | None:
+    """"Zona Perumahan" -> "R" dst (lihat `_ZONA_KODE_PREFIX`). None kalau nama tak dikenal —
+    JANGAN menebak, biarkan filter kosong (search tanpa filter zona, seperti perilaku lama) drpd
+    salah filter berdasar tebakan."""
+    if not nama_zona:
+        return None
+    return _ZONA_KODE_PREFIX.get(nama_zona.strip().lower())
+
 
 def ambil_chunks_pendukung(
     poin: PoinKonteks,
@@ -77,7 +118,9 @@ def ambil_chunks_pendukung(
         chunks = chunks[:top_k_dukungan]
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
-        chunks = retriever.search(query_fallback, RetrievalFilters(), top_k=top_k_dukungan)
+        # Filter KELUARGA zona (APP-2026-6191) — cegah Lampiran V.B/VI zona lain ikut terkutip.
+        filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
+        chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan)
     return chunks
 
 

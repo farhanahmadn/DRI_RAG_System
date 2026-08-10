@@ -395,10 +395,15 @@ class TestJalankanPrecheckEndToEnd:
                 }
             # intensitas/dampak: sitasi valid (bukan kosong) supaya cek "chunk tersedia tapi tidak
             # disitasi" tidak ikut menandai poin ini low_confidence — isolasi kasus ke itbx saja.
+            # citation_id "rdtr-p1-a107" (zona=None, general/tak terikat zona) SENGAJA dipakai, bukan
+            # "...-vi-c1" (zona C-1) — fixture ini rdtr_zone="Zona Perumahan" (kode R), filter
+            # zona_prefix (perbaikan APP-2026-6191) sekarang membuang chunk C-1 dari hasil search()
+            # fallback krn beda keluarga zona (perilaku yg BENAR) — "rdtr-p1-a107" dijamin selalu
+            # muncul di ketiga poin (top_k_dukungan=3) krn tak terikat zona apa pun.
             return {
                 "reasoning_pendek": "Ringkasan singkat poin ini.",
                 "reasoning_panjang": "Penjelasan lebih lengkap mengenai poin ini berdasarkan data yang tersedia.",
-                "sitasi": [{"citation_id": "rdtr-lampiran-vi-c1", "kutipan": "diabaikan, wajib verbatim chunk"}],
+                "sitasi": [{"citation_id": "rdtr-p1-a107", "kutipan": "diabaikan, wajib verbatim chunk"}],
                 "saran": "Ikuti prosedur yang berlaku.",
                 "disclaimer": None,
             }
