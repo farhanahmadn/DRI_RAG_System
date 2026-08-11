@@ -1,6 +1,6 @@
-from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
+from app.reasoning.prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_KESIMPULAN, build_kesimpulan_prompt, build_user_prompt
 from app.retrieval.base import Chunk
-from app.schemas import DasarHukum, MetaL2, PoinKonteks
+from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput
 
 
 def _poin(**overrides) -> PoinKonteks:
@@ -248,3 +248,46 @@ def test_build_user_prompt_catatan_perbaikan_muncul():
     prompt = build_user_prompt(_poin(), [], catatan_perbaikan="Sitasi sebelumnya tidak grounded.")
     assert "Catatan Perbaikan" in prompt
     assert "Sitasi sebelumnya tidak grounded." in prompt
+
+
+def _poin_output(**overrides) -> PoinOutput:
+    defaults = dict(
+        poin_id="dampak",
+        kategori="Dampak Tata Guna Lahan",
+        status="Sedang",
+        reasoning_pendek="x",
+        reasoning_panjang="x",
+        sitasi=[],
+        rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="x"),
+    )
+    defaults.update(overrides)
+    return PoinOutput(**defaults)
+
+
+class TestBuildKesimpulanPrompt:
+    def test_reasoning_pendek_tidak_disertakan(self):
+        # Bug ditemukan live (APP-2026-8376): reasoning_pendek poin "aman" (narasi bebas LLM,
+        # bisa terdengar kayak masih ada kewajiban) ikut jadi konteks kesimpulan berdampingan dgn
+        # saran (templated "tidak perlu tindakan") -> LLM sintesis ikut nada reasoning, bukan saran,
+        # hasilnya langkah_berdampak kontradiktif dgn saran poin itu sendiri. reasoning_pendek
+        # SENGAJA dihapus dari prompt ini supaya LLM tak punya sumber utk kontradiksi itu.
+        poin = _poin_output(
+            reasoning_pendek="Pemohon harus memastikan bahwa kegiatan tidak merusak fungsi kawasan resapan air.",
+            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."),
+        )
+        prompt = build_kesimpulan_prompt([poin], "Setuju Bersyarat")
+        assert "harus memastikan" not in prompt
+        assert "kawasan resapan air" not in prompt
+        assert "Tidak diperlukan tindakan khusus" in prompt
+
+    def test_saran_dan_status_tetap_muncul(self):
+        poin = _poin_output(poin_id="intensitas", status="MELAMPAUI_BATAS",
+                            rekomendasi=RekomendasiOutput(tipe="numerik", saran="Kurangi KDB hingga memenuhi ambang."))
+        prompt = build_kesimpulan_prompt([poin], "Setuju Bersyarat")
+        assert "intensitas" in prompt
+        assert "MELAMPAUI_BATAS" in prompt
+        assert "Kurangi KDB hingga memenuhi ambang." in prompt
+
+    def test_system_prompt_kesimpulan_larang_langkah_utk_saran_aman(self):
+        assert "tidak diperlukan tindakan khusus" in SYSTEM_PROMPT_KESIMPULAN.lower()
+        assert "hanya dari" in SYSTEM_PROMPT_KESIMPULAN.lower()

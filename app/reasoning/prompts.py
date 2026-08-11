@@ -248,8 +248,8 @@ def build_user_prompt(
 SYSTEM_PROMPT_KESIMPULAN = """Anda merangkum hasil pre-check izin bangunan Kabupaten Sleman menjadi kesimpulan akhir.
 
 ATURAN WAJIB (jangan dilanggar):
-1. Ringkasan per-poin di bawah SUDAH FINAL (status, reasoning, saran) — tugas Anda HANYA merangkum jadi langkah_berdampak (daftar langkah/pertimbangan untuk REVIEWER dalam mengambil keputusan — ACC / ACC bersyarat / tolak) dan catatan_lokasi (satu kalimat kalau relevan, atau null kalau tidak ada). JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
-2. langkah_berdampak HARUS dirangkai/diringkas dari saran per-poin yang diberikan — JANGAN menambah langkah yang tidak berdasar pada poin manapun.
+1. Ringkasan per-poin di bawah SUDAH FINAL (status, saran) — tugas Anda HANYA merangkum jadi langkah_berdampak (daftar langkah/pertimbangan untuk REVIEWER dalam mengambil keputusan — ACC / ACC bersyarat / tolak) dan catatan_lokasi (satu kalimat kalau relevan, atau null kalau tidak ada). JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
+2. langkah_berdampak HARUS dirangkai/diringkas HANYA dari "saran" per-poin persis seperti tertulis — JANGAN menambah langkah yang tidak berdasar pada saran poin manapun. KHUSUS: kalau saran suatu poin berbunyi "tidak diperlukan tindakan khusus" (atau senada), JANGAN tulis langkah/kewajiban apa pun untuk poin itu di langkah_berdampak — poin itu cukup dilewati, bukan diberi kalimat pengganti yang menyiratkan ada yang harus dilakukan.
 3. JANGAN menyebutkan angka apa pun (skor, target, dsb) di langkah_berdampak atau catatan_lokasi.
 4. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat langsung ke pemohon — sebut pemohon sebagai orang ketiga, JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, dan ringkas.
 
@@ -259,6 +259,14 @@ Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> str:
     """Susun prompt sintesis kesimpulan — HANYA dari ringkasan per-poin yang sudah lolos guardrail,
     TIDAK ada fakta mentah/angka (poin ini sudah bebas angka per SYSTEM_PROMPT aturan #8).
+
+    `reasoning_pendek` SENGAJA TIDAK disertakan di sini (beda dari versi lama) — bug ditemukan live
+    (APP-2026-8376): poin dampak "aman" (saran="Tidak diperlukan tindakan khusus...") tetap
+    menghasilkan langkah_berdampak yang menyiratkan ada kewajiban ("...harus memastikan tidak
+    merusak..."), krn reasoning_pendek poin itu (narasi bebas LLM, menjelaskan KENAPA lolos per
+    SYSTEM_PROMPT aturan #10) ditaruh berdampingan dgn saran dan menarik LLM sintesis mengikuti
+    nada reasoning, bukan saran — padahal Aturan #2 di bawah SUDAH bilang "HANYA dari saran". Hapus
+    reasoning dari konteks di sini MEMAKSA kepatuhan itu secara struktural, bukan cuma instruksi.
     """
     lines: list[str] = []
     lines.append("## Ringkasan Per-Poin (SUDAH FINAL — jangan dihitung ulang)")
@@ -266,7 +274,6 @@ def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str
     lines.append("")
     for poin in poin_list:
         lines.append(f"- [{poin.poin_id}] status={poin.status}, low_confidence={poin.low_confidence}")
-        lines.append(f"  reasoning: {poin.reasoning_pendek}")
         lines.append(f"  saran: {poin.rekomendasi.saran}")
 
     lines.append("")
