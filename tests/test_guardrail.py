@@ -8,6 +8,7 @@ from app.reasoning.guardrail import (
     _cek_invers_skor,
     _cek_konsistensi_numerik,
     _cek_konsistensi_verdict,
+    _dekat_dgn_pembulatan,
     _gabung_kalimat,
     _kalimat_tingkat_kepercayaan,
     _paksa_field_wajib,
@@ -305,6 +306,28 @@ class TestCekKonsistensiNumerik:
         output = _poin_output(poin_id="intensitas", reasoning_panjang="Selisihnya mencapai 12345 persen.")
         assert _cek_konsistensi_numerik(output, poin) != []
 
+    def test_kasus_nyata_app_2026_8376_angka_dibulatkan_terlacak_lolos(self):
+        # Fixture nyata: kdh.usulan=29.411764705882355 (presisi penuh float back-end) — LLM WAJAR
+        # menulis "29.41" di narasi (tak ada yang menulis 15 digit desimal dlm kalimat), tapi
+        # percobaan pertama SEBELUM diperbaiki selalu ditolak sbg "angka karangan" krn match string
+        # persis gagal — memicu retry sia-sia (kadang exhaust jadi low_confidence kalau nasib buruk).
+        poin = _poin(
+            poin_id="intensitas",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={
+                "parameter": {
+                    "kdh": {"usulan": 29.411764705882355, "ambang_maks": None, "ambang_min": 88.0,
+                            "memenuhi": False, "satuan": "persen"},
+                },
+            },
+        )
+        output = _poin_output(
+            poin_id="intensitas",
+            reasoning_panjang="KDH usulan 29.41% di bawah ambang minimum 88% yang berlaku di zona ini.",
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
     def test_diagnosis_dampak_angka_impact_score_terlacak_lolos(self):
         poin = _poin(
             poin_id="dampak",
@@ -451,6 +474,26 @@ class TestCekKonsistensiNumerik:
             ],
         )
         assert _cek_konsistensi_numerik(output, poin) != []
+
+
+class TestDekatDenganPembulatan:
+    def test_pembulatan_2_desimal_cocok(self):
+        assert _dekat_dgn_pembulatan("29.41", "kdh usulan 29.411764705882355 persen") is True
+
+    def test_pembulatan_bilangan_bulat_cocok(self):
+        assert _dekat_dgn_pembulatan("29", "kdh usulan 29.411764705882355 persen") is True
+
+    def test_angka_persis_tanpa_pembulatan_tetap_cocok(self):
+        assert _dekat_dgn_pembulatan("60.0", "target 60.0") is True
+
+    def test_angka_beda_tidak_cocok(self):
+        assert _dekat_dgn_pembulatan("25.41", "kdh usulan 29.411764705882355 persen") is False
+
+    def test_string_bukan_angka_return_false(self):
+        assert _dekat_dgn_pembulatan("bukan-angka", "kdh usulan 29.41 persen") is False
+
+    def test_sumber_kosong_return_false(self):
+        assert _dekat_dgn_pembulatan("29.41", "") is False
 
 
 class TestGabungKalimat:

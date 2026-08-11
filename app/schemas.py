@@ -20,7 +20,13 @@ class Koordinat(BaseModel):
 
 class GeoJSONPoint(BaseModel):
     type: str
-    coordinates: list[float]
+    # `Any`, BUKAN `list[float]` — GeoJSON "coordinates" berbeda kedalaman nesting per geometry
+    # (Point: [lon,lat] datar; Polygon: [[[lon,lat], ...]] 3 level; dst). Back-end pernah kirim
+    # Polygon (APP-2026-8376) padahal kontrak awal cuma Point -> `list[float]` gagal validasi
+    # (422) utk SEMUA geometry selain Point. Field ini TIDAK PERNAH dibaca oleh kode reasoning
+    # (cuma lewat, lihat app/sanitize.py — koordinat presisi memang sengaja tak pernah sampai ke
+    # LLM/query retrieval), jadi longgarkan validasi struktur di sini aman.
+    coordinates: Any
 
 
 class Lokasi(BaseModel):
@@ -112,7 +118,11 @@ class MetaL2(BaseModel):
 
 
 class L2Assessment(BaseModel):
-    application_id: int | None = None
+    # int (fixture lama, mis. 21) ATAU string UUID (back-end baru, APP-2026-8376: "3a4a6f3a-...").
+    # Field ini identitas murni — tidak pernah dipakai reasoning/kalkulasi apa pun (sengaja
+    # dikecualikan dari fakta yang sampai ke LLM, lihat app/sanitize.py) — longgarkan tipe,
+    # bukan pilih salah satu format & tolak yang lain.
+    application_id: int | str | None = None
     application_number: str | None = None
     timestamp: str | None = None
     lokasi: Lokasi

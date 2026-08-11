@@ -252,6 +252,31 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
     return angka
 
 
+_RE_ANGKA_DI_SUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _dekat_dgn_pembulatan(angka_str: str, sumber: str) -> bool:
+    """True kalau `angka_str` adalah versi DIBULATKAN (ke presisi berapa pun) dari salah satu angka
+    di `sumber`. Ditemukan live (APP-2026-8376): fakta `kdh.usulan=29.411764705882355` (presisi
+    penuh float back-end) — LLM WAJAR menulis "29.41" di narasi (tak ada yg menulis 15 digit desimal
+    dalam kalimat), tapi match string persis (word-boundary) di atas menolaknya sbg "angka karangan".
+    Bukan pelonggaran umum: dicek angka SUMBER dibulatkan ke presisi PERSIS SAMA dgn yg ditulis LLM
+    harus SAMA PERSIS (bukan toleransi rentang) — angka yang benar-benar beda tetap ditolak."""
+    try:
+        nilai_llm = float(angka_str)
+    except ValueError:
+        return False
+    desimal = len(angka_str.split(".", 1)[1]) if "." in angka_str else 0
+    for kandidat in _RE_ANGKA_DI_SUMBER.findall(sumber):
+        try:
+            nilai_sumber = float(kandidat)
+        except ValueError:
+            continue
+        if round(nilai_sumber, desimal) == nilai_llm:
+            return True
+    return False
+
+
 def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOutput | None = None) -> bool:
     """Investigasi ITBX APP-2026-6191: Cek #6 versi lama melarang SEMUA angka tanpa pandang sumber
     — menangkap angka ambang yang dikutip verbatim dari `keterangan_ketentuan`/`dasar_hukum` back-end
@@ -266,7 +291,9 @@ def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOu
     regenerasi tak perlu) ATAU nama dokumen yang disitasi (`poin.dasar_hukum[].dokumen`/
     `poin_output.sitasi[].dokumen` — investigasi APP-2026-3468 live: dokumen RAG asli bernama
     "Peraturan Bupati Sleman Nomor 80 Tahun 2023...", LLM menyebut "Nomor 80 Tahun 2023" saat
-    merujuk sumbernya, angka itu bagian nama dokumen yang benar-benar disitasi, bukan karangan).
+    merujuk sumbernya, angka itu bagian nama dokumen yang benar-benar disitasi, bukan karangan)
+    ATAU versi DIBULATKAN dari salah satu angka fakta di atas (`_dekat_dgn_pembulatan`, APP-2026-8376
+    — LLM wajar membulatkan angka float presisi tinggi saat menulis prosa).
     Angka yang tak cocok sumber manapun TETAP ditolak — ini MEMPERKETAT presisi cek, bukan melonggarkan.
     """
     sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
@@ -277,7 +304,9 @@ def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOu
     if poin_output is not None:
         sumber += " " + " ".join(s.pasal or "" for s in poin_output.sitasi)
         sumber += " " + " ".join(s.dokumen or "" for s in poin_output.sitasi)
-    return re.search(rf"\b{re.escape(angka)}\b", sumber) is not None
+    if re.search(rf"\b{re.escape(angka)}\b", sumber) is not None:
+        return True
+    return _dekat_dgn_pembulatan(angka, sumber)
 
 
 def _cek_konsistensi_numerik(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:

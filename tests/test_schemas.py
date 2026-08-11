@@ -20,7 +20,13 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.mark.parametrize(
-    "nama_file", ["l2_sample_lolos.json", "l2_sample_amplop_6191.json", "l2_sample_tidak_lolos.json"]
+    "nama_file",
+    [
+        "l2_sample_lolos.json",
+        "l2_sample_amplop_6191.json",
+        "l2_sample_tidak_lolos.json",
+        "l2_sample_amplop_8376.json",
+    ],
 )
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
     payload = json.loads((FIXTURES_DIR / nama_file).read_text(encoding="utf-8"))
@@ -38,6 +44,35 @@ def test_l2_assessment_toleran_extra_fields_di_payload_asli():
     assessment = L2Assessment.model_validate(payload["data"])
     assert assessment.application_id == 11
     assert assessment.application_number == "APP-2026-3468"
+
+
+class TestKontrakBackendBerubah:
+    """APP-2026-8376: back-end mulai kirim application_id UUID-string (bukan int) & geojson
+    Polygon (bukan cuma Point) — 422 sebelum diperbaiki. Skema HARUS terima kedua format lama
+    (fixture lain, int/Point) & baru (str/Polygon), bukan pilih salah satu."""
+
+    def test_application_id_uuid_string_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8376.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.application_id == "3a4a6f3a-6c9f-4a49-98ba-8c97c87d5048"
+
+    def test_application_id_int_lama_tetap_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.application_id == 11
+        assert isinstance(assessment.application_id, int)
+
+    def test_geojson_polygon_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8376.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.lokasi.geojson.type == "Polygon"
+        # 3 level nesting (ring -> titik -> [lon,lat]) — HARUS lolos, bukan dipaksa flat.
+        assert len(assessment.lokasi.geojson.coordinates[0]) == 5
+
+    def test_geojson_point_lama_tetap_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.lokasi.geojson.type == "Point"
 
 
 def test_parameter_intensitas_ambang_null_toleran():
