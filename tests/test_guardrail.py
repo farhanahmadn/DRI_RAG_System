@@ -741,6 +741,44 @@ class TestPerbaikiPoin:
         _, masalah = perbaiki_poin(output, _poin(), [], _muat_assessment("l2_sample_lolos.json"))
         assert masalah
 
+    def test_poin_aman_target_selalu_none_walau_kalkulator_kasih_angka(self):
+        # Bug ditemukan live (APP-2026-8376, dampak "Sedang"): perbaiki_poin SEBELUMNYA menghitung
+        # ulang target dari kalkulator TANPA cek apakah_aman() — kalau kalkulator (krn bug/gate
+        # beda) tetap kasih angka utk poin yang sebenarnya aman, target itu BOCOR ke output,
+        # kontradiktif dgn saran "tidak perlu tindakan". perbaiki_poin HARUS force None kalau aman,
+        # apa pun yang dihitung kalkulator — pertahanan lapis-2, independen dari kebenaran kalkulator.
+        poin = _poin(
+            poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Sedang",
+            fakta={
+                "dinilai": True,
+                "mitigasi": {"perlu_mitigasi": False, "arah": []},  # aman=True
+                # target_mitigasi SENGAJA diisi (simulasi kalkulator "salah"/tak selaras) — perbaiki_poin
+                # tetap TIDAK BOLEH memakainya krn poin ini aman.
+                "target_mitigasi": {"runoff_change_index_maks": 1.5, "kategori_target": "Rendah", "index_saat_ini": 1.56},
+            },
+        )
+        output = _poin_output(
+            poin_id="dampak", status="Sedang",
+            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", target=1.5, saran="Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."),
+        )
+        poin_bersih, _ = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
+        assert poin_bersih.rekomendasi.target is None
+
+    def test_poin_tidak_aman_target_tetap_dihitung(self):
+        # Kontrol negatif — poin BENAR-BENAR butuh mitigasi tetap dapat target (bukan disable total).
+        poin = _poin(
+            poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+            fakta={
+                "dinilai": True,
+                "mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]},
+                "target_mitigasi": {"runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.85},
+            },
+        )
+        output = _poin_output(poin_id="dampak", status="Tinggi",
+                              rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Turunkan KDB."))
+        poin_bersih, _ = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
+        assert poin_bersih.rekomendasi.target == 2.5
+
 
 class TestGeneratePoinDenganGuardrail:
     def test_poin_aman_tetap_lewat_llm_dan_guardrail_saran_ditemplate(self, monkeypatch):

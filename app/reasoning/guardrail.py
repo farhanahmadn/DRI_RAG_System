@@ -9,8 +9,12 @@ Dua kategori cek, disengaja dipisah:
   TANPA memicu retry — fallback ITBX data-kosong, caveat meta, wiring `cek_konsistensi_intensitas`.
   Regenerasi LLM tidak bisa memperbaiki data back-end yang tak konsisten atau caveat yang hilang;
   lebih murah & pasti benar kalau disuntik langsung via kode.
-- **Masalah teks** (`perbaiki_poin`): cuma jalan di jalur non-aman (setelah panggilan LLM), memicu
-  retry — reasoning/saran kosong, sitasi hilang, invers-skor, konsistensi verdict, angka di narasi.
+- **Masalah teks** (`perbaiki_poin`): dipanggil di SEMUA poin setelah panggilan LLM (APP-2026-3468:
+  poin aman kini juga lewat LLM+guardrail penuh, bukan cuma poin non-aman spt komentar lama di
+  sini) — cek reasoning/saran kosong, sitasi hilang, invers-skor, konsistensi verdict, angka di
+  narasi. Target rekomendasi HARUS ikut gerbang `apakah_aman()` (APP-2026-8376: `perbaiki_poin`
+  sempat menghitung ulang target TANPA cek aman, menimpa `target=None` yang benar dari
+  `generate_poin()` dgn angka kalkulator — kontradiktif dgn saran "tidak perlu tindakan").
 
 Verifikasi entailment sitasi/verdict (NLI/LLM) DITUNDA sampai eval membuktikan perlu — lihat stub
 `verifikasi_entailment_sitasi` di bawah, tidak dipanggil di alur utama.
@@ -21,7 +25,7 @@ import re
 
 from app.adapter import cek_konsistensi_intensitas
 from app.reasoning.calculator import pilih_target_mitigasi_dampak, pilih_target_utama_intensitas
-from app.reasoning.generator import ambil_chunks_pendukung, generate_poin
+from app.reasoning.generator import ambil_chunks_pendukung, apakah_aman, generate_poin
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk, Retriever
 from app.schemas import L2Assessment, PoinKonteks, PoinOutput
@@ -469,11 +473,16 @@ def perbaiki_poin(
         s for s in poin_output.sitasi if s.citation_id in anchor_by_id or s.citation_id in chunk_by_id
     ]
 
+    # Target HARUS ikut gerbang apakah_aman() sama persis dgn generate_poin() — JANGAN hitung ulang
+    # dari kalkulator tanpa syarat (APP-2026-8376: kalkulator target & gerbang "aman" bisa punya
+    # kriteria berbeda, mis. dampak "Sedang" -> aman=True tapi kalkulator tetap kasih angka ->
+    # target bocor kontradiktif dgn saran "tidak perlu tindakan").
     target = None
-    if poin.tipe_rekomendasi == "numerik":
-        target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
-    elif poin.tipe_rekomendasi == "numerik-mitigasi":
-        target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
+    if not apakah_aman(poin):
+        if poin.tipe_rekomendasi == "numerik":
+            target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+        elif poin.tipe_rekomendasi == "numerik-mitigasi":
+            target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
 
     poin_bersih = poin_output.model_copy(
         update={

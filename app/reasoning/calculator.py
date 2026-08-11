@@ -142,20 +142,25 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment) -> dict:
     rumus C/index sama sekali (itu wewenang back-end, lihat docstring `sarankan_arah_mitigasi_dampak`
     di atas — rumus itu masih volatile & DILARANG di-hardcode di sini).
 
-    Return {} (bukan angka) kalau: index/threshold_bands tidak ada, kategori sudah 'Rendah' (tak ada
-    yang lebih ringan), band kategori target tak bisa di-parse, atau band target berbentuk "> n"
-    (tak ada batas atas terhingga utk dijadikan target).
+    Bug ditemukan live (APP-2026-8376, kategori "Sedang"): gate di sini SEBELUMNYA cuma "ada
+    kategori lebih ringan?" (posisi != 0) — beda dari gate `sarankan_arah_mitigasi_dampak`
+    (`KATEGORI_DAMPAK_BERSYARAT` = Tinggi/Sangat Tinggi saja). Akibatnya poin dampak "Sedang"
+    (aman, `mitigasi.perlu_mitigasi=False`, saran="Tidak diperlukan tindakan khusus...") tetap dapat
+    `target=1.5` — kontradiktif dgn narasinya sendiri. Gate DISAMAKAN persis dgn
+    `sarankan_arah_mitigasi_dampak` — SATU sumber kebenaran "kapan mitigasi & targetnya berlaku",
+    bukan dua gerbang independen yang bisa berbeda pendapat.
+
+    Return {} (bukan angka) kalau: index/threshold_bands tidak ada, kategori BUKAN Tinggi/Sangat
+    Tinggi (selaras `KATEGORI_DAMPAK_BERSYARAT`), band kategori target tak bisa di-parse, atau band
+    target berbentuk "> n" (tak ada batas atas terhingga utk dijadikan target).
     """
     index = impact.runoff_change_index
     bands = impact.threshold_bands
     kategori = normalisasi_kategori_dampak(impact.impact_category)
-    if index is None or not bands or kategori not in _URUTAN_KATEGORI_DAMPAK:
+    if index is None or not bands or kategori not in KATEGORI_DAMPAK_BERSYARAT:
         return {}
 
     posisi = _URUTAN_KATEGORI_DAMPAK.index(kategori)
-    if posisi == 0:
-        return {}  # sudah kategori paling ringan, tak ada target lebih rendah
-
     kategori_target = _URUTAN_KATEGORI_DAMPAK[posisi - 1]
     rentang_target = bands.get(kategori_target)
     if not rentang_target:

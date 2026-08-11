@@ -224,6 +224,17 @@ class TestHitungTargetMitigasiDampak:
         )
         assert hasil == {}
 
+    def test_kategori_sedang_return_kosong_selaras_sarankan_arah_mitigasi(self):
+        # Bug ditemukan live (APP-2026-8376): kategori "Sedang" BUKAN anggota
+        # KATEGORI_DAMPAK_BERSYARAT (cuma Tinggi/Sangat Tinggi) — sarankan_arah_mitigasi_dampak
+        # sudah benar menandai perlu_mitigasi=False utk Sedang, tapi versi lama fungsi ini tetap
+        # menghitung target (krn cuma cek "ada kategori lebih ringan?"), bikin poin "aman" dapat
+        # target kontradiktif. Gate DISAMAKAN persis dgn KATEGORI_DAMPAK_BERSYARAT sekarang.
+        hasil = hitung_target_mitigasi_dampak(
+            self._impact(impact_category="Sedang", runoff_change_index=1.56)
+        )
+        assert hasil == {}
+
     def test_index_none_return_kosong(self):
         hasil = hitung_target_mitigasi_dampak(self._impact(runoff_change_index=None))
         assert hasil == {}
