@@ -1,0 +1,54 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "aa1e018e-aaac-4cb8-94a2-cdcfb6085891",
+    "application_number": "APP-2026-003",
+    "timestamp": "2026-08-13T04:07:55.483Z",
+    "lokasi": {
+      "koordinat": {
+        "lat": -7.7405,
+        "lon": 110.37049999999999
+      },
+      "geojson": {
+        "type": "MultiPoint",
+        "coordinates": [
+          [110.37, -7.74],
+          [110.371, -7.741]
+        ]
+      },
+      "rdtr_zone": "Zona Perumahan",
+      "luas_lahan_m2": 250
+    },
+    "gate_hukum": {
+      "final_gate_status": "Tidak Lolos",
+      "rekomendasi_sistem": "Tidak Setuju",
+      "decisive_stage": "itbx",
+      "tahapan": {
+        "itbx": {
+          "status": "X",
+          "lolos": false,
+          "kbli_diusulkan": "1413",
+          "kegiatan_diusulkan": "d Pembibitan Dan Budidaya Kerbau i . Potong",
+          "kegiatan_diizinkan": [],
+          "kegiatan_terbatas": [],
+          "kegiatan_bersyarat": [],
+          "keterangan_ketentuan": [
+            "3. untuk kegiatan perdagangan besar produk lainnya termasuk barang sisa dan potongan YTDL diperbolehkan dengan syarat apabila mendatangkan dari luar negeri (impor) wajib sesuai dengan ketentuan peraturan perundangan",
+            "Ketentuan Umum kegiatan yang diperbolehkan secara Bersyarat (B):"
+          ],
+          "reason": "Gagal karena kegiatan dilarang (X) atau tidak ditemukan di zona Zona Perumahan",
+          "dasar_hukum": [
+            {"dokumen": "RDTR Sleman", "pasal": "Matriks ITBX", "kutipan": "Data KBLI referensi"}
+          ]
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": false
+    },
+    "meta": {
+      "data_confidence_keseluruhan": "Medium"
+    }
+  }
+}

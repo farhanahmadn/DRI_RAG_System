@@ -191,3 +191,56 @@ def test_poin_dampak_tidak_dinilai_fallback(nama_file):
     hasil = adaptasi(assessment)
     poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
     assert poin_dampak.status == "Tidak Dinilai"
+
+
+class TestFixtureItbxBersyarat:
+    """APP-2026-8913: itbx status "B" (kegiatan bersyarat) + threshold_bands berformat deskriptif
+    ("index < 1.5", bukan angka murni) + c_coefficients campur label string."""
+
+    def test_parse_tanpa_error(self):
+        _muat_assessment("l2_sample_amplop_8913.json")
+
+    def test_itbx_status_b_diterima_dan_dipetakan(self):
+        assessment = _muat_assessment("l2_sample_amplop_8913.json")
+        hasil = adaptasi(assessment)
+        poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
+        assert poin_itbx.status == "B"
+        assert poin_itbx.fakta["kegiatan_bersyarat"] == ["Reparasi dan Perawatan Mobil"]
+
+    def test_dampak_target_mitigasi_kosong_krn_kategori_rendah(self):
+        # kategori "Rendah" -> tak ada target mitigasi (hanya Tinggi/Sangat Tinggi yg dapat target).
+        assessment = _muat_assessment("l2_sample_amplop_8913.json")
+        hasil = adaptasi(assessment)
+        poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
+        assert poin_dampak.fakta["target_mitigasi"] == {}
+
+
+class TestTahapanIntensitasAbsen:
+    """APP-2026-003: gate berhenti di ITBX (status X) -> back-end OMIT `tahapan.intensitas` sama
+    sekali (bukan kirim objek dgn reason=null spt sebelumnya, lihat l2_sample_tidak_lolos.json)."""
+
+    def test_poin_intensitas_tetap_terbentuk_status_tidak_dinilai(self):
+        assessment = _muat_assessment("l2_sample_itbx_x_tanpa_intensitas.json")
+        hasil = adaptasi(assessment)
+        assert len(hasil.poin) == 3  # itbx, intensitas, dampak — SELALU 3 poin, bukan diomit.
+        poin_intensitas = next(p for p in hasil.poin if p.poin_id == "intensitas")
+        assert poin_intensitas.status == "Tidak Dinilai"
+        assert poin_intensitas.fakta == {"dinilai": False}
+        assert poin_intensitas.tipe_rekomendasi == "numerik"
+
+    def test_bangun_poin_intensitas_langsung(self):
+        assessment = _muat_assessment("l2_sample_itbx_x_tanpa_intensitas.json")
+        poin = _bangun_poin_intensitas(assessment)
+        assert poin.status == "Tidak Dinilai"
+        assert poin.dasar_hukum == []
+
+    def test_cek_konsistensi_intensitas_kosong_kalau_absen(self):
+        assessment = _muat_assessment("l2_sample_itbx_x_tanpa_intensitas.json")
+        assert cek_konsistensi_intensitas(assessment) == []
+
+    def test_adaptasi_tidak_error_dgn_intensitas_absen(self):
+        assessment = _muat_assessment("l2_sample_itbx_x_tanpa_intensitas.json")
+        hasil = adaptasi(assessment)
+        poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
+        assert poin_itbx.status == "X"
+        assert hasil.rekomendasi_sistem == "Tidak Setuju"

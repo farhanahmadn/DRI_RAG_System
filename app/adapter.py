@@ -50,6 +50,21 @@ def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
 
 def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
     intensitas = assessment.gate_hukum.tahapan.intensitas
+    if intensitas is None:
+        # Gate berhenti di ITBX (mis. status "X") -> intensitas tidak pernah dievaluasi back-end.
+        # Pola sama dgn impact_assessment.dinilai=False -> status "Tidak Dinilai" (lihat
+        # _bangun_poin_dampak di bawah); generator.py/guardrail.py sudah aman thd fakta minim ini
+        # (semua akses field pakai `.get(...)` dgn default, lihat app/reasoning/prompts.py::
+        # _bangun_fakta_intensitas & app/reasoning/guardrail.py::_angka_fakta_poin).
+        return PoinKonteks(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="Tidak Dinilai",
+            fakta={"dinilai": False},
+            dasar_hukum=[],
+            zona=assessment.lokasi.rdtr_zone,
+        )
     return PoinKonteks(
         poin_id="intensitas",
         kategori="Intensitas Bangunan (KDB/KLB/KDH)",
@@ -142,6 +157,9 @@ def cek_konsistensi_intensitas(assessment: L2Assessment) -> list[str]:
     """
     masalah: list[str] = []
     intensitas = assessment.gate_hukum.tahapan.intensitas
+    if intensitas is None:
+        # Tidak dievaluasi back-end (gate berhenti di ITBX) -> tidak ada apa pun utk dicek silang.
+        return masalah
     ada_pelanggaran_param = any(not p.memenuhi for p in intensitas.parameter.values())
 
     if intensitas.status == "MELAMPAUI_BATAS" and not ada_pelanggaran_param:

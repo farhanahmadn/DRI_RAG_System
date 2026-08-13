@@ -17,6 +17,16 @@ from app.schemas import MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, Sita
 # hanya bagian "tidak ada tindakan lanjut" ini yang aman ditemplate (tak ada apa pun utk direkomendasikan).
 _SARAN_AMAN = "Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."
 
+# APP-2026-003: "Tidak Dinilai" (intensitas tanpa data krn gate berhenti di ITBX, atau
+# impact_assessment.dinilai=False) BUKAN "memenuhi ketentuan" — poin ini memang belum pernah
+# dievaluasi sama sekali. Pakai `_SARAN_AMAN` di sini akan kontradiktif dgn reasoning LLM yang
+# (benar) menjelaskan poin tidak dinilai (pola sama dgn bug kesimpulan APP-2026-8376 yg baru
+# diperbaiki: saran & narasi harus SATU sumber kebenaran, bukan dua kalimat beda makna).
+_SARAN_TIDAK_DINILAI = (
+    "Tidak dievaluasi karena proses pemeriksaan berhenti pada tahapan sebelumnya; "
+    "tidak ada rekomendasi untuk poin ini."
+)
+
 _LLM_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -213,7 +223,11 @@ def generate_poin(
         target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
 
     saran = llm_out["saran"]
-    if apakah_aman(poin):
+    if poin.status == "Tidak Dinilai":
+        # Belum pernah dievaluasi (bukan "sudah memenuhi ketentuan") — lihat _SARAN_TIDAK_DINILAI.
+        saran = _SARAN_TIDAK_DINILAI
+        target = None
+    elif apakah_aman(poin):
         # Tidak ada pelanggaran utk ditindaklanjuti -> saran & target deterministik, TAPI
         # reasoning_pendek/panjang & sitasi di atas tetap murni dari LLM (lihat docstring).
         saran = _SARAN_AMAN

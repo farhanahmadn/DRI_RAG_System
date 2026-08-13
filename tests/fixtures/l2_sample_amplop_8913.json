@@ -1,0 +1,65 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "4236d812-8902-402b-b374-0408472836cb",
+    "application_number": "APP-2026-8913",
+    "timestamp": "2026-08-13T03:50:00.684Z",
+    "lokasi": {
+      "koordinat": {"lat": -7.756, "lon": 110.38000000000001},
+      "geojson": {"type": "Polygon", "coordinates": [[[110.3795,-7.7565],[110.3805,-7.7565],[110.3805,-7.7555],[110.3795,-7.7555],[110.3795,-7.7565]]]},
+      "rdtr_zone": "Zona Perumahan",
+      "luas_lahan_m2": 850
+    },
+    "gate_hukum": {
+      "final_gate_status": "Lolos Bersyarat",
+      "rekomendasi_sistem": "Setuju Bersyarat",
+      "decisive_stage": "intensitas",
+      "tahapan": {
+        "itbx": {
+          "status": "B",
+          "lolos": true,
+          "kbli_diusulkan": "4520",
+          "kegiatan_diusulkan": "Reparasi dan Perawatan Mobil",
+          "kegiatan_diizinkan": [],
+          "kegiatan_terbatas": [],
+          "kegiatan_bersyarat": ["Reparasi dan Perawatan Mobil"],
+          "keterangan_ketentuan": ["a. keterangan 1", "b. keterangan 2"],
+          "reason": "Lolos karena kegiatan Bersyarat (B) di zona Zona Perumahan",
+          "dasar_hukum": [{"dokumen": "RDTR Sleman", "pasal": "Matriks ITBX", "kutipan": "Data KBLI referensi"}]
+        },
+        "intensitas": {
+          "status": "MELAMPAUI_BATAS",
+          "lolos": false,
+          "parameter": {
+            "kdb": {"usulan": 40, "ambang_maks": 0, "memenuhi": true, "satuan": "persen"},
+            "klb": {"usulan": 0.4, "ambang_maks": 0, "memenuhi": true, "satuan": "rasio"},
+            "kdh": {"usulan": 29.411764705882355, "ambang_min": 0, "memenuhi": true, "satuan": "persen"}
+          },
+          "luas_tapak_m2": 340,
+          "jumlah_lantai": 1,
+          "luas_rth_usulan_m2": 250,
+          "reason": "Melanggar Aturan: KDH (29.411764705882355 ) Min (30 )",
+          "dasar_hukum": []
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": true,
+      "c_before": 0.3,
+      "c_after": 0.368,
+      "runoff_change_index": 1.2266666666666668,
+      "impact_score": 85,
+      "impact_category": "RENDAH",
+      "calculation_details": "C_Sesudah = ...",
+      "threshold_bands": {"Rendah": "index < 1.5", "Sedang": "1.5-2.5", "Tinggi": "2.5-4.0", "Sangat Tinggi": "> 4.0"},
+      "existing_surface_details": {"kelas": "Daerah tak Terbangun", "proporsi": 1, "C": 0.3},
+      "proposed_surface_details": {"Bangunan/Atap": 40, "Taman/RTH": 29.411764705882355},
+      "c_coefficients": {"C_Atap_KBLI": 0.7, "Kelas_Atap": "Perdagangan Sekeliling Pusat Kota", "C_Taman": 0.3, "C_Daerah_tak_Terbangun": 0.3},
+      "luas_lahan_m2": 850,
+      "data_confidence": "High",
+      "limitations": null
+    },
+    "meta": {"data_confidence_keseluruhan": "Medium"}
+  }
+}

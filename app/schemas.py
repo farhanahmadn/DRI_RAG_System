@@ -82,7 +82,14 @@ class IntensitasTahap(BaseModel):
 
 class Tahapan(BaseModel):
     itbx: ItbxTahap
-    intensitas: IntensitasTahap
+    # Nullable (APP-2026-003): back-end SEBELUMNYA selalu kirim `intensitas` penuh (walau
+    # `decisive_stage="itbx"`, lihat tests/fixtures/l2_sample_tidak_lolos.json — reason=null tapi
+    # objek lengkap ada). Payload baru (itbx status "X", gate berhenti total di ITBX) OMIT key
+    # `intensitas` sama sekali -> field wajib gagal validasi (422) utk kasus "Tidak Lolos" murni
+    # ITBX. Field ini TIDAK PERNAH benar-benar kosong kalau gate lolos sampai tahap intensitas
+    # dievaluasi (lihat app/adapter.py::_bangun_poin_intensitas utk penanganan None -> poin
+    # "Tidak Dinilai", pola sama seperti impact_assessment.dinilai=False).
+    intensitas: IntensitasTahap | None = None
 
 
 class GateHukum(BaseModel):
@@ -105,7 +112,13 @@ class ImpactAssessment(BaseModel):
     threshold_bands: dict[str, str] | None = None
     existing_surface_details: dict[str, Any] | None = None
     proposed_surface_details: dict[str, float] | None = None
-    c_coefficients: dict[str, float] | None = None
+    # `Any`, BUKAN `float` (APP-2026-8913/-7012/-5397): back-end mulai selipkan field label
+    # string di sini juga (mis. "Kelas_Atap": "Perdagangan Sekeliling Pusat Kota") berdampingan dgn
+    # koefisien numerik (mis. "C_Atap_KBLI": 0.7) dalam SATU dict yang sama -> `dict[str, float]`
+    # gagal validasi (422) begitu ada key label. Field ini cuma diteruskan apa adanya ke
+    # fakta["mitigasi"]["c_coefficients_referensi"] (calculator.py) & prompt (tak pernah dihitung
+    # ulang secara aritmatika di kode kita), jadi longgarkan tipe value-nya aman.
+    c_coefficients: dict[str, Any] | None = None
     luas_lahan_m2: float | None = None
     data_confidence: str | None = None
     limitations: str | None = None

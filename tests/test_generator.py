@@ -333,6 +333,40 @@ def test_generate_poin_tidak_aman_pakai_saran_llm_apa_adanya(monkeypatch):
     assert hasil.rekomendasi.saran == "Saran spesifik dari LLM."
 
 
+def test_generate_poin_tidak_dinilai_saran_bukan_saran_aman(monkeypatch):
+    """APP-2026-003: poin "Tidak Dinilai" (gate berhenti sebelum poin ini dievaluasi) BUKAN
+    "memenuhi ketentuan" — `_SARAN_AMAN` di sini kontradiktif dgn fakta (belum pernah diperiksa),
+    pola sama dgn bug kesimpulan APP-2026-8376 yg sudah diperbaiki sebelumnya."""
+
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x",
+            "reasoning_panjang": "x",
+            "sitasi": [],
+            "saran": "Saran dari LLM ini HARUS diabaikan/ditimpa oleh template.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="intensitas",
+        kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+        tipe_rekomendasi="numerik",
+        status="Tidak Dinilai",
+        fakta={"dinilai": False},
+    )
+    # apakah_aman() jg True utk kasus ini (tak ada "target") — makanya perlu cabang terpisah
+    # keyed on `status`, BUKAN cuma mengandalkan apakah_aman().
+    assert apakah_aman(poin) is True
+
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert hasil.rekomendasi.saran != _SARAN_AMAN
+    assert "tidak dievaluasi" in hasil.rekomendasi.saran.lower()
+    assert hasil.rekomendasi.target is None
+
+
 def test_generate_poin_merakit_dari_respons_llm_palsu(monkeypatch):
     def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
         return {

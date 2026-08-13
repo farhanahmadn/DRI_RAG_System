@@ -26,6 +26,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
         "l2_sample_amplop_6191.json",
         "l2_sample_tidak_lolos.json",
         "l2_sample_amplop_8376.json",
+        "l2_sample_itbx_x_tanpa_intensitas.json",
+        "l2_sample_amplop_8913.json",
     ],
 )
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
@@ -73,6 +75,38 @@ class TestKontrakBackendBerubah:
         payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
         assessment = L2Assessment.model_validate(payload["data"])
         assert assessment.lokasi.geojson.type == "Point"
+
+    def test_geojson_multipoint_diterima(self):
+        # APP-2026-003: back-end kirim geometry "MultiPoint" (nesting 2 level, bukan Point/Polygon).
+        payload = json.loads(
+            (FIXTURES_DIR / "l2_sample_itbx_x_tanpa_intensitas.json").read_text(encoding="utf-8")
+        )
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.lokasi.geojson.type == "MultiPoint"
+
+    def test_tahapan_intensitas_absen_diterima(self):
+        # APP-2026-003: back-end OMIT `tahapan.intensitas` sama sekali kalau gate berhenti di ITBX
+        # (status "X") — sebelumnya field wajib -> 422. Field ini opsional & default None.
+        payload = json.loads(
+            (FIXTURES_DIR / "l2_sample_itbx_x_tanpa_intensitas.json").read_text(encoding="utf-8")
+        )
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.gate_hukum.tahapan.intensitas is None
+
+    def test_tahapan_intensitas_lama_tetap_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.gate_hukum.tahapan.intensitas is not None
+
+    def test_c_coefficients_boleh_campur_label_string(self):
+        # APP-2026-8913/-7012/-5397: back-end selipkan "Kelas_Atap": "<label string>" berdampingan
+        # dgn koefisien numerik (mis. "C_Atap_KBLI": 0.7) dlm SATU dict `c_coefficients` yang sama —
+        # `dict[str, float]` gagal validasi (422) begitu ada key label non-numerik.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8913.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        koef = assessment.impact_assessment.c_coefficients
+        assert koef["Kelas_Atap"] == "Perdagangan Sekeliling Pusat Kota"
+        assert koef["C_Atap_KBLI"] == 0.7
 
 
 def test_parameter_intensitas_ambang_null_toleran():

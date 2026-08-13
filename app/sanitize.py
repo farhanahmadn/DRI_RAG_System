@@ -53,7 +53,7 @@ ALLOWED_FAKTA_FIELDS: dict[str, frozenset[str]] = {
         "fallback_data_kosong",
     }),
     "intensitas": frozenset({
-        "parameter", "luas_tapak_m2", "jumlah_lantai", "luas_rth_usulan_m2", "target",
+        "dinilai", "parameter", "luas_tapak_m2", "jumlah_lantai", "luas_rth_usulan_m2", "target",
     }),
     "dampak": frozenset({
         "dinilai", "impact_score", "runoff_change_index", "c_before", "c_after", "threshold_bands",
