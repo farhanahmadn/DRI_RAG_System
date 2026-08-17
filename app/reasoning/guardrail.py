@@ -552,6 +552,15 @@ def generate_poin_dengan_guardrail(
                 temperature=suhu,
             )
         except Exception as exc:  # generasi gagal dihitung sebagai percobaan gagal, bukan crash
+            # Ditemukan live (migrasi model 2026-08-15): exception di sini SEBELUMNYA tak pernah
+            # dilog — begitu ketiga percobaan habis & jatuh ke template_low_confidence, root cause
+            # asli (rate limit? BadRequestError? timeout?) hilang tak berbekas, tak bisa dibedakan
+            # dari "model memang lemah". Log di sini TIDAK mengubah alur (masih retry lalu fallback
+            # spt semula), cuma bikin kegagalan terlihat.
+            logger.warning(
+                "generate_poin gagal (percobaan %d/%d) utk poin %r: %s: %s",
+                percobaan + 1, max_retry + 1, poin.poin_id, type(exc).__name__, exc,
+            )
             masalah = [str(exc)]
             continue
 

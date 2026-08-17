@@ -31,6 +31,7 @@ def test_get_client_default_timeout_dan_retries_masuk_akal():
     assert 0 <= llm_client_module._MAX_RETRIES <= 5
 
 
+@pytest.mark.live
 @pytest.mark.skipif(
     not os.getenv("GROQ_API_KEY"),
     reason="GROQ_API_KEY tidak diset — skip smoke test panggilan LLM nyata.",
@@ -49,7 +50,13 @@ def test_generate_returns_valid_json():
         prompt="Balas dengan JSON {\"ok\": true} saja, tanpa penjelasan apapun.",
         json_schema=schema,
         schema_name="ok_check",
-        max_tokens=50,
+        # max_tokens 300, BUKAN nilai kecil spt 50 (cukup utk llama-3.3-70b-versatile lama, model
+        # non-reasoning) — model reasoning skrg (mis. openai/gpt-oss-20b default sejak 2026-08-15)
+        # menghabiskan sebagian max_tokens utk trace berpikir TERSEMBUNYI sebelum JSON terlihat;
+        # budget kecil bikin generation kepotong kosong sebelum JSON sempat ditulis
+        # (json_validate_failed, failed_generation="") — dikonfirmasi reproduksi live, BUKAN bug
+        # produksi (generator.py/assemble.py pakai default 1024, bakeoff nyata json=100%).
+        max_tokens=300,
     )
 
     assert isinstance(result, dict)

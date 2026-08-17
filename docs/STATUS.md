@@ -50,13 +50,32 @@ data mock & data terstruktur (`kegiatan_data.py`).
   menghasilkan instance JSON yang sesuai, sehingga `generator.py` gagal parse dan guardrail
   fallback ke `low_confidence` secara benar di 10/15 kasus.
 
-  **Keputusan model: `llama-3.3-70b-versatile`** (sudah default `.env.example`/`.env`, tak perlu
-  diubah). Alasan: seri dengan `openai/gpt-oss-20b` di keempat metrik struktural (100%), tapi ~4x
-  lebih cepat (2.21s vs 8.70s) — penting utk precheck yang harus responsif, apalagi latensi
-  bertumpuk saat guardrail retry (maks 2x) atau banyak indikator. Sesuai juga ekspektasi arsitektur
-  CLAUDE.md ("model dev: katalog Groq, mis. Llama terbaru"). **Catatan**: kualitas Bahasa Indonesia
-  (LLM-as-judge) belum diukur sama sekali (sengaja ditunda, lihat di bawah) — bukan faktor
-  pembeda keputusan ini; kalau nanti diaktifkan, keputusan model bisa ditinjau ulang.
+  ~~**Keputusan model (lama): `llama-3.3-70b-versatile`**~~ — **SUPERSEDED 2026-08-15.** Groq
+  mengumumkan `llama-3.3-70b-versatile` di-decommission per 2026-08-16 (tidak dilayani lagi
+  setelahnya). Bakeoff ulang (`eval/bakeoff.py`, gold set 6 kasus — sudah menyusut dari 15 kasus
+  di tabel atas, angka di bawah TIDAK apple-to-apple dgn tabel di atas) atas kandidat pengganti
+  resmi Groq + kandidat lebih kecil/murah:
+
+  | Model | Overall | Grounded | Low_confidence | Catatan |
+  |---|---|---|---|---|
+  | openai/gpt-oss-120b | 67% | 83% | 3/6 | rekomendasi resmi Groq |
+  | **openai/gpt-oss-20b** | **67%** | **100%** | 3/6 | 2x lebih cepat, ~4x lebih murah dari 120b |
+  | llama-3.1-8b-instant | 50% | 83% | 6/6 | tak dipakai |
+  | qwen/qwen3.6-27b | 50% | 83% | 6/6 | rekomendasi resmi Groq lainnya — TAK KOMPATIBEL: model
+  reasoning ber-`<think>` yg gagal total (`json_validate_failed`, generation kosong) begitu
+  dipaksa `response_format=json_object`/`json_schema`, terlepas dari kualitas |
+
+  **Keputusan model (baru): `openai/gpt-oss-20b`.** Seri dgn `gpt-oss-120b` di overall score tapi
+  grounded lebih tinggi (100% vs 83%), jelas lebih murah/cepat — tak ada bukti 120b perlu utk
+  tugas LLM di sistem ini (pelapis narasi dlm skema sempit, LLM tak pernah memutuskan
+  angka/status). **Catatan penting**: skor 67% di bakeoff baru ini JAUH di bawah `gpt-oss-20b`
+  sendiri di histori (tabel atas: 100%/100%/0 low_confidence, gold set 15 kasus lama) — dugaan kuat
+  bukan model-nya melemah, tapi guardrail (`app/reasoning/guardrail.py`) sudah di-tuning berulang
+  kali sepanjang pengembangan khusus terhadap gaya jawab `llama-3.3-70b-versatile` (mis. pengecekan
+  frasa persis "dilarang"/"tidak diizinkan"), jadi model lain yg secara substansi benar bisa
+  kena tolak krn beda gaya bahasa. **Belum diverifikasi** — worth ditinjau ulang kalau ada waktu
+  (bukan pemblokir keputusan model, krn guardrail yang gagal SELALU jatuh ke fallback template
+  deterministik, bukan output salah yg lolos).
 
 ## Hardening (Fase 3.3)
 

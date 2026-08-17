@@ -24,7 +24,7 @@ target numerik pasti, dan rekomendasi** — sebagai JSON siap-render untuk revie
 | **Input** | JSON dari back-end L2 (`gate_hukum` + `impact_assessment` + `lokasi`) |
 | **Output** | JSON terstruktur (`OutputL3`) — ringkasan, 3 poin reasoning+sitasi+rekomendasi, kesimpulan |
 | **Endpoint** | `POST /reasoning` (+ `GET /health`), FastAPI, lihat Swagger di `/docs` |
-| **LLM** | Groq `llama-3.3-70b-versatile` — **hanya** merangkai narasi, tidak pernah memutuskan angka/status |
+| **LLM** | Groq `openai/gpt-oss-20b` — **hanya** merangkai narasi, tidak pernah memutuskan angka/status |
 | **Retrieval** | Hybrid RAG (Postgres + pgvector): dense + lexical (FTS) → Reciprocal Rank Fusion → rerank |
 | **Embedding/Reranker** | **Jina AI** (`jina-embeddings-v3` / `jina-reranker-v3`, default produksi) atau **lokal** (`BAAI/bge-m3` / `bge-reranker-v2-m3`) — pilih via `.env`, nol perubahan kode |
 | **Guardrail** | 6+ cek deterministik (konsistensi angka/verdict/sitasi) + retry terarah + fallback aman |
@@ -83,7 +83,7 @@ flowchart TD
       RAG["ambil_chunks_pendukung()<br/>dasar_hukum? -> get_by_reference()<br/>kosong? -> search() + filter zona"]
       RAG --> HYB["Hybrid retrieval (Postgres+pgvector)<br/>dense (Jina/bge-m3) + lexical FTS -> RRF -> rerank (Jina/bge-reranker)"]
       HYB --> PR["build_user_prompt()<br/>fakta FINAL + pasal ditemukan -> prompt sempit"]
-      PR --> LLM["Groq llama-3.3-70b-versatile<br/>reasoning_pendek/panjang, sitasi, saran, disclaimer"]
+      PR --> LLM["Groq openai/gpt-oss-20b<br/>reasoning_pendek/panjang, sitasi, saran, disclaimer"]
       LLM --> GR{"guardrail: perbaiki_poin()<br/>6+ cek deterministik"}
       GR -- "masalah, retry < 2" --> PR
       GR -- "lolos" --> OK["PoinOutput normal"]
@@ -145,7 +145,7 @@ query retrieval (`retriever.search()`/`get_by_reference()`) dan prompt LLM (`bui
 
 | Komponen | Default produksi | Alternatif (rollback) | Catatan |
 |---|---|---|---|
-| **LLM** | `llama-3.3-70b-versatile` (Groq) | — | JSON schema-constrained, `temperature=0` |
+| **LLM** | `openai/gpt-oss-20b` (Groq) | `openai/gpt-oss-120b` (Groq) | JSON schema-constrained, `temperature=0`. Ganti dari `llama-3.3-70b-versatile` 2026-08-15 (decommissioned Groq per 2026-08-16), dipilih via `eval/bakeoff.py` — lihat `docs/STATUS.md` § Keputusan model |
 | **Embedding** | `jina-embeddings-v3` (1024-dim) | `BAAI/bge-m3` (lokal, `transformers`) | `EMBEDDING_PROVIDER=jina\|local` |
 | **Reranker** | `jina-reranker-v3` | `BAAI/bge-reranker-v2-m3` (lokal) | `RERANK_PROVIDER=jina\|local` |
 | **Vector DB** | Postgres 16 + `pgvector` (HNSW cosine) | — | Docker Compose, dev lokal |

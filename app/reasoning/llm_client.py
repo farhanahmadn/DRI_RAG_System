@@ -58,7 +58,12 @@ def generate(
     schema_name: str = "response",
     system: str | None = None,
     temperature: float = 0.0,
-    max_tokens: int = 1024,
+    # 2048 (bukan 1024) sejak migrasi ke openai/gpt-oss-20b (2026-08-15) — model REASONING,
+    # menghabiskan sebagian max_tokens utk trace berpikir tersembunyi SEBELUM JSON terlihat. 1024
+    # terbukti live kehabisan di tengah jalan utk prompt lebih besar (mis. poin intensitas):
+    # 'max completion tokens reached before generating a valid document' -> json_validate_failed
+    # -> retry habis -> low_confidence, padahal bukan soal kualitas model.
+    max_tokens: int = 2048,
 ) -> dict:
     """Panggil LLM dan kembalikan JSON valid (dict) sesuai `json_schema`.
 

@@ -20,13 +20,24 @@ from eval.run_eval import HasilKasus, jalankan_gold_set, muat_gold_set
 load_dotenv()
 
 MODEL_KANDIDAT = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
+    "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
+    "llama-3.1-8b-instant",
 ]
 # Katalog model Groq sering berubah — "gemma2-9b-it" dipakai sebelumnya sudah DECOMMISSIONED
 # per klien.models.list() (400 model_decommissioned). Cek `client.models.list()` kalau kandidat
 # di atas suatu saat gagal serupa, jangan asumsikan itu otomatis rate limit.
+#
+# 2026-08-15: "llama-3.3-70b-versatile" (default lama, lihat docs/STATUS.md baseline 100%/2.21s)
+# di-decommission Groq per 2026-08-16. "qwen/qwen3.6-27b" (rekomendasi resmi Groq) DICORET dari
+# daftar setelah dites: model reasoning ber-<think> yang gagal total (generation kosong,
+# json_validate_failed) begitu dipaksa response_format json_object/json_schema — bukan soal
+# kualitas, memang tak kompatibel dgn pipeline JSON-schema-constrained kita, butuh rework besar.
+# "openai/gpt-oss-120b" lolos tes mentah (isolated call) tapi skor bakeoff pertama masih di bawah
+# baseline lama (67% overall vs 100%) — sebelum diputuskan sbg default, dibandingkan dulu vs
+# varian lebih kecil/cepat/murah (gpt-oss-20b, llama-3.1-8b-instant) yang justru mungkin CUKUP
+# utk tugas ini (LLM di sistem cuma pelapis narasi dlm skema sempit, bukan reasoning bebas —
+# lihat CLAUDE.md, "model dipilih via eval" bukan asumsi 'lebih besar = lebih perlu').
 
 JEDA_ANTAR_KASUS_DETIK = 3.0
 JEDA_ANTAR_MODEL_DETIK = 8.0

@@ -931,6 +931,23 @@ class TestGeneratePoinDenganGuardrail:
         assert panggilan["n"] == 2  # max_retry=1 -> 2 percobaan
         assert hasil.low_confidence is True
 
+    def test_exception_generate_poin_dilog_bukan_ditelan_diam(self, monkeypatch, caplog):
+        # Bug ditemukan live (migrasi model 2026-08-15): exception di generate_poin (rate limit,
+        # BadRequestError, dst) SEBELUMNYA ditelan tanpa jejak begitu retry habis & jatuh ke
+        # template_low_confidence — tak bisa dibedakan dari "model memang lemah" pasca-kejadian.
+        def _stub_raise(*args, **kwargs):
+            raise RuntimeError("simulasi RateLimitError")
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub_raise)
+
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        with caplog.at_level("WARNING", logger="app.reasoning.guardrail"):
+            generate_poin_dengan_guardrail(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert "simulasi RateLimitError" in caplog.text
+        assert "itbx" in caplog.text
+
 
 def test_verifikasi_entailment_sitasi_stub_selalu_true():
     assert verifikasi_entailment_sitasi(_poin_output(), []) is True
