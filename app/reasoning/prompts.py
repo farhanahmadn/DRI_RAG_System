@@ -24,7 +24,7 @@ ATURAN WAJIB (jangan dilanggar):
 8. JANGAN MENGHITUNG atau MENGARANG angka apa pun. Kamu BOLEH menyebut angka FAKTA yang diberikan di atas (usulan/ambang/target/skor) secara verbatim di reasoning_pendek, reasoning_panjang, maupun saran untuk memperjelas narasi (contoh BENAR: "KDB usulan 90% melampaui batas maksimum 60%") — SELAMA angka itu persis tercantum di fakta yang diberikan, bukan dihitung/diperkirakan/dikarang sendiri. Angka final rekomendasi (target) tetap dirakit sistem di field terpisah.
 9. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda/pengambil keputusan) yang akan meng-ACC atau memberi feedback atas permohonan — BUKAN nasihat langsung ke pemohon. Sebut pemohon sebagai orang ketiga ("pemohon"/"permohonan ini"), JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, analitis, dan dapat diaudit, agar reviewer dapat menilai dan memutuskan.
 10. POIN AMAN/LOLOS TETAP WAJIB DIJELASKAN — kalau fakta di atas menunjukkan poin ini lolos/memenuhi (mis. STATUS_ITBX "I", STATUS_INTENSITAS "MEMENUHI_SYARAT", atau KATEGORI_DAMPAK "Rendah"/"Sedang"), JANGAN menulis reasoning generik seperti "tidak ada catatan berisiko" atau "tidak ada tindakan lebih lanjut" tanpa alasan. WAJIB jelaskan KONKRET mengapa poin ini lolos — sebut fakta relevan (mis. kategori kegiatan di zona ini, angka usulan dibanding ambang, kategori dampak) dan sitasi pasal yang tersedia — sama persis seperti menjelaskan poin yang tidak lolos.
-11. SARAN HARUS KONKRET & DAPAT DITINDAKLANJUTI, bukan pernyataan terbuka/umum. "saran" adalah bahan reviewer memutuskan syarat ACC — JANGAN menulis kalimat umum seperti "menyesuaikan desain agar memenuhi ketentuan" TANPA menyebutkan APA yang disesuaikan dan (kalau ada FAKTA angka target/ambang di atas) angka targetnya persis. Kalau ada LEBIH DARI SATU langkah/opsi konkret yang tersedia di fakta (mis. beberapa "Arah Mitigasi", beberapa syarat di "Keterangan Ketentuan"), tulis "saran" sebagai daftar bernomor ("1. ...\\n2. ...") satu opsi per baris — JANGAN digabung jadi satu kalimat panjang. Kalau ada FAKTA "TARGET_MITIGASI_KUANTITATIF" atau target numerik lain, WAJIB sebutkan angkanya persis di salah satu baris saran (bukan cuma di reasoning).
+11. SARAN HARUS KONKRET & DAPAT DITINDAKLANJUTI, bukan pernyataan terbuka/umum. "saran" adalah bahan reviewer memutuskan syarat ACC — JANGAN menulis kalimat umum seperti "menyesuaikan desain agar memenuhi ketentuan" TANPA menyebutkan APA yang disesuaikan dan (kalau ada FAKTA angka target/ambang di atas) angka targetnya persis. Kalau ada LEBIH DARI SATU langkah/opsi konkret yang tersedia di fakta (mis. beberapa "Arah Mitigasi", beberapa syarat di "Keterangan Ketentuan"), tulis "saran" sebagai daftar bernomor ("1. ...\\n2. ...") satu opsi per baris — JANGAN digabung jadi satu kalimat panjang. Kalau ada FAKTA "TARGET_MITIGASI_KUANTITATIF" atau target numerik lain, WAJIB sebutkan angkanya persis di salah satu baris saran (bukan cuma di reasoning). KHUSUS poin intensitas: kalau baris "[TARGET PATUH: ...]" menyebut angka FISIK dalam meter persegi (mis. "luas lantai dasar bangunan maksimal 510.0 m²", "RTH dibutuhkan minimal 255.0 m²", "masih kurang 45.0 m²") — angka m² itu WAJIB dikutip persis di saran, BUKAN cuma angka persentase ambang (mis. "KDB maksimal 60%") tanpa terjemahan fisiknya. Angka persentase saja tidak actionable bagi pemohon; angka m² menjawab langsung "berapa luas yang boleh dibangun/berapa RTH yang masih harus ditambahkan".
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -155,6 +155,38 @@ def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
     return lines
 
 
+def _format_target_parameter(info: dict) -> str:
+    """Ubah dict target mentah dari app/reasoning/calculator.py (mis. {'target_kdb': 10,
+    'selisih': 30, 'footprint_maks_m2': 85.0}) jadi SATU kalimat siap-kutip, BUKAN dict Python
+    mentah (repr dict spt sebelumnya: '[TARGET PATUH: {'target_kdb': 10, ...}]').
+
+    Kenapa: LLM jauh lebih mudah menyalin kalimat lengkap drpd mem-parse repr dict & memilih field
+    mana yang relevan sendiri — dict mentah terbukti bikin LLM cenderung cuma sebut angka ambang
+    persen (mis. "KDB harus 10%"), jarang angka fisik m² (footprint_maks_m2/rth_kurang_m2) yang
+    justru PALING actionable buat reviewer (lihat SYSTEM_PROMPT aturan #11 di bawah, sekarang
+    eksplisit mewajibkan angka m² kalau tersedia)."""
+    if "target_kdb" in info:
+        kalimat = f"KDB harus turun ke maksimal {info['target_kdb']}% (selisih {info['selisih']} poin dari usulan)"
+        if "footprint_maks_m2" in info:
+            kalimat += f" → luas lantai dasar bangunan maksimal {info['footprint_maks_m2']:.1f} m²"
+        return kalimat
+    if "target_klb" in info:
+        kalimat = f"KLB harus turun ke maksimal {info['target_klb']} (selisih {info['selisih']} dari usulan)"
+        if "luas_lantai_maks_m2" in info:
+            kalimat += f" → luas total lantai bangunan maksimal {info['luas_lantai_maks_m2']:.1f} m²"
+        return kalimat
+    if "target_kdh" in info:
+        kalimat = f"KDH harus naik ke minimal {info['target_kdh']}% (kurang {info['selisih']} poin dari usulan)"
+        if "rth_dibutuhkan_m2" in info:
+            kalimat += f" → RTH dibutuhkan minimal {info['rth_dibutuhkan_m2']:.1f} m²"
+        if info.get("rth_kurang_m2"):
+            kalimat += f" (RTH yang sudah diusulkan pemohon masih kurang {info['rth_kurang_m2']:.1f} m²)"
+        return kalimat
+    # Jaring pengaman — harusnya tak pernah kena selama calculator.py konsisten dgn 3 bentuk di
+    # atas (target_kdb/target_klb/target_kdh), tapi jangan diam-diam sembunyikan data kalau meleset.
+    return str(info)
+
+
 def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
     # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
     # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
@@ -170,7 +202,7 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
             f"memenuhi={param['memenuhi']}"
         )
         if nama in target_map:
-            baris += f"  [TARGET PATUH: {target_map[nama]}]"
+            baris += f"  [TARGET PATUH: {_format_target_parameter(target_map[nama])}]"
         lines.append(baris)
 
     if fakta.get("luas_tapak_m2") is not None:

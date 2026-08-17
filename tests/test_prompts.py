@@ -42,6 +42,8 @@ def test_system_prompt_memuat_semua_aturan_wajib():
     assert "JANGAN mengarang" in SYSTEM_PROMPT
     assert "REVIEWER" in SYSTEM_PROMPT
     assert '"Anda"' in SYSTEM_PROMPT  # dilarang, bukan diwajibkan — lihat test_voice di bawah
+    assert "SARAN HARUS KONKRET" in SYSTEM_PROMPT
+    assert "WAJIB dikutip persis di saran" in SYSTEM_PROMPT  # aturan #11 diperkuat: wajib angka m²
 
 
 def test_system_prompt_suara_reviewer_bukan_pemohon():
@@ -222,6 +224,66 @@ class TestFaktaIntensitas:
     def test_target_tak_muncul_saat_kosong(self):
         prompt = build_user_prompt(self._poin_intensitas(target={}), [])
         assert "TARGET PATUH" not in prompt
+
+    def test_target_kdb_kalimat_berlabel_bukan_dict_mentah(self):
+        # Sebelumnya: "[TARGET PATUH: {'target_kdb': 60.0, 'selisih': 10.0, ...}]" (repr dict
+        # Python mentah) — sekarang kalimat siap-kutip termasuk angka fisik m².
+        target = {"kdb": {"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0}}
+        prompt = build_user_prompt(self._poin_intensitas(target=target), [])
+        assert "{'target_kdb'" not in prompt  # bukan lagi repr dict mentah
+        assert "KDB harus turun ke maksimal 60.0%" in prompt
+        assert "luas lantai dasar bangunan maksimal 510.0 m²" in prompt
+
+    def test_target_kdh_sebut_rth_kurang_m2(self):
+        poin = _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={
+                "parameter": {
+                    "kdh": {"usulan": 25.0, "ambang_maks": None, "ambang_min": 30.0, "memenuhi": False, "satuan": "persen"},
+                },
+                "target": {"kdh": {"target_kdh": 30.0, "selisih": 5.0, "rth_dibutuhkan_m2": 255.0, "rth_kurang_m2": 45.0}},
+            },
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "KDH harus naik ke minimal 30.0%" in prompt
+        assert "RTH dibutuhkan minimal 255.0 m²" in prompt
+        assert "masih kurang 45.0 m²" in prompt
+
+
+class TestFormatTargetParameter:
+    def test_kdb(self):
+        from app.reasoning.prompts import _format_target_parameter
+
+        hasil = _format_target_parameter({"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0})
+        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan) → luas lantai dasar bangunan maksimal 510.0 m²"
+
+    def test_kdb_tanpa_footprint_m2(self):
+        from app.reasoning.prompts import _format_target_parameter
+
+        hasil = _format_target_parameter({"target_kdb": 60.0, "selisih": 10.0})
+        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan)"
+
+    def test_klb(self):
+        from app.reasoning.prompts import _format_target_parameter
+
+        hasil = _format_target_parameter({"target_klb": 1.8, "selisih": 0.2, "luas_lantai_maks_m2": 900.0})
+        assert "KLB harus turun ke maksimal 1.8" in hasil
+        assert "luas total lantai bangunan maksimal 900.0 m²" in hasil
+
+    def test_kdh_tanpa_rth_kurang(self):
+        from app.reasoning.prompts import _format_target_parameter
+
+        hasil = _format_target_parameter({"target_kdh": 30.0, "selisih": 5.0, "rth_dibutuhkan_m2": 255.0})
+        assert "KDH harus naik ke minimal 30.0%" in hasil
+        assert "kurang" not in hasil.split("RTH dibutuhkan")[1]  # tak ada klausa "masih kurang"
+
+    def test_bentuk_tak_dikenal_fallback_str(self):
+        from app.reasoning.prompts import _format_target_parameter
+
+        assert _format_target_parameter({"aneh": 1}) == "{'aneh': 1}"
 
 
 class TestFaktaDampak:
