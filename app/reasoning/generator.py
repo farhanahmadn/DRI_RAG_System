@@ -128,8 +128,15 @@ def ambil_chunks_pendukung(
         chunks = chunks[:top_k_dukungan]
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
-        # Filter KELUARGA zona (APP-2026-6191) — cegah Lampiran V.B/VI zona lain ikut terkutip.
-        filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
+        # APP-2026-8090: filter EXACT ke sub-zona presisi (mis. "P-1") kalau BE mengirim &
+        # yakin (poin.zona_subzone) — jauh lebih presisi drpd filter KELUARGA (zona_prefix, cuma
+        # bisa saring "P" tanpa beda P-1/P-2). Fallback ke zona_prefix (APP-2026-6191, cegah
+        # Lampiran V.B/VI zona lain ikut terkutip) kalau sub-zona kosong/BE tak yakin — TIDAK
+        # PERNAH menebak sub-zona sendiri di sini.
+        if poin.zona_subzone:
+            filters = RetrievalFilters(zona=poin.zona_subzone)
+        else:
+            filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
         chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan)
     return chunks
 

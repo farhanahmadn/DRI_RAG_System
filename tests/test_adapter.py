@@ -43,6 +43,25 @@ class TestFixtureLolos:
         for poin_id in ("itbx", "intensitas", "dampak"):
             assert poin_by_id[poin_id].zona == assessment.lokasi.rdtr_zone
 
+    def test_ketiga_poin_zona_subzone_none_kalau_be_tak_kirim(self):
+        # Fixture lama (sebelum APP-2026-8090) tak punya rdtr_subzone -> None, BUKAN error/tebakan.
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assert assessment.lokasi.rdtr_subzone is None
+        hasil = adaptasi(assessment)
+        for p in hasil.poin:
+            assert p.zona_subzone is None
+
+    def test_ketiga_poin_bawa_zona_subzone_kalau_be_kirim(self):
+        # APP-2026-8090: BE mulai kirim rdtr_subzone (mis. "P-1") — HARUS diteruskan apa adanya
+        # ke ketiga poin, dipakai app/reasoning/generator.py utk filter retrieval EXACT.
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(
+            update={"lokasi": assessment.lokasi.model_copy(update={"rdtr_subzone": "P-1"})}
+        )
+        hasil = adaptasi(assessment)
+        for p in hasil.poin:
+            assert p.zona_subzone == "P-1"
+
     def test_rekomendasi_sistem_setuju(self):
         hasil = adaptasi(_muat_assessment("l2_sample_lolos.json"))
         assert hasil.rekomendasi_sistem == "Setuju"

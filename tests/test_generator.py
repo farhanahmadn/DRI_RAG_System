@@ -203,6 +203,29 @@ class TestAmbilChunksPendukungZonaFilter:
         ambil_chunks_pendukung(poin, retriever)
         assert retriever.filters_diterima.zona_prefix is None
 
+    def test_zona_subzone_diteruskan_sbg_filter_zona_exact(self):
+        # APP-2026-8090: kalau poin.zona_subzone terisi (mis. "P-1"), filter HARUS exact `zona`
+        # (jauh lebih presisi drpd zona_prefix keluarga "P" yg tak bisa beda P-1/P-2/P-3).
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi", fakta={}, dasar_hukum=[], zona="Zona Pertanian", zona_subzone="P-1",
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.filters_diterima.zona == "P-1"
+        assert retriever.filters_diterima.zona_prefix is None  # exact & prefix tak digabung sekaligus
+
+    def test_zona_subzone_kosong_fallback_ke_zona_prefix(self):
+        # zona_subzone None (BE tak kirim/tak yakin) -> fallback ke perilaku lama (zona_prefix).
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi", fakta={}, dasar_hukum=[], zona="Zona Pertanian", zona_subzone=None,
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.filters_diterima.zona_prefix == "P"
+        assert retriever.filters_diterima.zona is None
+
 
 class TestQueryFallbackDampak:
     """Fix #5: poin dampak (dasar_hukum selalu kosong) skrng punya kata kunci fallback pendek

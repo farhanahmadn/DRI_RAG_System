@@ -33,6 +33,17 @@ class Lokasi(BaseModel):
     koordinat: Koordinat
     geojson: GeoJSONPoint
     rdtr_zone: str
+    # APP-2026-8090: field baru dari BE (permintaan sebelumnya sudah dipenuhi) — kode sub-zona
+    # presisi (mis. "P-1", "R-2"), BEDA dari `rdtr_zone` yang cuma nama zona INDUK ("Zona
+    # Pertanian"). Nullable/opsional: BE eksplisit bilang RDTR PDF vs geojson kadang tak sinkron
+    # sempurna, jadi field ini boleh kosong kalau BE tak yakin — TIDAK memaksa tebakan, retrieval
+    # tetap fallback ke filter keluarga zona (zona_prefix) kalau None (lihat app/adapter.py,
+    # app/reasoning/generator.py).
+    rdtr_subzone: str | None = None
+    # Provenance penentuan sub-zona di atas (mis. "geojson_overlay") — informational only, TIDAK
+    # dipakai logika apa pun saat ini; disimpan siapa tahu suatu saat perlu bedakan tingkat
+    # kepercayaan per-sumber.
+    rdtr_subzone_source: str | None = None
     luas_lahan_m2: float
 
 
@@ -175,10 +186,17 @@ class PoinKonteks(BaseModel):
     status: str
     fakta: dict[str, Any]
     dasar_hukum: list[DasarHukum] = []
-    # Nama zona pemohon APA ADANYA dari `assessment.lokasi.rdtr_zone` (mis. "Zona Perumahan") — BUKAN
-    # kode sub-zona presisi (back-end tak menyediakannya). Dipakai app/reasoning/generator.py utk
-    # filter KELUARGA zona saat retrieval fallback (cegah kontaminasi lintas-zona, lihat APP-2026-6191).
+    # Nama zona pemohon APA ADANYA dari `assessment.lokasi.rdtr_zone` (mis. "Zona Perumahan") — nama
+    # zona INDUK, dipakai app/reasoning/generator.py utk filter KELUARGA zona saat retrieval fallback
+    # (cegah kontaminasi lintas-zona, lihat APP-2026-6191) — TETAP dipakai sbg fallback kalau
+    # `zona_subzone` di bawah kosong.
     zona: str | None = None
+    # APP-2026-8090: kode sub-zona presisi dari `assessment.lokasi.rdtr_subzone` (mis. "P-1", "R-2")
+    # KALAU back-end kirim & yakin (bisa None — RDTR PDF vs geojson kadang tak sinkron, BE eksplisit
+    # tak mau menebak). Kalau terisi, app/reasoning/generator.py filter retrieval EXACT ke sub-zona
+    # ini (RetrievalFilters.zona) — jauh lebih presisi drpd filter keluarga (zona_prefix) yg cuma
+    # bisa menyaring "R" tanpa bisa beda R-2/R-3/R-4.
+    zona_subzone: str | None = None
 
 
 class AdapterResult(BaseModel):

@@ -45,6 +45,7 @@ def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
         },
         dasar_hukum=itbx.dasar_hukum,
         zona=assessment.lokasi.rdtr_zone,
+        zona_subzone=assessment.lokasi.rdtr_subzone,
     )
 
 
@@ -64,6 +65,7 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
             fakta={"dinilai": False},
             dasar_hukum=[],
             zona=assessment.lokasi.rdtr_zone,
+        zona_subzone=assessment.lokasi.rdtr_subzone,
         )
     return PoinKonteks(
         poin_id="intensitas",
@@ -96,6 +98,7 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
         },
         dasar_hukum=intensitas.dasar_hukum,
         zona=assessment.lokasi.rdtr_zone,
+        zona_subzone=assessment.lokasi.rdtr_subzone,
     )
 
 
@@ -127,6 +130,7 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
         },
         dasar_hukum=[],
         zona=assessment.lokasi.rdtr_zone,
+        zona_subzone=assessment.lokasi.rdtr_subzone,
     )
 
 
