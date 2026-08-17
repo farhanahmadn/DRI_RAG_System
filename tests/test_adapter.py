@@ -263,3 +263,39 @@ class TestTahapanIntensitasAbsen:
         poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
         assert poin_itbx.status == "X"
         assert hasil.rekomendasi_sistem == "Tidak Setuju"
+
+
+class TestFixtureAmplop8090:
+    """APP-2026-8090: payload real pertama dgn rdtr_subzone terisi — itbx status "I" (diizinkan,
+    tak butuh keterangan_ketentuan) + intensitas MELAMPAUI_BATAS ganda (KDB & KDH, ambang nyata
+    bukan artefak 0 spt fixture 8913 sebelumnya)."""
+
+    def test_parse_tanpa_error(self):
+        _muat_assessment("l2_sample_amplop_8090.json")
+
+    def test_zona_subzone_p1_sampai_ke_semua_poin(self):
+        assessment = _muat_assessment("l2_sample_amplop_8090.json")
+        hasil = adaptasi(assessment)
+        for p in hasil.poin:
+            assert p.zona == "Zona Pertanian"
+            assert p.zona_subzone == "P-1"
+
+    def test_intensitas_dua_parameter_melanggar(self):
+        assessment = _muat_assessment("l2_sample_amplop_8090.json")
+        hasil = adaptasi(assessment)
+        poin_intensitas = next(p for p in hasil.poin if p.poin_id == "intensitas")
+        assert poin_intensitas.status == "MELAMPAUI_BATAS"
+        assert poin_intensitas.fakta["parameter"]["kdb"]["memenuhi"] is False
+        assert poin_intensitas.fakta["parameter"]["kdh"]["memenuhi"] is False
+        assert poin_intensitas.fakta["parameter"]["klb"]["memenuhi"] is True
+        assert cek_konsistensi_intensitas(assessment) == []  # data BE konsisten kali ini
+
+    def test_itbx_status_i_tak_perlu_keterangan_ketentuan(self):
+        assessment = _muat_assessment("l2_sample_amplop_8090.json")
+        hasil = adaptasi(assessment)
+        poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
+        assert poin_itbx.status == "I"
+
+    def test_rekomendasi_sistem_setuju_bersyarat(self):
+        hasil = adaptasi(_muat_assessment("l2_sample_amplop_8090.json"))
+        assert hasil.rekomendasi_sistem == "Setuju Bersyarat"

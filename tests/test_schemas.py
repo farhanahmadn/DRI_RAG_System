@@ -28,6 +28,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
         "l2_sample_amplop_8376.json",
         "l2_sample_itbx_x_tanpa_intensitas.json",
         "l2_sample_amplop_8913.json",
+        "l2_sample_amplop_8090.json",
     ],
 )
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
@@ -97,6 +98,20 @@ class TestKontrakBackendBerubah:
         payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
         assessment = L2Assessment.model_validate(payload["data"])
         assert assessment.gate_hukum.tahapan.intensitas is not None
+
+    def test_rdtr_subzone_diterima(self):
+        # APP-2026-8090: field baru dari BE (permintaan sebelumnya) — kode sub-zona presisi.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8090.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.lokasi.rdtr_subzone == "P-1"
+        assert assessment.lokasi.rdtr_subzone_source == "geojson_overlay"
+
+    def test_rdtr_subzone_absen_tetap_none(self):
+        # Fixture lama (pra-8090) tak punya field ini sama sekali -> None, bukan error.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_lolos.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.lokasi.rdtr_subzone is None
+        assert assessment.lokasi.rdtr_subzone_source is None
 
     def test_c_coefficients_boleh_campur_label_string(self):
         # APP-2026-8913/-7012/-5397: back-end selipkan "Kelas_Atap": "<label string>" berdampingan
