@@ -164,9 +164,11 @@ class TestAmbilChunksPendukungZonaFilter:
     class _RetrieverPerekamFilter:
         def __init__(self):
             self.filters_diterima = None
+            self.query_diterima = None
 
         def search(self, query, filters, top_k=5):
             self.filters_diterima = filters
+            self.query_diterima = query
             return []
 
         def get_by_reference(self, referensi):
@@ -214,6 +216,43 @@ class TestAmbilChunksPendukungZonaFilter:
         ambil_chunks_pendukung(poin, retriever)
         assert retriever.filters_diterima.zona == "P-1"
         assert retriever.filters_diterima.zona_prefix is None  # exact & prefix tak digabung sekaligus
+
+    def test_intensitas_dgn_subzone_pakai_query_lebih_tajam(self):
+        # APP-2026-8090 (verifikasi live thd DB): query "kdb" polos kalah oleh pasal definisional
+        # umum walau filter zona sudah benar — tabel ambang Lampiran VI baru naik ke rank #1 dgn
+        # query lebih spesifik. AMAN dipakai di sini krn filter zona EXACT (bukan cuma keluarga).
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)", tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS", fakta={}, dasar_hukum=[], zona="Zona Pertanian", zona_subzone="P-1",
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.query_diterima == "ambang KDB KLB KDH maksimal minimal"
+        assert retriever.filters_diterima.zona == "P-1"
+
+    def test_intensitas_tanpa_subzone_tetap_query_generik(self):
+        # Tanpa sub-zona presisi (cuma zona_prefix keluarga), query TETAP generik "kdb" — query
+        # tajam TANPA filter exact terbukti bikin sub-zona (mis. R-2/R-3/R-4) skor berdekatan &
+        # berisiko kutip tabel sub-zona yang salah.
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)", tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS", fakta={}, dasar_hukum=[], zona="Zona Perumahan", zona_subzone=None,
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.query_diterima == "kdb"
+        assert retriever.filters_diterima.zona_prefix == "R"
+
+    def test_dampak_dgn_subzone_query_tak_berubah(self):
+        # Query lebih tajam HANYA berlaku utk poin_id="intensitas" — dampak/itbx tetap pakai
+        # _QUERY_FALLBACK_PER_POIN spt biasa, walau zona_subzone tersedia.
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi", fakta={}, dasar_hukum=[], zona="Zona Pertanian", zona_subzone="P-1",
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.query_diterima == "dampak tata guna lahan"
 
     def test_zona_subzone_kosong_fallback_ke_zona_prefix(self):
         # zona_subzone None (BE tak kirim/tak yakin) -> fallback ke perilaku lama (zona_prefix).

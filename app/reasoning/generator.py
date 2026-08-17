@@ -72,6 +72,17 @@ _QUERY_FALLBACK_PER_POIN = {
     "dampak": "dampak tata guna lahan",
 }
 
+# APP-2026-8090 (live, verifikasi manual thd DB): query "kdb" polos kalah oleh pasal definisional
+# umum (Pasal 1/44/61 — skor lebih tinggi drpd tabel ambang Lampiran VI spesifik-zona, walau
+# filter zona SUDAH benar) — tabel ambang cuma naik ke rank #1 dgn query lebih spesifik ini. TAPI
+# query ini HANYA aman dipakai kalau `zona_subzone` presisi tersedia (filter EXACT, lihat di
+# bawah) — tanpa sub-zona presisi (cuma filter KELUARGA zona_prefix), query setajam ini pernah
+# terbukti bikin beberapa sub-zona (mis. R-2/R-3/R-4) skor berdekatan & TAK BISA dibedakan —
+# berisiko percaya diri mengutip tabel sub-zona yang SALAH. Query generik `_QUERY_FALLBACK_PER_POIN`
+# di atas tetap dipakai kalau sub-zona tak diketahui (aman tapi kurang presisi, lebih baik drpd
+# presisi tapi bisa salah).
+_QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA = "ambang KDB KLB KDH maksimal minimal"
+
 # Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
 # Pasal 17 (Zona Lindung) & Pasal 23 (Zona Budi Daya), "RDTR Kawasan Sleman Tengah 2023-2043.md"
 # (data/parsed/v1/) — diverifikasi thd `data/raw/*.pdf` langsung, BUKAN ditebak. Dipakai
@@ -140,6 +151,10 @@ def ambil_chunks_pendukung(
         # PERNAH menebak sub-zona sendiri di sini.
         if poin.zona_subzone:
             filters = RetrievalFilters(zona=poin.zona_subzone)
+            if poin.poin_id == "intensitas":
+                # Query lebih tajam AMAN di sini krn filter zona sudah EXACT (bukan cuma
+                # keluarga) — lihat _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA di atas.
+                query_fallback = _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA
         else:
             filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
         chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan)
