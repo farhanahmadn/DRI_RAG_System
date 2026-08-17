@@ -1,7 +1,9 @@
+import logging
 import os
 
 import pytest
 from dotenv import load_dotenv
+from openai import RateLimitError
 
 load_dotenv()
 
@@ -13,13 +15,14 @@ def test_get_client_pakai_timeout_dan_max_retries_dari_konfigurasi(monkeypatch):
     import app.reasoning.llm_client as llm_client_module
 
     monkeypatch.setenv("GROQ_API_KEY", "fake-key-utk-test")
-    monkeypatch.setattr(llm_client_module, "_client", None)
+    monkeypatch.delenv("GROQ_API_KEYS", raising=False)
+    monkeypatch.setattr(llm_client_module, "_rotator", None)
 
     client = llm_client_module._get_client()
 
     assert client.timeout == llm_client_module._TIMEOUT_S
     assert client.max_retries == llm_client_module._MAX_RETRIES
-    # monkeypatch otomatis kembalikan _client ke nilai semula saat test ini selesai
+    # monkeypatch otomatis kembalikan _rotator ke nilai semula saat test ini selesai
 
 
 def test_get_client_default_timeout_dan_retries_masuk_akal():
@@ -29,6 +32,269 @@ def test_get_client_default_timeout_dan_retries_masuk_akal():
     # tidak selama default SDK (~10 menit) yang terlalu lama utk web request.
     assert llm_client_module._TIMEOUT_S <= 60
     assert 0 <= llm_client_module._MAX_RETRIES <= 5
+
+
+class TestMuatDaftarKunci:
+    def test_groq_api_keys_csv_diprioritaskan(self, monkeypatch):
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setenv("GROQ_API_KEYS", "kunci-a, kunci-b ,kunci-c")
+        monkeypatch.setenv("GROQ_API_KEY", "kunci-tunggal-lama")
+        assert llm_client_module._muat_daftar_kunci() == ["kunci-a", "kunci-b", "kunci-c"]
+
+    def test_fallback_ke_groq_api_key_tunggal(self, monkeypatch):
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.delenv("GROQ_API_KEYS", raising=False)
+        monkeypatch.setenv("GROQ_API_KEY", "kunci-tunggal")
+        assert llm_client_module._muat_daftar_kunci() == ["kunci-tunggal"]
+
+    def test_tak_ada_kunci_sama_sekali_return_kosong(self, monkeypatch):
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.delenv("GROQ_API_KEYS", raising=False)
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        assert llm_client_module._muat_daftar_kunci() == []
+
+    def test_groq_api_keys_kosong_fallback_ke_tunggal(self, monkeypatch):
+        # GROQ_API_KEYS="" (diset tapi kosong) -> BUKAN dianggap "ada 1 kunci kosong", fallback.
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setenv("GROQ_API_KEYS", "  ,  ")
+        monkeypatch.setenv("GROQ_API_KEY", "kunci-tunggal")
+        assert llm_client_module._muat_daftar_kunci() == ["kunci-tunggal"]
+
+
+class TestRotasiKunciGroq:
+    def test_client_aktif_index_0_di_awal(self):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        r = _RotasiKunciGroq(["kunci-1", "kunci-2"], base_url=None)
+        idx, client = r.client_aktif()
+        assert idx == 0
+        assert client.api_key == "kunci-1"
+
+    def test_rotasi_dari_pindah_ke_index_berikutnya(self):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        r = _RotasiKunciGroq(["kunci-1", "kunci-2", "kunci-3"], base_url=None)
+        idx_baru = r.rotasi_dari(0)
+        assert idx_baru == 1
+        idx, client = r.client_aktif()
+        assert idx == 1
+        assert client.api_key == "kunci-2"
+
+    def test_rotasi_muter_balik_ke_awal_setelah_kunci_terakhir(self):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        r = _RotasiKunciGroq(["kunci-1", "kunci-2"], base_url=None)
+        r.rotasi_dari(0)  # -> index 1
+        idx_baru = r.rotasi_dari(1)  # -> muter balik ke 0
+        assert idx_baru == 0
+
+    def test_rotasi_dari_idx_basi_tak_dobel_rotasi(self):
+        # Simulasi 2 thread gagal bersamaan di index yang sama: thread A rotasi duluan (0->1),
+        # thread B panggil rotasi_dari(0) juga (idx_lama basi, sudah bukan index aktif) -> TIDAK
+        # boleh merotasi lagi jadi 2 (harus tetap 1, insiden yang sama jangan dihitung 2x).
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        r = _RotasiKunciGroq(["kunci-1", "kunci-2", "kunci-3"], base_url=None)
+        assert r.rotasi_dari(0) == 1  # thread A
+        assert r.rotasi_dari(0) == 1  # thread B, idx_lama basi -> no-op, tetap 1
+
+    def test_tanpa_kunci_raise(self):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+            _RotasiKunciGroq([], base_url=None)
+
+    def test_client_di_cache_bukan_dibangun_ulang(self):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        r = _RotasiKunciGroq(["kunci-1"], base_url=None)
+        _, client_a = r.client_aktif()
+        _, client_b = r.client_aktif()
+        assert client_a is client_b
+
+
+class TestKlasifikasiRateLimit:
+    def test_per_hari_tpd(self):
+        from app.reasoning.llm_client import _klasifikasi_rate_limit
+
+        pesan = "Rate limit reached ... on tokens per day (TPD): Limit 200000, Used 199992..."
+        assert _klasifikasi_rate_limit(pesan) == "tpd"
+
+    def test_per_menit_tpm(self):
+        from app.reasoning.llm_client import _klasifikasi_rate_limit
+
+        pesan = "Rate limit reached ... on tokens per minute (TPM): Limit 8000, Used 6990..."
+        assert _klasifikasi_rate_limit(pesan) == "tpm"
+
+    def test_per_menit_rpm(self):
+        from app.reasoning.llm_client import _klasifikasi_rate_limit
+
+        pesan = "Rate limit reached ... on requests per minute (RPM): Limit 30..."
+        assert _klasifikasi_rate_limit(pesan) == "tpm"
+
+    def test_format_tak_dikenal_dianggap_tpm_lebih_aman(self):
+        from app.reasoning.llm_client import _klasifikasi_rate_limit
+
+        assert _klasifikasi_rate_limit("pesan aneh yang tak sesuai format apapun") == "tak_diketahui"
+
+
+class TestEkstrakTungguDetik:
+    def test_ekstrak_angka_dari_pesan(self):
+        from app.reasoning.llm_client import _ekstrak_tunggu_detik
+
+        pesan = "... Please try again in 34.019999999s. Need more tokens?..."
+        assert _ekstrak_tunggu_detik(pesan) == pytest.approx(34.02, abs=0.01)
+
+    def test_dibatasi_tunggu_maks(self):
+        from app.reasoning.llm_client import _ekstrak_tunggu_detik, _TUNGGU_MAKS_S
+
+        pesan = "... Please try again in 99999s. ..."
+        assert _ekstrak_tunggu_detik(pesan) == _TUNGGU_MAKS_S
+
+    def test_tak_ada_angka_pakai_default(self):
+        from app.reasoning.llm_client import _ekstrak_tunggu_detik, _TUNGGU_DEFAULT_S
+
+        assert _ekstrak_tunggu_detik("pesan tanpa saran waktu sama sekali") == _TUNGGU_DEFAULT_S
+
+
+class TestGenerateRotasiSaatRateLimit:
+    """Simulasi RateLimitError dari client Groq via monkeypatch — TIDAK memanggil Groq nyata."""
+
+    @staticmethod
+    def _buat_rate_limit_error(pesan: str) -> RateLimitError:
+        import httpx
+
+        request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+        response = httpx.Response(429, request=request, json={"error": {"message": pesan}})
+        return RateLimitError(message=pesan, response=response, body=None)
+
+    def test_tpd_rotasi_kunci_lalu_sukses(self, monkeypatch, caplog):
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setattr(llm_client_module, "_rotator", None)
+        monkeypatch.setenv("GROQ_API_KEYS", "kunci-1,kunci-2")
+        monkeypatch.setenv("LLM_MODEL", "model-tes")
+        monkeypatch.setattr(llm_client_module.time, "sleep", lambda s: None)  # jangan benar2 tidur
+
+        panggilan = {"n": 0, "kunci_dipakai": []}
+
+        def _stub_panggil(client, messages, json_schema, schema_name, temperature, max_tokens):
+            panggilan["n"] += 1
+            panggilan["kunci_dipakai"].append(client.api_key)
+            if panggilan["n"] == 1:
+                raise self._buat_rate_limit_error(
+                    "Rate limit reached for model x on tokens per day (TPD): Limit 200000, Used 199992"
+                )
+
+            class _Msg:
+                content = '{"ok": true}'
+
+            class _Choice:
+                message = _Msg()
+
+            class _Completion:
+                choices = [_Choice()]
+
+            return _Completion()
+
+        monkeypatch.setattr(llm_client_module, "_panggil_llm_sekali", _stub_panggil)
+
+        with caplog.at_level(logging.WARNING, logger="app.reasoning.llm_client"):
+            hasil = llm_client_module.generate("prompt", {"type": "object"}, schema_name="tes")
+
+        assert hasil == {"ok": True}
+        assert panggilan["n"] == 2
+        assert panggilan["kunci_dipakai"] == ["kunci-1", "kunci-2"]  # rotasi beneran pindah kunci
+        assert "Rotasi GROQ_API_KEY" in caplog.text
+
+    def test_tpm_tunggu_lalu_ulang_kunci_sama(self, monkeypatch):
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setattr(llm_client_module, "_rotator", None)
+        monkeypatch.setenv("GROQ_API_KEYS", "kunci-1,kunci-2")
+        monkeypatch.setenv("LLM_MODEL", "model-tes")
+
+        tidur_dipanggil = {"detik": []}
+        monkeypatch.setattr(llm_client_module.time, "sleep", lambda s: tidur_dipanggil["detik"].append(s))
+
+        panggilan = {"n": 0, "kunci_dipakai": []}
+
+        def _stub_panggil(client, messages, json_schema, schema_name, temperature, max_tokens):
+            panggilan["n"] += 1
+            panggilan["kunci_dipakai"].append(client.api_key)
+            if panggilan["n"] == 1:
+                raise self._buat_rate_limit_error(
+                    "Rate limit reached for model x on tokens per minute (TPM): Limit 8000, Used 6990. "
+                    "Please try again in 1.5s."
+                )
+
+            class _Msg:
+                content = '{"ok": true}'
+
+            class _Choice:
+                message = _Msg()
+
+            class _Completion:
+                choices = [_Choice()]
+
+            return _Completion()
+
+        monkeypatch.setattr(llm_client_module, "_panggil_llm_sekali", _stub_panggil)
+
+        hasil = llm_client_module.generate("prompt", {"type": "object"}, schema_name="tes")
+
+        assert hasil == {"ok": True}
+        assert panggilan["n"] == 2
+        # TPM -> kunci SAMA diulang, BUKAN rotasi ke kunci-2.
+        assert panggilan["kunci_dipakai"] == ["kunci-1", "kunci-1"]
+        assert tidur_dipanggil["detik"] == [pytest.approx(1.5, abs=0.01)]
+
+    def test_tpd_semua_kunci_habis_raise(self, monkeypatch):
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setattr(llm_client_module, "_rotator", None)
+        monkeypatch.setenv("GROQ_API_KEYS", "kunci-1,kunci-2")
+        monkeypatch.setenv("LLM_MODEL", "model-tes")
+        monkeypatch.setattr(llm_client_module.time, "sleep", lambda s: None)
+
+        def _stub_selalu_gagal(client, messages, json_schema, schema_name, temperature, max_tokens):
+            raise self._buat_rate_limit_error(
+                "Rate limit reached for model x on tokens per day (TPD): Limit 200000, Used 200000"
+            )
+
+        monkeypatch.setattr(llm_client_module, "_panggil_llm_sekali", _stub_selalu_gagal)
+
+        with pytest.raises(RateLimitError):
+            llm_client_module.generate("prompt", {"type": "object"}, schema_name="tes")
+
+    def test_kunci_tunggal_tpd_langsung_raise_tanpa_loop_tak_terbatas(self, monkeypatch):
+        # Kasus paling umum sekarang (1 kunci di .env) — HARUS tetap gagal cepat spt perilaku lama,
+        # bukan berputar tanpa henti mencoba "rotasi" ke kunci yang sama.
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setattr(llm_client_module, "_rotator", None)
+        monkeypatch.delenv("GROQ_API_KEYS", raising=False)
+        monkeypatch.setenv("GROQ_API_KEY", "kunci-satu-satunya")
+        monkeypatch.setenv("LLM_MODEL", "model-tes")
+        monkeypatch.setattr(llm_client_module.time, "sleep", lambda s: None)
+
+        panggilan = {"n": 0}
+
+        def _stub_selalu_gagal(client, messages, json_schema, schema_name, temperature, max_tokens):
+            panggilan["n"] += 1
+            raise self._buat_rate_limit_error(
+                "Rate limit reached for model x on tokens per day (TPD): Limit 200000, Used 200000"
+            )
+
+        monkeypatch.setattr(llm_client_module, "_panggil_llm_sekali", _stub_selalu_gagal)
+
+        with pytest.raises(RateLimitError):
+            llm_client_module.generate("prompt", {"type": "object"}, schema_name="tes")
+        assert panggilan["n"] == 1  # 1 kunci -> 1 percobaan, langsung menyerah
 
 
 @pytest.mark.live
