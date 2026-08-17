@@ -1,6 +1,9 @@
 import pytest
 
 from app.reasoning.calculator import (
+    bangun_langkah_konkret_dampak,
+    bangun_langkah_konkret_intensitas,
+    format_target_parameter,
     hitung_target_intensitas,
     hitung_target_kdb,
     hitung_target_kdh,
@@ -264,3 +267,81 @@ class TestPilihTargetMitigasiDampak:
 
     def test_dict_kosong_return_none(self):
         assert pilih_target_mitigasi_dampak({}) is None
+
+
+class TestFormatTargetParameter:
+    def test_kdb(self):
+        hasil = format_target_parameter({"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0})
+        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan) → luas lantai dasar bangunan maksimal 510.0 m²"
+
+    def test_kdb_tanpa_footprint_m2(self):
+        hasil = format_target_parameter({"target_kdb": 60.0, "selisih": 10.0})
+        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan)"
+
+    def test_klb(self):
+        hasil = format_target_parameter({"target_klb": 1.8, "selisih": 0.2, "luas_lantai_maks_m2": 900.0})
+        assert "KLB harus turun ke maksimal 1.8" in hasil
+        assert "luas total lantai bangunan maksimal 900.0 m²" in hasil
+
+    def test_kdh_tanpa_rth_kurang(self):
+        hasil = format_target_parameter({"target_kdh": 30.0, "selisih": 5.0, "rth_dibutuhkan_m2": 255.0})
+        assert "KDH harus naik ke minimal 30.0%" in hasil
+        assert "kurang" not in hasil.split("RTH dibutuhkan")[1]  # tak ada klausa "masih kurang"
+
+    def test_bentuk_tak_dikenal_fallback_str(self):
+        assert format_target_parameter({"aneh": 1}) == "{'aneh': 1}"
+
+
+class TestBangunLangkahKonkretIntensitas:
+    def test_satu_parameter_melanggar(self):
+        parameter = {"kdb": {"usulan": 40.0, "satuan": "persen"}}
+        target_map = {"kdb": {"target_kdb": 10.0, "selisih": 30.0, "footprint_maks_m2": 85.0}}
+        hasil = bangun_langkah_konkret_intensitas(parameter, target_map)
+        assert len(hasil) == 1
+        assert hasil[0]["parameter"] == "KDB"
+        assert hasil[0]["nilai_saat_ini"] == 40.0
+        assert hasil[0]["nilai_target"] == 10.0
+        assert hasil[0]["satuan"] == "persen"
+        assert "luas lantai dasar bangunan maksimal 85.0" in hasil[0]["deskripsi"]
+
+    def test_dua_parameter_melanggar_sekaligus(self):
+        # APP-2026-8090 (live nyata): KDB & KDH melanggar BERSAMAAN — RekomendasiOutput.target
+        # (pilih_target_utama_intensitas) cuma bisa kasih 1 representatif, langkah_konkret HARUS
+        # kasih keduanya, bukan cuma yang pertama.
+        parameter = {
+            "kdb": {"usulan": 40.0, "satuan": "persen"},
+            "kdh": {"usulan": 29.4, "satuan": "persen"},
+        }
+        target_map = {
+            "kdb": {"target_kdb": 10.0, "selisih": 30.0},
+            "kdh": {"target_kdh": 88.0, "selisih": 58.6},
+        }
+        hasil = bangun_langkah_konkret_intensitas(parameter, target_map)
+        assert len(hasil) == 2
+        assert {h["parameter"] for h in hasil} == {"KDB", "KDH"}
+
+    def test_target_map_kosong_return_kosong(self):
+        assert bangun_langkah_konkret_intensitas({"kdb": {"usulan": 40.0}}, {}) == []
+
+    def test_nilai_target_nol_tetap_muncul_bukan_dianggap_kosong(self):
+        # Regresi APP-2026-8913: ambang_maks=0 (bug data BE) -> target_kdb=0 — nilai 0 itu FALSY
+        # di Python, JANGAN sampai `or`-chain bikin nilai_target salah jadi None.
+        parameter = {"kdb": {"usulan": 40.0, "satuan": "persen"}}
+        target_map = {"kdb": {"target_kdb": 0.0, "selisih": 40.0}}
+        hasil = bangun_langkah_konkret_intensitas(parameter, target_map)
+        assert hasil[0]["nilai_target"] == 0.0
+
+
+class TestBangunLangkahKonkretDampak:
+    def test_ada_target_mitigasi(self):
+        target_mitigasi = {"runoff_change_index_maks": 1.5, "index_saat_ini": 2.8, "kategori_target": "Sedang"}
+        hasil = bangun_langkah_konkret_dampak(target_mitigasi)
+        assert len(hasil) == 1
+        assert hasil[0]["parameter"] == "runoff_change_index"
+        assert hasil[0]["nilai_saat_ini"] == 2.8
+        assert hasil[0]["nilai_target"] == 1.5
+        assert "Sedang" in hasil[0]["deskripsi"]
+
+    def test_target_mitigasi_kosong_return_kosong(self):
+        assert bangun_langkah_konkret_dampak({}) == []
+        assert bangun_langkah_konkret_dampak({"perlu_mitigasi": False, "arah": []}) == []

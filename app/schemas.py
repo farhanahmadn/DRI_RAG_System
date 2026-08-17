@@ -218,11 +218,33 @@ class SitasiOutput(BaseModel):
     terverifikasi: bool
 
 
+class LangkahKonkretOutput(BaseModel):
+    """Satu item aksi konkret, dirakit DETERMINISTIK dari app/reasoning/calculator.py — BUKAN
+    ditulis LLM. Field ADDITIF di RekomendasiOutput (BUKAN pengganti `saran`, yang tetap narasi
+    bebas LLM) — dibuat supaya reviewer/FE dapat checklist presisi angka yang tak bergantung pada
+    kualitas narasi model manapun yang sedang dipakai (lihat diskusi kualitas saran, 2026-08-17/18).
+
+    BEDA dari `RekomendasiOutput.target` (SATU angka representatif, ambil parameter pertama yang
+    melanggar kalau lebih dari satu — lihat calculator.py::pilih_target_utama_intensitas):
+    `langkah_konkret` memuat SEMUA parameter yang melanggar sekaligus (mis. KDB & KDH berbarengan),
+    bukan cuma satu representatif.
+    """
+    parameter: str
+    deskripsi: str
+    nilai_saat_ini: float | None = None
+    nilai_target: float | None = None
+    satuan: str | None = None
+
+
 class RekomendasiOutput(BaseModel):
     tipe: Literal["kategorikal", "numerik", "numerik-mitigasi"]
     target: float | str | None = None
     saran: str
     disclaimer: str | None = None
+    # Additive (2026-08-18) — list kosong = tak ada aksi konkret (poin aman/Tidak Dinilai/
+    # kategorikal tanpa target numerik). TIDAK PERNAH kosong-krn-null vs kosong-krn-tak-ada-aksi
+    # ambigu: keduanya direpresentasikan sbg [] (list kosong), bukan None.
+    langkah_konkret: list[LangkahKonkretOutput] = []
 
 
 class PoinOutput(BaseModel):

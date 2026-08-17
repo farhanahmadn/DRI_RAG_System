@@ -188,3 +188,89 @@ def pilih_target_mitigasi_dampak(target_mitigasi: dict) -> float | None:
     """Satu angka representatif dari `hitung_target_mitigasi_dampak()` utk `RekomendasiOutput.target`
     — pola sama seperti `pilih_target_utama_intensitas`."""
     return target_mitigasi.get("runoff_change_index_maks")
+
+
+# ---------------------------------------------------------------------------
+# Presentasi target intensitas/mitigasi — kalimat siap-kutip + langkah_konkret terstruktur
+# (RekomendasiOutput.langkah_konkret, schemas.py, additive 2026-08-18).
+# ---------------------------------------------------------------------------
+
+
+def format_target_parameter(info: dict) -> str:
+    """Ubah dict target mentah dari `hitung_target_kdb/klb/kdh` di atas (mis. {'target_kdb': 10,
+    'selisih': 30, 'footprint_maks_m2': 85.0}) jadi SATU kalimat siap-kutip, BUKAN dict Python
+    mentah. Dipakai app/reasoning/prompts.py (fakta ke LLM) & bangun_langkah_konkret_intensitas
+    di bawah (field terstruktur) — satu sumber kebenaran teks, tak digandakan di dua tempat.
+
+    Kenapa kalimat, bukan dict mentah: LLM jauh lebih mudah menyalin kalimat lengkap drpd
+    mem-parse repr dict & memilih field yang relevan sendiri — dict mentah terbukti live bikin LLM
+    cenderung cuma sebut angka ambang persen (mis. "KDB harus 10%"), jarang angka fisik m² yang
+    justru paling actionable buat reviewer (lihat SYSTEM_PROMPT aturan #11, prompts.py).
+    """
+    if "target_kdb" in info:
+        kalimat = f"KDB harus turun ke maksimal {info['target_kdb']}% (selisih {info['selisih']} poin dari usulan)"
+        if "footprint_maks_m2" in info:
+            kalimat += f" → luas lantai dasar bangunan maksimal {info['footprint_maks_m2']:.1f} m²"
+        return kalimat
+    if "target_klb" in info:
+        kalimat = f"KLB harus turun ke maksimal {info['target_klb']} (selisih {info['selisih']} dari usulan)"
+        if "luas_lantai_maks_m2" in info:
+            kalimat += f" → luas total lantai bangunan maksimal {info['luas_lantai_maks_m2']:.1f} m²"
+        return kalimat
+    if "target_kdh" in info:
+        kalimat = f"KDH harus naik ke minimal {info['target_kdh']}% (kurang {info['selisih']} poin dari usulan)"
+        if "rth_dibutuhkan_m2" in info:
+            kalimat += f" → RTH dibutuhkan minimal {info['rth_dibutuhkan_m2']:.1f} m²"
+        if info.get("rth_kurang_m2"):
+            kalimat += f" (RTH yang sudah diusulkan pemohon masih kurang {info['rth_kurang_m2']:.1f} m²)"
+        return kalimat
+    # Jaring pengaman — harusnya tak pernah kena selama fungsi hitung_target_* di atas konsisten
+    # dgn 3 bentuk di atas (target_kdb/target_klb/target_kdh), tapi jangan diam-diam sembunyikan
+    # data kalau meleset.
+    return str(info)
+
+
+def _nilai_target_dari_info(info: dict) -> float | None:
+    for kunci in ("target_kdb", "target_klb", "target_kdh"):
+        if kunci in info:
+            return info[kunci]
+    return None
+
+
+def bangun_langkah_konkret_intensitas(parameter: dict, target_map: dict) -> list[dict]:
+    """Daftar SEMUA parameter intensitas yang melanggar (bukan cuma 1 representatif spt
+    `pilih_target_utama_intensitas`) — dirakit deterministik, siap jadi
+    `RekomendasiOutput.langkah_konkret` (schemas.py). `parameter`/`target_map` di sini SUDAH dict
+    biasa (bukan objek Pydantic `ParameterIntensitas`) — bentuk yang sama seperti `poin.fakta`
+    (app/adapter.py sudah meng-konversi sebelum masuk PoinKonteks).
+    """
+    langkah: list[dict] = []
+    for nama, info in target_map.items():
+        p = parameter.get(nama) or {}
+        langkah.append({
+            "parameter": nama.upper(),
+            "deskripsi": format_target_parameter(info),
+            "nilai_saat_ini": p.get("usulan"),
+            "nilai_target": _nilai_target_dari_info(info),
+            "satuan": p.get("satuan"),
+        })
+    return langkah
+
+
+def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:
+    """Satu item langkah_konkret utk mitigasi dampak (runoff_change_index) — kosong kalau tak ada
+    target (poin aman/kategori tak bersyarat, lihat `hitung_target_mitigasi_dampak` di atas)."""
+    if not target_mitigasi or "runoff_change_index_maks" not in target_mitigasi:
+        return []
+    ambang = target_mitigasi["runoff_change_index_maks"]
+    return [{
+        "parameter": "runoff_change_index",
+        "deskripsi": (
+            f"Indikator limpasan air (runoff) perlu ditekan hingga di bawah {ambang} (saat ini "
+            f"{target_mitigasi.get('index_saat_ini')}) supaya kategori dampak turun ke "
+            f"{target_mitigasi.get('kategori_target')}."
+        ),
+        "nilai_saat_ini": target_mitigasi.get("index_saat_ini"),
+        "nilai_target": ambang,
+        "satuan": None,
+    }]

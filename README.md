@@ -51,7 +51,12 @@ Untuk **setiap poin**, alurnya:
    ditemukan dirangkai jadi prompt. LLM **tidak** diberi data mentah permohonan (nama/NIK/koordinat
    presisi disaring `app/sanitize.py` sebelum ini — lihat [§ Keamanan Data](#-keamanan--privasi-data)).
 3. **Panggil LLM** (Groq, `temperature=0` percobaan pertama) — hasilkan `reasoning_pendek`,
-   `reasoning_panjang`, `sitasi[]`, `saran`, `disclaimer` (JSON schema-constrained).
+   `reasoning_panjang`, `sitasi[]`, `saran`, `disclaimer` (JSON schema-constrained). Di luar LLM,
+   `rekomendasi.langkah_konkret[]` (additive, 2026-08-18) dirakit **deterministik** langsung dari
+   `app/reasoning/calculator.py` — daftar SEMUA parameter yang melanggar sekaligus (mis. KDB & KDH
+   berbarengan) dgn `{parameter, deskripsi, nilai_saat_ini, nilai_target, satuan}` per item; beda
+   dari `target` (satu angka representatif saja). Checklist presisi yang tak bergantung pada narasi
+   LLM manapun yang sedang dipakai.
 4. **Guardrail memvalidasi** — 6+ cek deterministik: sitasi harus ada di daftar yang diberikan
    (bukan karangan), angka di narasi harus terlacak ke fakta sumber, verdict tidak boleh
    kontradiktif, skor dampak (invers) tidak boleh disalahtafsirkan, dst. Gagal → **retry** dengan

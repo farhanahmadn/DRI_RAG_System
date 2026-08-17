@@ -8,6 +8,7 @@ membungkusnya jadi Bahasa Indonesia yang jelas. LLM TIDAK PERNAH menyimpulkan ve
 import re
 
 from app import sanitize
+from app.reasoning.calculator import format_target_parameter
 from app.retrieval.base import Chunk
 from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput
 
@@ -155,38 +156,6 @@ def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
     return lines
 
 
-def _format_target_parameter(info: dict) -> str:
-    """Ubah dict target mentah dari app/reasoning/calculator.py (mis. {'target_kdb': 10,
-    'selisih': 30, 'footprint_maks_m2': 85.0}) jadi SATU kalimat siap-kutip, BUKAN dict Python
-    mentah (repr dict spt sebelumnya: '[TARGET PATUH: {'target_kdb': 10, ...}]').
-
-    Kenapa: LLM jauh lebih mudah menyalin kalimat lengkap drpd mem-parse repr dict & memilih field
-    mana yang relevan sendiri — dict mentah terbukti bikin LLM cenderung cuma sebut angka ambang
-    persen (mis. "KDB harus 10%"), jarang angka fisik m² (footprint_maks_m2/rth_kurang_m2) yang
-    justru PALING actionable buat reviewer (lihat SYSTEM_PROMPT aturan #11 di bawah, sekarang
-    eksplisit mewajibkan angka m² kalau tersedia)."""
-    if "target_kdb" in info:
-        kalimat = f"KDB harus turun ke maksimal {info['target_kdb']}% (selisih {info['selisih']} poin dari usulan)"
-        if "footprint_maks_m2" in info:
-            kalimat += f" → luas lantai dasar bangunan maksimal {info['footprint_maks_m2']:.1f} m²"
-        return kalimat
-    if "target_klb" in info:
-        kalimat = f"KLB harus turun ke maksimal {info['target_klb']} (selisih {info['selisih']} dari usulan)"
-        if "luas_lantai_maks_m2" in info:
-            kalimat += f" → luas total lantai bangunan maksimal {info['luas_lantai_maks_m2']:.1f} m²"
-        return kalimat
-    if "target_kdh" in info:
-        kalimat = f"KDH harus naik ke minimal {info['target_kdh']}% (kurang {info['selisih']} poin dari usulan)"
-        if "rth_dibutuhkan_m2" in info:
-            kalimat += f" → RTH dibutuhkan minimal {info['rth_dibutuhkan_m2']:.1f} m²"
-        if info.get("rth_kurang_m2"):
-            kalimat += f" (RTH yang sudah diusulkan pemohon masih kurang {info['rth_kurang_m2']:.1f} m²)"
-        return kalimat
-    # Jaring pengaman — harusnya tak pernah kena selama calculator.py konsisten dgn 3 bentuk di
-    # atas (target_kdb/target_klb/target_kdh), tapi jangan diam-diam sembunyikan data kalau meleset.
-    return str(info)
-
-
 def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
     # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
     # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
@@ -202,7 +171,7 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
             f"memenuhi={param['memenuhi']}"
         )
         if nama in target_map:
-            baris += f"  [TARGET PATUH: {_format_target_parameter(target_map[nama])}]"
+            baris += f"  [TARGET PATUH: {format_target_parameter(target_map[nama])}]"
         lines.append(baris)
 
     if fakta.get("luas_tapak_m2") is not None:

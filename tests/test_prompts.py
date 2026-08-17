@@ -253,37 +253,9 @@ class TestFaktaIntensitas:
         assert "masih kurang 45.0 m²" in prompt
 
 
-class TestFormatTargetParameter:
-    def test_kdb(self):
-        from app.reasoning.prompts import _format_target_parameter
-
-        hasil = _format_target_parameter({"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0})
-        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan) → luas lantai dasar bangunan maksimal 510.0 m²"
-
-    def test_kdb_tanpa_footprint_m2(self):
-        from app.reasoning.prompts import _format_target_parameter
-
-        hasil = _format_target_parameter({"target_kdb": 60.0, "selisih": 10.0})
-        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan)"
-
-    def test_klb(self):
-        from app.reasoning.prompts import _format_target_parameter
-
-        hasil = _format_target_parameter({"target_klb": 1.8, "selisih": 0.2, "luas_lantai_maks_m2": 900.0})
-        assert "KLB harus turun ke maksimal 1.8" in hasil
-        assert "luas total lantai bangunan maksimal 900.0 m²" in hasil
-
-    def test_kdh_tanpa_rth_kurang(self):
-        from app.reasoning.prompts import _format_target_parameter
-
-        hasil = _format_target_parameter({"target_kdh": 30.0, "selisih": 5.0, "rth_dibutuhkan_m2": 255.0})
-        assert "KDH harus naik ke minimal 30.0%" in hasil
-        assert "kurang" not in hasil.split("RTH dibutuhkan")[1]  # tak ada klausa "masih kurang"
-
-    def test_bentuk_tak_dikenal_fallback_str(self):
-        from app.reasoning.prompts import _format_target_parameter
-
-        assert _format_target_parameter({"aneh": 1}) == "{'aneh': 1}"
+# TestFormatTargetParameter dipindah ke tests/test_calculator.py — format_target_parameter() kini
+# tinggal di app/reasoning/calculator.py (satu sumber kebenaran teks, dipakai prompts.py & juga
+# bangun_langkah_konkret_intensitas/dampak, bukan digandakan di sini).
 
 
 class TestFaktaDampak:

@@ -19,7 +19,7 @@ from app.reasoning.guardrail import (
 )
 from app.retrieval.base import Chunk
 from app.retrieval.mock import MockRetriever
-from app.schemas import L2Assessment, MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
+from app.schemas import L2Assessment, LangkahKonkretOutput, MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -763,6 +763,7 @@ class TestPerbaikiPoin:
         )
         poin_bersih, _ = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
         assert poin_bersih.rekomendasi.target is None
+        assert poin_bersih.rekomendasi.langkah_konkret == []  # sama gerbangnya dgn target di atas
 
     def test_poin_tidak_aman_target_tetap_dihitung(self):
         # Kontrol negatif — poin BENAR-BENAR butuh mitigasi tetap dapat target (bukan disable total).
@@ -778,6 +779,9 @@ class TestPerbaikiPoin:
                               rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Turunkan KDB."))
         poin_bersih, _ = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
         assert poin_bersih.rekomendasi.target == 2.5
+        assert len(poin_bersih.rekomendasi.langkah_konkret) == 1
+        assert poin_bersih.rekomendasi.langkah_konkret[0].parameter == "runoff_change_index"
+        assert isinstance(poin_bersih.rekomendasi.langkah_konkret[0], LangkahKonkretOutput)  # bukan dict mentah
 
 
 class TestGeneratePoinDenganGuardrail:

@@ -24,11 +24,16 @@ import logging
 import re
 
 from app.adapter import cek_konsistensi_intensitas
-from app.reasoning.calculator import pilih_target_mitigasi_dampak, pilih_target_utama_intensitas
+from app.reasoning.calculator import (
+    bangun_langkah_konkret_dampak,
+    bangun_langkah_konkret_intensitas,
+    pilih_target_mitigasi_dampak,
+    pilih_target_utama_intensitas,
+)
 from app.reasoning.generator import ambil_chunks_pendukung, apakah_aman, generate_poin
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk, Retriever
-from app.schemas import L2Assessment, PoinKonteks, PoinOutput
+from app.schemas import L2Assessment, LangkahKonkretOutput, PoinKonteks, PoinOutput
 
 logger = logging.getLogger(__name__)
 
@@ -478,18 +483,35 @@ def perbaiki_poin(
     # kriteria berbeda, mis. dampak "Sedang" -> aman=True tapi kalkulator tetap kasih angka ->
     # target bocor kontradiktif dgn saran "tidak perlu tindakan").
     target = None
+    # langkah_konkret ikut gerbang yang SAMA persis dgn target di atas (alasan sama: aman/Tidak
+    # Dinilai -> tak ada aksi konkret, jangan sampai kalkulator tetap kasih daftar item yg
+    # kontradiktif dgn saran "tidak perlu tindakan").
+    langkah_konkret: list[dict] = []
     if not apakah_aman(poin):
         if poin.tipe_rekomendasi == "numerik":
             target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+            langkah_konkret = bangun_langkah_konkret_intensitas(
+                poin.fakta.get("parameter") or {}, poin.fakta.get("target") or {}
+            )
         elif poin.tipe_rekomendasi == "numerik-mitigasi":
             target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
+            langkah_konkret = bangun_langkah_konkret_dampak(poin.fakta.get("target_mitigasi") or {})
 
     poin_bersih = poin_output.model_copy(
         update={
             "status": poin.status,
             "sitasi": sitasi_bersih,
             "rekomendasi": poin_output.rekomendasi.model_copy(
-                update={"tipe": poin.tipe_rekomendasi, "target": target}
+                update={
+                    "tipe": poin.tipe_rekomendasi,
+                    "target": target,
+                    # model_copy() TIDAK memvalidasi field yg di-update (beda dari konstruktor
+                    # biasa) — konversi eksplisit ke LangkahKonkretOutput di sini, JANGAN kirim
+                    # list[dict] mentah (akan lolos type checker statis tapi runtime jadi dict,
+                    # bukan objek — ditemukan & diperbaiki saat implementasi, verifikasi empiris
+                    # via python -c langsung sebelum wiring ini).
+                    "langkah_konkret": [LangkahKonkretOutput(**item) for item in langkah_konkret],
+                }
             ),
         }
     )

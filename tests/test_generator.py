@@ -306,6 +306,69 @@ def test_generate_poin_aman_tetap_panggil_llm_untuk_reasoning_dan_sitasi(monkeyp
     assert hasil.sitasi[0].citation_id == "anchor-0"
 
 
+def test_generate_poin_intensitas_langkah_konkret_semua_parameter_melanggar(monkeypatch):
+    # APP-2026-8090 (live nyata): KDB & KDH melanggar BERSAMAAN — langkah_konkret HARUS kasih
+    # keduanya (beda dari `target`, yg cuma 1 angka representatif).
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x", "reasoning_panjang": "x", "sitasi": [],
+            "saran": "1. Sesuaikan KDB.\n2. Sesuaikan KDH.", "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="intensitas",
+        kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+        tipe_rekomendasi="numerik",
+        status="MELAMPAUI_BATAS",
+        fakta={
+            "parameter": {
+                "kdb": {"usulan": 40, "ambang_maks": 10, "ambang_min": None, "memenuhi": False, "satuan": "persen"},
+                "kdh": {"usulan": 29.4, "ambang_maks": None, "ambang_min": 88, "memenuhi": False, "satuan": "persen"},
+            },
+            "target": {
+                "kdb": {"target_kdb": 10.0, "selisih": 30.0, "footprint_maks_m2": 85.0},
+                "kdh": {"target_kdh": 88.0, "selisih": 58.6, "rth_dibutuhkan_m2": 748.0},
+            },
+        },
+    )
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert len(hasil.rekomendasi.langkah_konkret) == 2
+    parameter_terlihat = {l.parameter for l in hasil.rekomendasi.langkah_konkret}
+    assert parameter_terlihat == {"KDB", "KDH"}
+    kdb_item = next(l for l in hasil.rekomendasi.langkah_konkret if l.parameter == "KDB")
+    assert kdb_item.nilai_saat_ini == 40
+    assert kdb_item.nilai_target == 10.0
+    assert "85.0" in kdb_item.deskripsi
+
+
+def test_generate_poin_dampak_langkah_konkret_dari_target_mitigasi(monkeypatch):
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "x", "reasoning_panjang": "x", "sitasi": [],
+            "saran": "1. Turunkan indikator limpasan.", "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+        status="Tinggi",
+        fakta={
+            "dinilai": True,
+            "mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]},
+            "target_mitigasi": {"runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.85},
+        },
+    )
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert len(hasil.rekomendasi.langkah_konkret) == 1
+    assert hasil.rekomendasi.langkah_konkret[0].parameter == "runoff_change_index"
+    assert hasil.rekomendasi.langkah_konkret[0].nilai_target == 2.5
+
+
 def test_generate_poin_aman_saran_dan_target_tetap_ditemplate(monkeypatch):
     def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
         return {
@@ -334,6 +397,7 @@ def test_generate_poin_aman_saran_dan_target_tetap_ditemplate(monkeypatch):
 
     assert hasil.rekomendasi.saran == _SARAN_AMAN
     assert hasil.rekomendasi.target is None
+    assert hasil.rekomendasi.langkah_konkret == []
     assert hasil.low_confidence is False
 
 

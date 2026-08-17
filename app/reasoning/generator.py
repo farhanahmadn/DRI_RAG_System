@@ -7,7 +7,12 @@ diretrieve — bukan dipercaya dari output LLM. citation_id yang tidak dikenal (
 """
 
 from app.reasoning import llm_client
-from app.reasoning.calculator import pilih_target_mitigasi_dampak, pilih_target_utama_intensitas
+from app.reasoning.calculator import (
+    bangun_langkah_konkret_dampak,
+    bangun_langkah_konkret_intensitas,
+    pilih_target_mitigasi_dampak,
+    pilih_target_utama_intensitas,
+)
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.retrieval.base import Chunk, RetrievalFilters, Retriever
 from app.schemas import MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
@@ -224,21 +229,32 @@ def generate_poin(
         )
 
     target: float | str | None = None
+    # langkah_konkret (additive, 2026-08-18): SEMUA parameter yang melanggar sekaligus, dirakit
+    # deterministik dari calculator.py — beda dari `target` di atas (cuma 1 angka representatif,
+    # lihat pilih_target_utama_intensitas). Field tambahan di RekomendasiOutput, tak mengubah
+    # `target`/`saran` yang sudah ada.
+    langkah_konkret: list[dict] = []
     if poin.tipe_rekomendasi == "numerik":
         target = pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+        langkah_konkret = bangun_langkah_konkret_intensitas(
+            poin.fakta.get("parameter") or {}, poin.fakta.get("target") or {}
+        )
     elif poin.tipe_rekomendasi == "numerik-mitigasi":
         target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
+        langkah_konkret = bangun_langkah_konkret_dampak(poin.fakta.get("target_mitigasi") or {})
 
     saran = llm_out["saran"]
     if poin.status == "Tidak Dinilai":
         # Belum pernah dievaluasi (bukan "sudah memenuhi ketentuan") — lihat _SARAN_TIDAK_DINILAI.
         saran = _SARAN_TIDAK_DINILAI
         target = None
+        langkah_konkret = []
     elif apakah_aman(poin):
         # Tidak ada pelanggaran utk ditindaklanjuti -> saran & target deterministik, TAPI
         # reasoning_pendek/panjang & sitasi di atas tetap murni dari LLM (lihat docstring).
         saran = _SARAN_AMAN
         target = None
+        langkah_konkret = []
 
     return PoinOutput(
         poin_id=poin.poin_id,
@@ -252,6 +268,7 @@ def generate_poin(
             target=target,
             saran=saran,
             disclaimer=llm_out.get("disclaimer"),
+            langkah_konkret=langkah_konkret,
         ),
         low_confidence=False,
     )
