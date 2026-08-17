@@ -5,6 +5,8 @@ dari model lama: fakta (status/verdict/angka/kategori) DISUNTIKKAN sebagai groun
 membungkusnya jadi Bahasa Indonesia yang jelas. LLM TIDAK PERNAH menyimpulkan verdict sendiri.
 """
 
+import re
+
 from app import sanitize
 from app.retrieval.base import Chunk
 from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput
@@ -36,7 +38,57 @@ _LABEL_ITBX = {
     "X": "lihat REASON di bawah untuk makna sebenarnya",
 }
 
-_MAKS_KETERANGAN_KETENTUAN = 15
+# APP-2026-8090: BE mulai kirim keterangan_ketentuan LENGKAP (bukan dipotong sepihak spt sebelumnya
+# — lihat commit sebelumnya soal "(disembunyikan)"), tapi utk zona Bersyarat besar bisa >150 item
+# (satu dokumen zona memuat ketentuan SEMUA kelompok KBLI + overlay KKOP/LP2B/bencana/sempadan
+# sekaligus, bukan cuma yg relevan ke kegiatan pemohon). Naikkan dari 15 (headroom konteks
+# gpt-oss-20b 131K token, jauh dari mepet) TAPI kenaikan jumlah SENDIRIAN tidak menyelesaikan
+# masalah inti: tanpa pengurutan relevansi, potongan tetap ambil item PALING AWAL (selalu kelompok
+# "a. pertanian/kehutanan/perikanan" dst, apapun kegiatan pemohon) — lihat _urutkan_relevansi_ketentuan.
+_MAKS_KETERANGAN_KETENTUAN = 20
+
+_RE_KATA = re.compile(r"[a-zA-Z]{4,}")
+
+# Kata umum Bahasa Indonesia yg TIDAK informatif utk overlap relevansi (stopword kasar, bukan
+# kamus lengkap) — tanpa ini kata spt "yang"/"dengan"/"untuk" mendominasi skor & menenggelamkan
+# kata kunci kegiatan yg sebenarnya (mis. "pertanian", "reparasi", "mobil").
+_STOPWORD_RELEVANSI = frozenset({
+    "yang", "dengan", "untuk", "pada", "dari", "atau", "dan", "secara", "dapat", "tidak", "adalah",
+    "wajib", "memenuhi", "ketentuan", "kegiatan", "kelompok", "sebagai", "berikut", "diperbolehkan",
+    "sesuai", "peraturan", "perundang", "undangan", "sebagaimana", "dimaksud", "meliputi", "serta",
+})
+
+
+def _kata_kunci(teks: str) -> set[str]:
+    return {w.lower() for w in _RE_KATA.findall(teks)} - _STOPWORD_RELEVANSI
+
+
+def _urutkan_relevansi_ketentuan(ketentuan: list[str], kegiatan_diusulkan: str | None) -> list[str]:
+    """Urutkan (stable sort, BUKAN filter/buang) item keterangan_ketentuan berdasar overlap kata
+    kunci dgn kegiatan_diusulkan pemohon — supaya kalau daftar terlalu panjang & harus dipotong,
+    yang terpotong adalah item PALING TAK RELEVAN, bukan sekadar item paling akhir di daftar asli.
+
+    Ditemukan live (APP-2026-8090, zona Bersyarat >150 item): potongan 15-teratas versi lama SELALU
+    kelompok "a. pertanian/kehutanan/perikanan" (urutan pertama di dokumen), apapun kegiatan yg
+    diusulkan pemohon — kalau kegiatan sebenarnya ada di kelompok lain (mis. "f. konstruksi" atau
+    "n. jasa lainnya"), syarat yg BENAR-BENAR relevan tidak pernah sampai ke LLM sama sekali.
+
+    Heuristik overlap kata kunci teks, BUKAN tabel kode KBLI resmi (RDTR Sleman tak menyediakan
+    pemetaan digit KBLI -> nama kelompok yg bisa diverifikasi di sini) — sengaja demikian: risiko
+    tabel kode yg salah/kadaluarsa lebih berbahaya (silent wrong-filter) drpd heuristik teks yg
+    predictable & mudah diaudit manusia dari `kegiatan_diusulkan` fakta itu sendiri.
+    """
+    if not kegiatan_diusulkan:
+        return ketentuan
+    kata_kegiatan = _kata_kunci(kegiatan_diusulkan)
+    if not kata_kegiatan:
+        return ketentuan
+
+    def _skor(item: str) -> int:
+        return len(kata_kegiatan & _kata_kunci(item))
+
+    # sorted() Python stable -> item skor sama tetap urutan asli relatif satu sama lain.
+    return sorted(ketentuan, key=_skor, reverse=True)
 
 
 def _format_chunk(chunk: Chunk) -> str:
@@ -83,15 +135,22 @@ def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
             lines.extend(f"- {item}" for item in daftar)
 
     # keterangan_ketentuan cuma relevan (syarat) utk status T/B/TB — I/X tak butuh, & fixture nyata
-    # bisa >100 item sehingga WAJIB dipotong demi kuota token.
+    # bisa >150 item (satu dokumen zona memuat SEMUA kelompok KBLI + overlay sekaligus) sehingga
+    # WAJIB dipotong demi kuota token — tapi diurutkan relevansi dulu (lihat
+    # _urutkan_relevansi_ketentuan), BUKAN dipotong dari urutan asli dokumen apa adanya.
     if poin.status in ("T", "B", "TB"):
         ketentuan = fakta.get("keterangan_ketentuan") or []
         if ketentuan:
-            lines.append("\nKeterangan Ketentuan (syarat yang berlaku):")
-            dipotong = ketentuan[:_MAKS_KETERANGAN_KETENTUAN]
+            terurut = _urutkan_relevansi_ketentuan(ketentuan, kegiatan_diusulkan)
+            lines.append("\nKeterangan Ketentuan (syarat yang berlaku, diurutkan berdasar relevansi ke kegiatan pemohon):")
+            dipotong = terurut[:_MAKS_KETERANGAN_KETENTUAN]
             lines.extend(f"- {item}" for item in dipotong)
-            if len(ketentuan) > _MAKS_KETERANGAN_KETENTUAN:
-                lines.append(f"(dipotong dari {len(ketentuan)} item — hanya {_MAKS_KETERANGAN_KETENTUAN} pertama ditampilkan)")
+            if len(terurut) > _MAKS_KETERANGAN_KETENTUAN:
+                lines.append(
+                    f"(dipotong dari {len(terurut)} item total — {_MAKS_KETERANGAN_KETENTUAN} item "
+                    "PALING RELEVAN ke kegiatan pemohon ditampilkan, bukan sekadar urutan pertama "
+                    "di dokumen)"
+                )
 
     return lines
 

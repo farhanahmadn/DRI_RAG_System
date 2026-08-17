@@ -111,14 +111,82 @@ class TestFaktaItbx:
         prompt = build_user_prompt(poin, [])
         assert "Syarat 1" not in prompt
 
-    def test_keterangan_ketentuan_dipotong_15_item(self):
+    def test_keterangan_ketentuan_dipotong_20_item(self):
+        # Tanpa kegiatan_diusulkan -> _urutkan_relevansi_ketentuan no-op (return apa adanya),
+        # jadi potongan tetap urutan asli — cuma batas jumlahnya yg diuji di sini (15 -> 20,
+        # APP-2026-8090, headroom konteks gpt-oss-20b). Urutan relevansi diuji terpisah di bawah.
         ketentuan = [f"Syarat {i}" for i in range(30)]
         poin = _poin(status="T", fakta={"lolos": True, "reason": "x", "keterangan_ketentuan": ketentuan})
         prompt = build_user_prompt(poin, [])
         assert "Syarat 0" in prompt
-        assert "Syarat 14" in prompt
-        assert "Syarat 15" not in prompt
+        assert "Syarat 19" in prompt
+        assert "Syarat 20" not in prompt
         assert "dipotong dari 30 item" in prompt
+
+    def test_keterangan_ketentuan_diurutkan_relevansi_bukan_urutan_dokumen(self):
+        # APP-2026-8090 (live): potongan 15/20-teratas versi lama SELALU kelompok pertama di
+        # dokumen (mis. "pertanian") apapun kegiatan pemohon. Item relevan (kata kunci overlap
+        # dgn kegiatan_diusulkan) HARUS naik ke depan meski posisi aslinya jauh di belakang.
+        ketentuan = (
+            [f"Kelompok pertanian dan kehutanan syarat {i}" for i in range(25)]
+            + ["Kelompok konstruksi wajib pembatasan pengambilan air tanah dan pemeliharaan irigasi"]
+        )
+        poin = _poin(
+            status="B",
+            fakta={
+                "lolos": True,
+                "reason": "x",
+                "kegiatan_diusulkan": "Konstruksi Bangunan Gedung",
+                "keterangan_ketentuan": ketentuan,
+            },
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "Kelompok konstruksi wajib pembatasan" in prompt  # item ke-26 (posisi asli) tetap masuk
+        assert "diurutkan berdasar relevansi" in prompt
+
+    def test_keterangan_ketentuan_tanpa_kegiatan_diusulkan_urutan_apa_adanya(self):
+        ketentuan = ["Syarat A", "Syarat B", "Syarat C"]
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x", "keterangan_ketentuan": ketentuan})
+        prompt = build_user_prompt(poin, [])
+        # Tak ada kegiatan_diusulkan -> _urutkan_relevansi_ketentuan no-op, urutan asli dipertahankan.
+        pos_a = prompt.index("Syarat A")
+        pos_b = prompt.index("Syarat B")
+        pos_c = prompt.index("Syarat C")
+        assert pos_a < pos_b < pos_c
+
+
+class TestUrutkanRelevansiKetentuan:
+    def test_item_relevan_naik_ke_depan(self):
+        from app.reasoning.prompts import _urutkan_relevansi_ketentuan
+
+        ketentuan = ["Syarat pertanian dan kehutanan", "Syarat reparasi mobil dan sepeda motor"]
+        hasil = _urutkan_relevansi_ketentuan(ketentuan, "Reparasi dan Perawatan Mobil")
+        assert hasil[0] == "Syarat reparasi mobil dan sepeda motor"
+
+    def test_tanpa_kegiatan_diusulkan_return_apa_adanya(self):
+        from app.reasoning.prompts import _urutkan_relevansi_ketentuan
+
+        ketentuan = ["Syarat A", "Syarat B"]
+        assert _urutkan_relevansi_ketentuan(ketentuan, None) == ketentuan
+
+    def test_tak_ada_overlap_tetap_return_semua_urutan_asli(self):
+        from app.reasoning.prompts import _urutkan_relevansi_ketentuan
+
+        ketentuan = ["Syarat X sama sekali tak nyambung", "Syarat Y juga tak nyambung"]
+        hasil = _urutkan_relevansi_ketentuan(ketentuan, "Reparasi dan Perawatan Mobil")
+        assert hasil == ketentuan  # skor 0 semua -> stable sort -> urutan asli dipertahankan
+
+    def test_stopword_tidak_mendominasi_skor(self):
+        from app.reasoning.prompts import _urutkan_relevansi_ketentuan
+
+        # "yang", "dengan", "untuk" dll SENGAJA muncul di kedua kalimat (stopword) — tanpa filter
+        # stopword, kalimat ke-2 (tak nyambung ke "mobil") bisa menang krn overlap kata umum.
+        ketentuan = [
+            "Syarat yang diperbolehkan untuk dengan pertanian pada umumnya",
+            "Syarat reparasi mobil yang diperbolehkan untuk dengan bengkel pada umumnya",
+        ]
+        hasil = _urutkan_relevansi_ketentuan(ketentuan, "Reparasi dan Perawatan Mobil")
+        assert hasil[0] == "Syarat reparasi mobil yang diperbolehkan untuk dengan bengkel pada umumnya"
 
 
 class TestFaktaIntensitas:
