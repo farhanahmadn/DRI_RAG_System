@@ -34,4 +34,6 @@ jobs:
             else
               python -m venv .venv && . .venv/bin/activate && pip install -q -e ".[rag-serverless]"
             fi
-            pm2 restart 4005-drisman-ai --update-env
+            # PM2 v7 (daemon ml) — /usr/bin/pm2 adalah v6 (daemon beda) -> "Process not found"
+            export PATH="$HOME/.npm-global/bin:$PATH"
+            $HOME/.npm-global/bin/pm2 restart 4005-drisman-ai --update-env
