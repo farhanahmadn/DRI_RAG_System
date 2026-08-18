@@ -9,14 +9,42 @@ Status di kedua template SELALU `poin.status` apa adanya (ground truth back-end/
 tidak punya skor per-poin lagi, jadi tidak ada `status_dari_skor` seperti versi lama.
 """
 
-from app.reasoning.calculator import pilih_target_utama_intensitas
-from app.schemas import PoinKonteks, PoinOutput, RekomendasiOutput
+from app.reasoning.calculator import (
+    bangun_langkah_konkret_dampak,
+    bangun_langkah_konkret_intensitas,
+    pilih_target_mitigasi_dampak,
+    pilih_target_utama_intensitas,
+)
+from app.schemas import LangkahKonkretOutput, PoinKonteks, PoinOutput, RekomendasiOutput
 
 
 def _target_untuk_poin(poin: PoinKonteks) -> float | str | None:
-    if poin.tipe_rekomendasi != "numerik":
-        return None
-    return pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+    # Bug ditemukan live (2026-08-18): sebelumnya HANYA menangani "numerik" (intensitas) — poin
+    # dampak ("numerik-mitigasi") yang jatuh ke template ini SELALU dapat target=None, walau
+    # fakta['target_mitigasi'] sebenarnya ada. Disamakan dgn app/reasoning/generator.py::
+    # generate_poin() & guardrail.py::perbaiki_poin (2 tempat lain yang menghitung target) —
+    # SEHARUSNYA 3 tempat ini selalu selaras, JANGAN ditambah tanpa update ketiganya.
+    if poin.tipe_rekomendasi == "numerik":
+        return pilih_target_utama_intensitas(poin.fakta.get("target") or {})
+    if poin.tipe_rekomendasi == "numerik-mitigasi":
+        return pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
+    return None
+
+
+def _langkah_konkret_untuk_poin(poin: PoinKonteks) -> list[LangkahKonkretOutput]:
+    # Bug ditemukan live (2026-08-18): langkah_konkret ditambahkan ke generate_poin()/perbaiki_poin
+    # tapi LUPA di-wire ke template fallback ini — poin yang jatuh low_confidence SELALU dapat
+    # langkah_konkret=[] kosong, walau `target` di atas terisi benar (ambang tetap dari kalkulator,
+    # bukan LLM, jadi HARUSNYA tetap tersedia persis seperti target).
+    if poin.tipe_rekomendasi == "numerik":
+        mentah = bangun_langkah_konkret_intensitas(
+            poin.fakta.get("parameter") or {}, poin.fakta.get("target") or {}
+        )
+    elif poin.tipe_rekomendasi == "numerik-mitigasi":
+        mentah = bangun_langkah_konkret_dampak(poin.fakta.get("target_mitigasi") or {})
+    else:
+        mentah = []
+    return [LangkahKonkretOutput(**item) for item in mentah]
 
 
 def template_aman(poin: PoinKonteks) -> PoinOutput:
@@ -39,6 +67,7 @@ def template_aman(poin: PoinKonteks) -> PoinOutput:
             target=_target_untuk_poin(poin),
             saran="Tidak diperlukan tindakan khusus untuk poin ini.",
             disclaimer=None,
+            langkah_konkret=_langkah_konkret_untuk_poin(poin),
         ),
         low_confidence=False,
     )
@@ -68,6 +97,7 @@ def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
             target=_target_untuk_poin(poin),
             saran="Perlu peninjauan manual oleh petugas terkait poin ini.",
             disclaimer="Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual.",
+            langkah_konkret=_langkah_konkret_untuk_poin(poin),
         ),
         low_confidence=True,
     )

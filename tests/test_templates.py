@@ -1,5 +1,5 @@
 from app.reasoning.templates import template_aman, template_low_confidence
-from app.schemas import PoinKonteks
+from app.schemas import LangkahKonkretOutput, PoinKonteks
 
 
 def _poin(**overrides) -> PoinKonteks:
@@ -57,6 +57,7 @@ class TestTemplateAman:
         )
         hasil = template_aman(poin)
         assert hasil.rekomendasi.target is None
+        assert hasil.rekomendasi.langkah_konkret == []
 
 
 class TestTemplateLowConfidence:
@@ -78,3 +79,49 @@ class TestTemplateLowConfidence:
         )
         hasil = template_low_confidence(poin)
         assert hasil.rekomendasi.target == 20.0
+
+    def test_intensitas_langkah_konkret_ikut_terisi(self):
+        # Bug ditemukan live (2026-08-18): poin jatuh low_confidence, target sudah benar (10) tapi
+        # langkah_konkret KOSONG — template ini lupa di-wire saat langkah_konkret ditambahkan ke
+        # generate_poin()/perbaiki_poin(). Ambang tetap dari kalkulator (bukan LLM), HARUSNYA selalu
+        # tersedia persis seperti target, tak peduli narasi LLM gagal atau tidak.
+        poin = _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MELAMPAUI_BATAS",
+            fakta={
+                "parameter": {"kdb": {"usulan": 40, "satuan": "persen"}},
+                "target": {"kdb": {"target_kdb": 10.0, "selisih": 30.0, "footprint_maks_m2": 85.0}},
+            },
+        )
+        hasil = template_low_confidence(poin)
+        assert hasil.rekomendasi.target == 10.0
+        assert len(hasil.rekomendasi.langkah_konkret) == 1
+        assert hasil.rekomendasi.langkah_konkret[0].parameter == "KDB"
+        assert isinstance(hasil.rekomendasi.langkah_konkret[0], LangkahKonkretOutput)
+
+    def test_dampak_target_dan_langkah_konkret_ikut_terisi(self):
+        # Bug kedua ditemukan bersamaan: _target_untuk_poin SEBELUMNYA cuma menangani "numerik"
+        # (intensitas) — dampak ("numerik-mitigasi") yang jatuh low_confidence SELALU target=None
+        # walau fakta['target_mitigasi'] sebenarnya ada.
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi",
+            fakta={
+                "mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]},
+                "target_mitigasi": {"runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.85},
+            },
+        )
+        hasil = template_low_confidence(poin)
+        assert hasil.rekomendasi.target == 2.5
+        assert len(hasil.rekomendasi.langkah_konkret) == 1
+        assert hasil.rekomendasi.langkah_konkret[0].parameter == "runoff_change_index"
+
+    def test_itbx_langkah_konkret_selalu_kosong(self):
+        # kategorikal (itbx) tak punya target numerik -> langkah_konkret selalu [], bukan error.
+        poin = _poin(status="X", fakta={"lolos": False, "reason": "Tidak ditemukan di matriks"})
+        hasil = template_low_confidence(poin)
+        assert hasil.rekomendasi.langkah_konkret == []
