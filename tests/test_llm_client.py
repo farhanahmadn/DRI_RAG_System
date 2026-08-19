@@ -66,41 +66,45 @@ class TestMuatDaftarKunci:
 
 
 class TestRotasiKunciGroq:
-    def test_client_aktif_index_0_di_awal(self):
+    def test_kunci_awal_index_0_pada_panggilan_pertama(self):
         from app.reasoning.llm_client import _RotasiKunciGroq
 
         r = _RotasiKunciGroq(["kunci-1", "kunci-2"], base_url=None)
-        idx, client = r.client_aktif()
+        idx = r.kunci_awal()
         assert idx == 0
-        assert client.api_key == "kunci-1"
+        assert r.client_utk(idx).api_key == "kunci-1"
 
-    def test_rotasi_dari_pindah_ke_index_berikutnya(self):
+    def test_kunci_awal_round_robin_setiap_panggilan(self):
+        # 2026-08-19: beda dari desain lama (sticky, semua panggilan pakai kunci yg sama sampai
+        # gagal) — SEKARANG setiap panggilan generate() baru dapat kunci AWAL berikutnya scr
+        # berurutan, supaya beban tersebar sejak awal (bukan menumpuk di kunci pertama).
         from app.reasoning.llm_client import _RotasiKunciGroq
 
         r = _RotasiKunciGroq(["kunci-1", "kunci-2", "kunci-3"], base_url=None)
-        idx_baru = r.rotasi_dari(0)
-        assert idx_baru == 1
-        idx, client = r.client_aktif()
-        assert idx == 1
-        assert client.api_key == "kunci-2"
+        assert [r.kunci_awal() for _ in range(5)] == [0, 1, 2, 0, 1]  # muter balik stlh kunci ke-3
 
-    def test_rotasi_muter_balik_ke_awal_setelah_kunci_terakhir(self):
+    def test_kunci_awal_thread_safe_tak_ada_index_dobel(self):
+        # Increment counter dilindungi lock -> N panggilan concurrent hasilkan N index BERBEDA
+        # (0..N-1 tiap siklus), bukan ada yang kebagian index sama krn race condition.
+        import threading
+
         from app.reasoning.llm_client import _RotasiKunciGroq
 
-        r = _RotasiKunciGroq(["kunci-1", "kunci-2"], base_url=None)
-        r.rotasi_dari(0)  # -> index 1
-        idx_baru = r.rotasi_dari(1)  # -> muter balik ke 0
-        assert idx_baru == 0
+        r = _RotasiKunciGroq(["kunci-1", "kunci-2", "kunci-3", "kunci-4"], base_url=None)
+        hasil = []
+        lock_hasil = threading.Lock()
 
-    def test_rotasi_dari_idx_basi_tak_dobel_rotasi(self):
-        # Simulasi 2 thread gagal bersamaan di index yang sama: thread A rotasi duluan (0->1),
-        # thread B panggil rotasi_dari(0) juga (idx_lama basi, sudah bukan index aktif) -> TIDAK
-        # boleh merotasi lagi jadi 2 (harus tetap 1, insiden yang sama jangan dihitung 2x).
-        from app.reasoning.llm_client import _RotasiKunciGroq
+        def _ambil():
+            idx = r.kunci_awal()
+            with lock_hasil:
+                hasil.append(idx)
 
-        r = _RotasiKunciGroq(["kunci-1", "kunci-2", "kunci-3"], base_url=None)
-        assert r.rotasi_dari(0) == 1  # thread A
-        assert r.rotasi_dari(0) == 1  # thread B, idx_lama basi -> no-op, tetap 1
+        threads = [threading.Thread(target=_ambil) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert sorted(hasil) == [0, 1, 2, 3]  # 4 kunci, 4 panggilan -> masing2 index kepakai persis 1x
 
     def test_tanpa_kunci_raise(self):
         from app.reasoning.llm_client import _RotasiKunciGroq
@@ -112,9 +116,16 @@ class TestRotasiKunciGroq:
         from app.reasoning.llm_client import _RotasiKunciGroq
 
         r = _RotasiKunciGroq(["kunci-1"], base_url=None)
-        _, client_a = r.client_aktif()
-        _, client_b = r.client_aktif()
+        client_a = r.client_utk(0)
+        client_b = r.client_utk(0)
         assert client_a is client_b
+
+    def test_client_utk_index_di_luar_jangkauan_dibungkus_modulo(self):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+
+        r = _RotasiKunciGroq(["kunci-1", "kunci-2"], base_url=None)
+        assert r.client_utk(2).api_key == "kunci-1"  # 2 % 2 == 0
+        assert r.client_utk(3).api_key == "kunci-2"  # 3 % 2 == 1
 
 
 class TestKlasifikasiRateLimit:
@@ -295,6 +306,39 @@ class TestGenerateRotasiSaatRateLimit:
         with pytest.raises(RateLimitError):
             llm_client_module.generate("prompt", {"type": "object"}, schema_name="tes")
         assert panggilan["n"] == 1  # 1 kunci -> 1 percobaan, langsung menyerah
+
+    def test_panggilan_berturut_turut_mulai_dari_kunci_berbeda(self, monkeypatch):
+        # 2026-08-19: ditemukan live di VPS — desain lama sticky bikin kunci pertama terus
+        # dipakai sampai nyaris limit berulang, kunci lain menganggur. Sekarang tiap generate()
+        # BARU (bukan retry di dalamnya) harus mulai dari kunci berikutnya scr round-robin.
+        import app.reasoning.llm_client as llm_client_module
+
+        monkeypatch.setattr(llm_client_module, "_rotator", None)
+        monkeypatch.setenv("GROQ_API_KEYS", "kunci-1,kunci-2,kunci-3")
+        monkeypatch.setenv("LLM_MODEL", "model-tes")
+
+        kunci_dipakai = []
+
+        def _stub_sukses(client, messages, json_schema, schema_name, temperature, max_tokens):
+            kunci_dipakai.append(client.api_key)
+
+            class _Msg:
+                content = '{"ok": true}'
+
+            class _Choice:
+                message = _Msg()
+
+            class _Completion:
+                choices = [_Choice()]
+
+            return _Completion()
+
+        monkeypatch.setattr(llm_client_module, "_panggil_llm_sekali", _stub_sukses)
+
+        for _ in range(4):
+            llm_client_module.generate("prompt", {"type": "object"}, schema_name="tes")
+
+        assert kunci_dipakai == ["kunci-1", "kunci-2", "kunci-3", "kunci-1"]
 
 
 @pytest.mark.live

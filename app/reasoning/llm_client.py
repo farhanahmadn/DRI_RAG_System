@@ -71,8 +71,19 @@ def _muat_daftar_kunci() -> list[str]:
 
 class _RotasiKunciGroq:
     """Rotasi multi-API-key Groq, thread-safe (poin digenerate paralel via ThreadPoolExecutor,
-    lihat app/reasoning/assemble.py). Index & cache client per-kunci dilindungi satu lock —
-    operasi di dalamnya murni in-memory (bangun objek OpenAI klien), bukan I/O, jadi lock singkat.
+    lihat app/reasoning/assemble.py).
+
+    2026-08-19 — diubah dari "sticky index global" (semua panggilan pakai kunci yang sama sampai
+    kunci itu gagal) jadi ROUND-ROBIN PROAKTIF: setiap `generate()` BARU (bukan retry di
+    dalamnya) mulai dari kunci berikutnya scr berurutan. Ditemukan live di VPS: desain lama
+    reaktif murni — TPM (limit per-menit) sengaja menunggu+ulang KUNCI YANG SAMA (sesuai spek),
+    baru pindah kunci sbg upaya terakhir setelah gagal berkali-kali di kunci itu. Akibatnya di
+    traffic sustained, kunci pertama terus-menerus dipakai sampai nyaris limit BERULANG KALI,
+    sementara kunci lain menganggur — rotasi cuma cadangan darurat, bukan menyebar beban.
+    Round-robin proaktif menyebar beban ke SEMUA kunci sejak awal (total TPM efektif ~jumlah_kunci
+    x limit per kunci di bawah traffic sustained), TPM-tunggu/TPD-lompat di DALAM satu panggilan
+    tetap sama persis (lihat generate() di bawah) — cuma titik AWAL yang berubah, bukan
+    perilaku saat rate limit terjadi.
     """
 
     def __init__(self, keys: list[str], base_url: str | None):
@@ -83,16 +94,24 @@ class _RotasiKunciGroq:
             )
         self._keys = keys
         self._base_url = base_url
-        self._idx = 0
+        self._counter = 0
         self._lock = threading.Lock()
         self._clients: dict[int, OpenAI] = {}
 
     def jumlah_kunci(self) -> int:
         return len(self._keys)
 
-    def client_aktif(self) -> tuple[int, OpenAI]:
+    def kunci_awal(self) -> int:
+        """Index kunci AWAL utk satu panggilan generate() baru — round-robin (increment atomik),
+        BUKAN selalu kunci pertama. Inilah yang menyebarkan beban ke semua kunci sejak awal."""
         with self._lock:
-            idx = self._idx
+            idx = self._counter % len(self._keys)
+            self._counter += 1
+            return idx
+
+    def client_utk(self, idx: int) -> OpenAI:
+        idx = idx % len(self._keys)
+        with self._lock:
             client = self._clients.get(idx)
             if client is None:
                 client = OpenAI(
@@ -102,21 +121,7 @@ class _RotasiKunciGroq:
                     max_retries=_MAX_RETRIES,
                 )
                 self._clients[idx] = client
-            return idx, client
-
-    def rotasi_dari(self, idx_lama: int) -> int:
-        """Pindah ke kunci berikutnya HANYA kalau index global belum berubah sejak `idx_lama`
-        dibaca caller (cegah 2 thread yang gagal bersamaan merotasi 2x berturut-turut utk 1
-        insiden yang sama). Return index aktif SETELAH panggilan ini (baru atau tetap lama kalau
-        thread lain sudah duluan merotasi)."""
-        with self._lock:
-            if self._idx == idx_lama:
-                self._idx = (self._idx + 1) % len(self._keys)
-                logger.warning(
-                    "Rotasi GROQ_API_KEY: index %d -> %d (dari %d kunci total, alasan: rate limit TPD/RPD)",
-                    idx_lama, self._idx, len(self._keys),
-                )
-            return self._idx
+            return client
 
 
 _rotator: _RotasiKunciGroq | None = None
@@ -130,10 +135,10 @@ def _get_rotator() -> _RotasiKunciGroq:
 
 
 def _get_client() -> OpenAI:
-    """Kompat mundur — client utk kunci AKTIF saat ini (index 0 kalau belum pernah rotasi).
-    Dipertahankan utk caller lama & test yang tak perlu tahu soal rotasi sama sekali."""
-    _, client = _get_rotator().client_aktif()
-    return client
+    """Kompat mundur — satu client (kunci berikutnya scr round-robin). Dipertahankan utk caller
+    lama & test yang tak perlu tahu soal rotasi sama sekali."""
+    rotator = _get_rotator()
+    return rotator.client_utk(rotator.kunci_awal())
 
 
 def _model() -> str:
@@ -239,41 +244,55 @@ def generate(
     model_terpakai = "unknown"
 
     try:
+        # Round-robin: titik AWAL kunci berbeda tiap panggilan generate() (lihat kunci_awal()) —
+        # menyebar beban dasar ke semua kunci. Rate limit DI DALAM satu panggilan ini masih
+        # ditangani reaktif spt sebelumnya: TPM/RPM -> tunggu+ulang KUNCI SAMA; TPD/RPD -> lompat
+        # SEGERA ke kunci berikutnya (idx lokal, tak perlu koordinasi lintas-thread — tiap
+        # panggilan generate() punya jalur/kunci sendiri sejak kunci_awal()).
+        idx = rotator.kunci_awal()
         tunggu_di_kunci_ini = 0
-        kunci_dicoba = set()
+        kunci_berbeda_dicoba = 1
         while True:
-            idx, client = rotator.client_aktif()
-            kunci_dicoba.add(idx)
+            client = rotator.client_utk(idx)
             try:
                 completion = _panggil_llm_sekali(client, messages, json_schema, schema_name, temperature, max_tokens)
                 break
             except RateLimitError as exc:
                 jenis = _klasifikasi_rate_limit(str(exc))
+                pindah_kunci = False
                 if jenis == "tpd":
-                    idx_baru = rotator.rotasi_dari(idx)
-                    tunggu_di_kunci_ini = 0
-                    if len(kunci_dicoba) >= rotator.jumlah_kunci() and idx_baru in kunci_dicoba:
+                    # Kuota harian tak akan reset dlm sesi ini -> lompat segera, tanpa nunggu.
+                    pindah_kunci = True
+                else:
+                    # TPM/RPM (atau format tak dikenali, diperlakukan spt TPM demi aman) -> tunggu
+                    # dulu di kunci yang sama; pindah kunci HANYA sbg upaya terakhir kalau sudah
+                    # nunggu berkali-kali tanpa membaik.
+                    tunggu_di_kunci_ini += 1
+                    if tunggu_di_kunci_ini > _MAKS_TUNGGU_PER_KUNCI:
+                        pindah_kunci = True
+                    else:
+                        detik = _ekstrak_tunggu_detik(str(exc))
+                        logger.warning(
+                            "Rate limit TPM/RPM (kunci index %d) — tunggu %.1fs lalu ulang (percobaan %d/%d): %s",
+                            idx, detik, tunggu_di_kunci_ini, _MAKS_TUNGGU_PER_KUNCI, exc,
+                        )
+                        time.sleep(detik)
+                        continue
+
+                if pindah_kunci:
+                    if kunci_berbeda_dicoba >= rotator.jumlah_kunci():
                         # Semua kunci yang ada sudah dicoba & masih limit -> tak ada lagi yg bisa
                         # dirotasi, menyerah (guardrail.py akan menangkap ini spt exception biasa).
                         raise
-                    continue
-                # TPM/RPM (atau format tak dikenali, diperlakukan spt TPM demi aman) -> tunggu.
-                tunggu_di_kunci_ini += 1
-                if tunggu_di_kunci_ini > _MAKS_TUNGGU_PER_KUNCI:
-                    # Sudah nunggu berkali-kali di kunci ini tanpa membaik -> coba kunci lain
-                    # sbg upaya terakhir (barangkali kunci lain memang lebih longgar).
-                    idx_baru = rotator.rotasi_dari(idx)
+                    idx_lama = idx
+                    idx = (idx + 1) % rotator.jumlah_kunci()
+                    kunci_berbeda_dicoba += 1
                     tunggu_di_kunci_ini = 0
-                    if len(kunci_dicoba) >= rotator.jumlah_kunci() and idx_baru in kunci_dicoba:
-                        raise
+                    logger.warning(
+                        "Rotasi GROQ_API_KEY: index %d -> %d (kunci ke-%d/%d dicoba, alasan: %s)",
+                        idx_lama, idx, kunci_berbeda_dicoba, rotator.jumlah_kunci(), jenis,
+                    )
                     continue
-                detik = _ekstrak_tunggu_detik(str(exc))
-                logger.warning(
-                    "Rate limit TPM/RPM (kunci index %d) — tunggu %.1fs lalu ulang (percobaan %d/%d): %s",
-                    idx, detik, tunggu_di_kunci_ini, _MAKS_TUNGGU_PER_KUNCI, exc,
-                )
-                time.sleep(detik)
-                continue
 
         model_terpakai = _model()
         content = completion.choices[0].message.content
