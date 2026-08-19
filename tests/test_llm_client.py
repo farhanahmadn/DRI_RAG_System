@@ -34,6 +34,61 @@ def test_get_client_default_timeout_dan_retries_masuk_akal():
     assert 0 <= llm_client_module._MAX_RETRIES <= 5
 
 
+class TestOverrideEnvTerbatasSaatImport:
+    """Bug ditemukan live full-suite (2026-08-19, Docker lokal mati): import ulang llm_client.py
+    dgn load_dotenv(override=True) POLOS menimpa SELURUH isi .env, termasuk DATABASE_URL/RETRIEVER
+    yang sengaja diproteksi tests/conftest.py — suite offline diam-diam coba konek Postgres
+    sungguhan, hang bermenit-menit (dari <10s jadi >1000s). Sebelumnya lolos tanpa ketahuan krn
+    Docker lokal kebetulan selalu jalan (koneksi ke DB asli SUKSES diam-diam, bukan hang).
+
+    Fix: override hanya per-key milik modul ini (_ENV_KUNCI_LLM_CLIENT), bukan seluruh file .env.
+    Test ini reload modul scr paksa (import ulang memicu ulang kode level-modul, termasuk override)
+    supaya bug regresi ini tertangkap OFFLINE, tak perlu Docker mati dulu baru ketahuan lagi.
+    """
+
+    def test_reimport_tak_menimpa_var_yg_diproteksi_modul_lain(self, monkeypatch):
+        import importlib
+
+        import app.reasoning.llm_client as llm_client_module
+
+        # Simulasikan proteksi tests/conftest.py: var ini SENGAJA diset ke nilai non-.env sebelum
+        # modul di-import ulang — modul lain (bukan llm_client.py) yang "punya" var ini.
+        monkeypatch.setenv("DATABASE_URL", "")
+        monkeypatch.setenv("RETRIEVER", "mock")
+        # Pastikan .env sungguhan (dibaca test ini via load_dotenv scr manual) MEMANG punya nilai
+        # lain utk kedua var ini — kalau tidak, test ini false-negative (tak menguji apa pun).
+        from dotenv import dotenv_values
+        nilai_dotenv = dotenv_values()
+        if not nilai_dotenv.get("DATABASE_URL") and not nilai_dotenv.get("RETRIEVER"):
+            pytest.skip(".env tak punya DATABASE_URL/RETRIEVER utk dibandingkan — tak bisa uji bug ini")
+
+        try:
+            importlib.reload(llm_client_module)
+            assert os.environ.get("DATABASE_URL") == ""  # TETAP kosong, bukan ketimpa isi .env
+            assert os.environ.get("RETRIEVER") == "mock"  # TETAP mock, bukan ketimpa "asli"
+        finally:
+            importlib.reload(llm_client_module)  # pulihkan state modul utk test lain
+
+    def test_reimport_tetap_refresh_key_groq_milik_sendiri(self, monkeypatch):
+        # Kontrol positif — key yg MEMANG milik modul ini (GROQ_API_KEY) HARUS tetap ter-refresh
+        # dari .env saat re-import, walau ada nilai basi di os.environ (kasus asli PM2 di VPS).
+        import importlib
+
+        import app.reasoning.llm_client as llm_client_module
+
+        from dotenv import dotenv_values
+        nilai_asli = dotenv_values().get("GROQ_API_KEY")
+        if not nilai_asli:
+            pytest.skip(".env tak punya GROQ_API_KEY — tak bisa uji refresh")
+
+        monkeypatch.setenv("GROQ_API_KEY", "nilai-basi-simulasi-cache-pm2")
+        try:
+            importlib.reload(llm_client_module)
+            assert os.environ.get("GROQ_API_KEY") == nilai_asli  # ketimpa isi .env, bukan basi
+        finally:
+            importlib.reload(llm_client_module)
+
+
 class TestMuatDaftarKunci:
     def test_groq_api_keys_csv_diprioritaskan(self, monkeypatch):
         import app.reasoning.llm_client as llm_client_module

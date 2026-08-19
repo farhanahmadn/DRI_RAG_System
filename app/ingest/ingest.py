@@ -25,6 +25,9 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
+    # BUKAN override=True — skrip CLI manual (bukan proses long-running PM2), tak butuh proteksi
+    # itu (lihat app/reasoning/llm_client.py utk kasus yg benar2 butuh, dgn override TERBATAS per
+    # key — bukan blanket override=True yg pernah menimpa proteksi tests/conftest.py, ketemu live).
     load_dotenv()
 except Exception:
     pass

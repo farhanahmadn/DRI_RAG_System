@@ -32,7 +32,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:  # .env di root repo (LLAMA_CLOUD_API_KEY, dst) — opsional kalau env sudah diset shell
+try:  # .env di root repo (LLAMA_CLOUD_API_KEY, dst) — BUKAN override=True, skrip CLI manual
+    # (bukan proses long-running PM2), tak butuh proteksi itu (lihat app/reasoning/llm_client.py
+    # utk kasus yg benar2 butuh, dgn override TERBATAS per key)
     from dotenv import load_dotenv
 
     load_dotenv()

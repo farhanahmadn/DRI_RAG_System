@@ -24,12 +24,28 @@ import re
 import threading
 import time
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from openai import BadRequestError, OpenAI, RateLimitError
 
 from app.reasoning import observability
 
 load_dotenv()
+# Override TERBATAS (2026-08-19, ditemukan live VPS) — HANYA key yang modul ini pakai, BUKAN
+# load_dotenv(override=True) polos. python-dotenv SECARA DEFAULT tak menimpa env var yang sudah
+# ada di proses (mis. dicache PM2 dari shell saat `pm2 start` pertama kali dijalankan) — restart
+# proses SAJA tak menjamin .env yang baru diedit benar2 kepakai. TAPI load_dotenv(override=True)
+# polos PERNAH DICOBA & DIBATALKAN: itu menimpa SELURUH isi .env sekaligus, termasuk var yang
+# SENGAJA diproteksi modul lain saat test (tests/conftest.py memaksa RETRIEVER=mock/
+# DATABASE_URL="" — override=True global menimpa balik keduanya begitu llm_client.py di-import,
+# suite offline diam-diam coba konek Postgres sungguhan & hang bermenit-menit, ketemu live pas
+# Docker lokal kebetulan mati). Override manual per-key di bawah cuma "milik" modul ini.
+_ENV_KUNCI_LLM_CLIENT = (
+    "GROQ_API_KEY", "GROQ_API_KEYS", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_MAX_RETRIES",
+    "GROQ_RATE_LIMIT_MAKS_TUNGGU_PER_KUNCI", "GROQ_RATE_LIMIT_TUNGGU_MAKS_S", "GROQ_RATE_LIMIT_TUNGGU_DEFAULT_S",
+)
+for _k, _v in dotenv_values().items():
+    if _k in _ENV_KUNCI_LLM_CLIENT:
+        os.environ[_k] = _v
 
 logger = logging.getLogger(__name__)
 

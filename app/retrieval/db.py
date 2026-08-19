@@ -10,6 +10,14 @@ import os
 from datetime import date
 
 try:  # muat .env (DATABASE_URL) bila belum diset shell — supaya retriever jalan dari entrypoint mana pun
+    # SENGAJA BUKAN override=True (beda dari app/reasoning/llm_client.py) — dicoba, langsung
+    # dibatalkan: tests/conftest.py memaksa RETRIEVER=mock & DATABASE_URL="" scr eksplisit
+    # MENGANDALKAN perilaku default load_dotenv() (tak menimpa env yg sudah ada) supaya suite
+    # offline tak pernah kena test_retrieval.py mencoba konek Postgres sungguhan. override=True di
+    # sini bikin .env (RETRIEVER=asli) menimpa balik nilai mock itu begitu db.py di-import test
+    # lain (mis. via app.api.main) -> RetrieverAsli asli dibangun, connect ke Postgres yg mungkin
+    # mati -> seluruh suite hang/timeout (ditemukan live, 2026-08-19). Lihat docstring
+    # tests/conftest.py utk detail lengkap mekanisme proteksinya.
     from dotenv import load_dotenv
 
     load_dotenv()
