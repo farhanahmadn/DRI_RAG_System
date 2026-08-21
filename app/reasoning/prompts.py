@@ -48,6 +48,14 @@ _LABEL_ITBX = {
 # "a. pertanian/kehutanan/perikanan" dst, apapun kegiatan pemohon) — lihat _urutkan_relevansi_ketentuan.
 _MAKS_KETERANGAN_KETENTUAN = 20
 
+# APP-2026-9461 (413 Request too large, live): BE mengirim `dasar_hukum` bisa puluhan item
+# (kutipan utuh tiap pasal) -> prompt satu poin >8-11K token -> Groq 413/429 padahal kuota TPM
+# cuma 8K. Anchor dipotong ke N PALING AWAL (urutan BE = prioritas hukum yg dipakai pengambilan
+# keputusan) + catatan eksplisit; LLM tetap dilarang mengarang sitasi di luar daftar yg tampil
+# (SYSTEM_PROMPT aturan #6). citation_id (anchor-{i}) tetap konsisten dgn generator.py karena
+# indeks asli dipertahankan.
+_MAKS_ANCHOR = 12
+
 _RE_KATA = re.compile(r"[a-zA-Z]{4,}")
 
 # Kata umum Bahasa Indonesia yg TIDAK informatif utk overlap relevansi (stopword kasar, bukan
@@ -268,8 +276,15 @@ def build_user_prompt(
     ada_sitasi = False
     if poin.dasar_hukum:
         lines.append("Anchor dasar hukum dari back-end (prioritaskan ini):")
-        for i, dasar_hukum in enumerate(poin.dasar_hukum):
+        # APP-2026-9461: potong ke _MAKS_ANCHOR (lihat komentar di atas) — prevent 413/429.
+        anchor_inti = poin.dasar_hukum[:_MAKS_ANCHOR]
+        for i, dasar_hukum in enumerate(anchor_inti):
             lines.append(_format_anchor(i, dasar_hukum))
+        if len(poin.dasar_hukum) > _MAKS_ANCHOR:
+            lines.append(
+                f"(cetakan kiri: {len(poin.dasar_hukum) - _MAKS_ANCHOR} item dasar hukum lain "
+                "tidak ditampilkan untuk menjaga ukuran konteks — jangan mengarang pasal di luar daftar)"
+            )
         ada_sitasi = True
     if chunks:
         lines.append("Pasal tambahan dari RAG:")
