@@ -70,3 +70,31 @@ def from_env(prefix: str = "RETRIEVAL_CACHE") -> TTLCache:
     ttl_s = float(os.getenv(f"{prefix}_TTL_S", "3600"))
     max_entries = int(os.getenv(f"{prefix}_MAX_ENTRIES", "2000"))
     return TTLCache(ttl_s=ttl_s, max_entries=max_entries, enabled=enabled)
+
+
+def notify_admin_cache_clear(url: str, admin_token: str | None, *, timeout_s: float = 10.0) -> bool:
+    """Panggil POST {url} (endpoint app/api/admin.py di proses API yang SEDANG HIDUP) supaya cache
+    retrieval-nya ikut kosong setelah scripts/ingest.py / scripts/reembed.py selesai — DUA proses
+    OS terpisah (CLI vs API), tak ada cara lain selain HTTP utk saling menjangkau memorinya.
+
+    Dipakai scripts/ingest.py & scripts/reembed.py (sengaja tinggal di sini, satu-satunya tempat,
+    supaya tak digandakan). SELALU non-fatal — kegagalan di sini (server API tak jalan, token
+    salah, dst) TIDAK BOLEH menggagalkan ingest/reembed yang sudah sukses; caller cukup log
+    peringatan & tetap keluar sukses (invalidasi manual/restart proses tetap jadi jaring pengaman).
+    Return True kalau berhasil (HTTP 200), False kalau gagal (alasan sudah diprint di sini).
+    """
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(url, method="POST")
+    if admin_token:
+        req.add_header("X-Admin-Token", admin_token)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            ok = 200 <= resp.status < 300
+            print(f"[notify_admin_cache_clear] {url} -> HTTP {resp.status}" + ("" if ok else " (bukan 2xx)"))
+            return ok
+    except urllib.error.URLError as exc:
+        print(f"[notify_admin_cache_clear] GAGAL panggil {url}: {exc} — cache proses API TIDAK ter-invalidasi "
+              "otomatis, restart proses API manual kalau perlu segera.")
+        return False

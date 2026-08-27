@@ -9,6 +9,7 @@ import logging
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.admin import clear_retrieval_cache, verifikasi_admin_token
 from app.api.dependencies import get_retriever
 from app.api.rate_limit import cek_rate_limit
 from app.reasoning.assemble import jalankan_precheck
@@ -36,6 +37,14 @@ def health() -> dict:
 @app.post("/reasoning", response_model=OutputL3, dependencies=[Depends(cek_rate_limit)])
 def reasoning(request: L2Envelope, retriever: Retriever = Depends(get_retriever)) -> OutputL3:
     return jalankan_precheck(request.data, retriever)
+
+
+@app.post("/admin/cache/clear", dependencies=[Depends(verifikasi_admin_token)])
+def admin_cache_clear(retriever: Retriever = Depends(get_retriever)) -> dict:
+    """Kosongkan cache retrieval in-memory proses ini — dipanggil scripts/ingest.py / reembed.py
+    setelah korpus berubah (lihat app/api/admin.py utk penjelasan lengkap kenapa perlu HTTP,
+    bukan panggilan fungsi biasa dari skrip CLI). Butuh header X-Admin-Token = env ADMIN_TOKEN."""
+    return clear_retrieval_cache(retriever)
 
 
 @app.exception_handler(Exception)

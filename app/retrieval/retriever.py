@@ -79,6 +79,15 @@ class RetrieverAsli:
             return filters.model_copy(update={"dokumen": self._default_wilayah})
         return filters
 
+    def clear_cache(self) -> None:
+        """Kosongkan cache retrieval in-memory milik instance ini. TIDAK dipanggil otomatis dari
+        mana pun di kelas ini (retriever tak tahu kapan korpus di DB berubah) — dipanggil dari luar
+        oleh app/api/admin.py (endpoint POST /admin/cache/clear), yang dipicu scripts/ingest.py /
+        scripts/reembed.py via HTTP setelah korpus selesai di-ingest/reembed. Proses CLI ingest/
+        reembed TIDAK BISA mengosongkan cache ini langsung lewat panggilan fungsi biasa — beda
+        proses OS, beda memori; HTTP ke proses API yang sedang hidup satu-satunya cara sah."""
+        self._cache.clear()
+
     # ---------------------------------------------------------------- search
     def search(self, query: str, filters: RetrievalFilters, top_k: int = 5) -> list[Chunk]:
         # Pagar PII di titik pembentukan query retrieval (app/sanitize.py) — raise kalau query

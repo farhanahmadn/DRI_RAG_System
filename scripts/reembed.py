@@ -150,6 +150,15 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--force", action="store_true", help="Re-embed ulang meski sudah ada (default: skip).")
     ap.add_argument("--dry-run", action="store_true", help="Cuma tampilkan rencana, tanpa panggil API/tulis DB.")
     ap.add_argument("--reindex", action="store_true", help="REINDEX CONCURRENTLY HNSW di akhir.")
+    ap.add_argument(
+        "--notify-cache-clear-url", default=None,
+        help="URL endpoint admin (mis. http://localhost:8000/admin/cache/clear) yg dipanggil via "
+             "POST setelah reembed sukses, utk kosongkan cache retrieval proses API yg SEDANG "
+             "HIDUP (proses CLI ini TAK BISA clear cache proses lain langsung, lihat "
+             "app/retrieval/cache.py::notify_admin_cache_clear). Butuh ADMIN_TOKEN yg sama persis "
+             "dgn .env server (dibaca dari env ADMIN_TOKEN di sini juga). Opsional — kalau kosong, "
+             "invalidasi tak dilakukan otomatis (restart proses API manual sbg jaring pengaman).",
+    )
     args = ap.parse_args(argv)
 
     if args.dokumen_ids is None and args.limit is None and not args.dry_run:
@@ -160,8 +169,12 @@ def main(argv: list[str] | None = None) -> None:
             "--limit dgn angka besar (mis. --limit 100000) sebagai konfirmasi eksplisit di command line."
         )
 
-    run(args.provider, dokumen_ids=args.dokumen_ids, limit=args.limit, batch_size=args.batch_size,
-        sleep_s=args.sleep_s, force=args.force, dry_run=args.dry_run, reindex=args.reindex)
+    hasil = run(args.provider, dokumen_ids=args.dokumen_ids, limit=args.limit, batch_size=args.batch_size,
+                sleep_s=args.sleep_s, force=args.force, dry_run=args.dry_run, reindex=args.reindex)
+
+    if args.notify_cache_clear_url and not args.dry_run and hasil["n_upsert"] > 0:
+        from app.retrieval.cache import notify_admin_cache_clear
+        notify_admin_cache_clear(args.notify_cache_clear_url, os.getenv("ADMIN_TOKEN"))
 
 
 if __name__ == "__main__":

@@ -135,6 +135,14 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--structured", required=True, type=Path, help="Folder structured (dokumen.json, chunks_prosa.jsonl)")
     ap.add_argument("--version", default="v1", help="Tag source_version")
     ap.add_argument("--batch-size", type=int, default=32)
+    ap.add_argument(
+        "--notify-cache-clear-url", default=None,
+        help="URL endpoint admin (mis. http://localhost:8000/admin/cache/clear) yg dipanggil via "
+             "POST setelah ingest sukses, utk kosongkan cache retrieval proses API yg SEDANG HIDUP "
+             "(lihat app/retrieval/cache.py::notify_admin_cache_clear utk alasan lengkap kenapa "
+             "perlu HTTP, bukan panggilan fungsi biasa). Butuh ADMIN_TOKEN yg sama persis dgn .env "
+             "server (dibaca dari env ADMIN_TOKEN di sini juga). Opsional.",
+    )
     args = ap.parse_args(argv)
 
     reg = json.loads((args.structured / "dokumen.json").read_text(encoding="utf-8"))
@@ -156,6 +164,10 @@ def main(argv: list[str] | None = None) -> None:
             print(f"[ingest] chunks dgn embedding di DB: {cur.fetchone()[0]}")
     finally:
         conn.close()
+
+    if args.notify_cache_clear_url and n > 0:
+        from app.retrieval.cache import notify_admin_cache_clear
+        notify_admin_cache_clear(args.notify_cache_clear_url, os.getenv("ADMIN_TOKEN"))
 
 
 if __name__ == "__main__":
