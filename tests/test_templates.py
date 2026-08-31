@@ -1,3 +1,4 @@
+from app.reasoning.generator import _SARAN_TIDAK_DINILAI
 from app.reasoning.templates import template_aman, template_low_confidence
 from app.schemas import LangkahKonkretOutput, PoinKonteks
 
@@ -58,6 +59,23 @@ class TestTemplateAman:
         hasil = template_aman(poin)
         assert hasil.rekomendasi.target is None
         assert hasil.rekomendasi.langkah_konkret == []
+
+    def test_dampak_tidak_dinilai_saran_echo_limitations_bukan_saran_aman(self):
+        # APP-2026-2428: status "Tidak Dinilai" BUKAN "memenuhi ketentuan" — _saran_untuk_poin_aman
+        # harus reuse _saran_tidak_dinilai (echo limitations), bukan "tidak diperlukan tindakan".
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tidak Dinilai",
+            fakta={
+                "dinilai": False,
+                "limitations": "Permohonan bersinggungan dengan lebih dari 1 persil (memerlukan pengecekan manual)",
+            },
+        )
+        hasil = template_aman(poin)
+        assert "lebih dari 1 persil" in hasil.rekomendasi.saran
+        assert "tidak diperlukan tindakan" not in hasil.rekomendasi.saran.lower()
 
 
 class TestTemplateLowConfidence:
@@ -125,3 +143,34 @@ class TestTemplateLowConfidence:
         poin = _poin(status="X", fakta={"lolos": False, "reason": "Tidak ditemukan di matriks"})
         hasil = template_low_confidence(poin)
         assert hasil.rekomendasi.langkah_konkret == []
+
+    def test_dampak_tidak_dinilai_dgn_limitations_echo_bukan_pesan_generik(self):
+        # APP-2026-2428: fallback low_confidence utk status "Tidak Dinilai" HARUS mencerminkan
+        # alasan SEBENARNYA (echo limitations) — bukan "sistem gagal menghasilkan penjelasan" yang
+        # keliru krn substansi (kenapa dampak tak dinilai) sudah pasti & tak berhubungan dgn
+        # kegagalan generasi LLM. low_confidence TETAP True (sinyal generasi gagal, independen isi teks).
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tidak Dinilai",
+            fakta={
+                "dinilai": False,
+                "limitations": "Permohonan bersinggungan dengan lebih dari 1 persil (memerlukan pengecekan manual)",
+            },
+        )
+        hasil = template_low_confidence(poin)
+        assert "lebih dari 1 persil" in hasil.rekomendasi.saran
+        assert "lebih dari 1 persil" in hasil.reasoning_pendek
+        assert "lebih dari 1 persil" in hasil.reasoning_panjang
+        assert "Sistem tidak berhasil menghasilkan penjelasan" not in hasil.reasoning_panjang
+        assert hasil.low_confidence is True  # tetap True — sinyal operasional, independen dari teks
+
+    def test_dampak_tidak_dinilai_tanpa_limitations_pakai_saran_generik_lama(self):
+        poin = _poin(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tidak Dinilai", fakta={"dinilai": False},
+        )
+        hasil = template_low_confidence(poin)
+        assert hasil.rekomendasi.saran == _SARAN_TIDAK_DINILAI
+        assert hasil.low_confidence is True

@@ -29,6 +29,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
         "l2_sample_itbx_x_tanpa_intensitas.json",
         "l2_sample_amplop_8913.json",
         "l2_sample_amplop_8090.json",
+        "l2_sample_amplop_2428.json",
     ],
 )
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
@@ -122,6 +123,30 @@ class TestKontrakBackendBerubah:
         koef = assessment.impact_assessment.c_coefficients
         assert koef["Kelas_Atap"] == "Perdagangan Sekeliling Pusat Kota"
         assert koef["C_Atap_KBLI"] == 0.7
+
+    def test_dinilai_false_dgn_limitations_multi_persil_diterima(self):
+        # APP-2026-2428: dinilai=False penyebab BARU (poligon bersinggungan >1 persil), BEDA dari
+        # penyebab lama (gate berhenti di ITBX). limitations bawa alasan bebas-teks dari BE.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_2428.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.impact_assessment.dinilai is False
+        assert "lebih dari 1 persil" in assessment.impact_assessment.limitations
+
+    def test_luas_usulan_melebihi_persil_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_2428.json").read_text(encoding="utf-8"))
+        data = json.loads(json.dumps(payload["data"]))
+        data["impact_assessment"]["dinilai"] = True
+        data["impact_assessment"]["luas_usulan_melebihi_persil"] = True
+        assessment = L2Assessment.model_validate(data)
+        assert assessment.impact_assessment.luas_usulan_melebihi_persil is True
+
+    def test_field_impact_assessment_baru_tak_dikenal_diabaikan_bukan_422(self):
+        # delta_c/detailed_surface_breakdown/luas_persil_source/c_before_source — sengaja TAK
+        # dideklarasikan eksplisit di skema, harus diam-diam diabaikan (Pydantic default), bukan
+        # bikin request gagal validasi.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_2428.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])  # tak boleh raise
+        assert assessment.impact_assessment.dinilai is False
 
 
 def test_parameter_intensitas_ambang_null_toleran():

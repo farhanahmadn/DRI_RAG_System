@@ -642,6 +642,52 @@ class TestPaksaFieldWajib:
         assert "DATA_CONFIDENCE" not in hasil.rekomendasi.disclaimer
         assert "Medium" not in hasil.rekomendasi.disclaimer
 
+    def test_luas_usulan_melebihi_persil_true_tambah_peringatan_disclaimer(self):
+        # APP-2026-2428, Cek #3b: peringatan WAJIB dirakit deterministik di guardrail, jaring
+        # pengaman kedua terlepas dari apakah LLM menyebutnya sendiri di reasoning/saran.
+        poin = _poin(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}, "luas_usulan_melebihi_persil": True},
+        )
+        output = _poin_output(poin_id="dampak", kategori="Dampak Tata Guna Lahan", status="Sedang")
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+        assert "melebihi luas bidang persil" in hasil.rekomendasi.disclaimer.lower()
+
+    def test_luas_usulan_melebihi_persil_false_tidak_tambah_peringatan(self):
+        poin = _poin(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}, "luas_usulan_melebihi_persil": False},
+        )
+        output = _poin_output(poin_id="dampak", kategori="Dampak Tata Guna Lahan", status="Sedang")
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+        assert hasil.rekomendasi.disclaimer is None
+
+    def test_luas_usulan_melebihi_persil_hanya_utk_poin_dampak(self):
+        # Field ini cuma relevan utk poin dampak — poin itbx/intensitas TIDAK boleh dapat peringatan
+        # ini walau (secara hipotetis/salah data) fakta-nya kebetulan punya key ini.
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x", "luas_usulan_melebihi_persil": True})
+        output = _poin_output(status="I")
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+        assert hasil.rekomendasi.disclaimer is None
+
+    def test_luas_usulan_melebihi_persil_tidak_dobel_kalau_sudah_disebut_llm(self):
+        poin = _poin(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}, "luas_usulan_melebihi_persil": True},
+        )
+        output = _poin_output(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", status="Sedang",
+            reasoning_panjang=(
+                "Luas usulan tapak bangunan + RTH melebihi luas bidang persil yang tercatat — hasil "
+                "perhitungan dampak berikut berpotensi kurang akurat, perlu peninjauan manual."
+            ),
+        )
+        hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
+        assert hasil.rekomendasi.disclaimer is None
+
     def test_data_confidence_konsisten_utk_ketiga_poin(self):
         assessment = _muat_assessment("l2_sample_lolos.json")
         assessment = assessment.model_copy(update={"meta": MetaL2(data_confidence_keseluruhan="High")})

@@ -213,6 +213,33 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         ),
     ]
 
+    # APP-2026-2428: dinilai=False sekarang punya penyebab BARU selain "gate berhenti sebelum
+    # dampak dievaluasi" — poligon pemohon bersinggungan dgn >1 bidang persil, back-end SENGAJA tak
+    # menghitung skor hidrologi (bukan kegagalan sistem). `limitations` bawa alasan itu apa adanya
+    # dari back-end — WAJIB disuntikkan di sini supaya LLM tahu alasan SEBENARNYA (bukan menebak/
+    # mengarang "gate berhenti"), dan supaya reasoning_pendek/panjang konsisten dgn `saran` yang
+    # sudah ditemplate deterministik di generator.py::_saran_tidak_dinilai (sumber sama).
+    if poin.status == "Tidak Dinilai" and fakta.get("limitations"):
+        lines.append(
+            f"\nALASAN_TIDAK_DINILAI: {fakta['limitations']}\n"
+            "Ini SEBAB SEBENARNYA dampak tak dinilai — JANGAN mengarang alasan lain (mis. 'gate "
+            "berhenti di tahap sebelumnya') kalau bukan ini alasannya. JANGAN merekomendasikan "
+            "solusi teknis drainase/mitigasi lingkungan apa pun di sini — itu tak relevan selama "
+            "penyebab di atas belum diselesaikan (mis. kalau soal batas persil, solusinya "
+            "administratif/spasial, bukan teknis lingkungan)."
+        )
+
+    # APP-2026-2428: usulan tapak+RTH melebihi luas persil tercatat — dampak TETAP dinilai (skor
+    # tetap dihitung back-end), tapi akurasinya berkurang. WAJIB tampil sbg peringatan eksplisit
+    # (deterministik JUGA ditambahkan ke disclaimer di guardrail.py — dua lapis, bukan
+    # mengandalkan LLM ingat menyebutnya di sini saja).
+    if fakta.get("luas_usulan_melebihi_persil"):
+        lines.append(
+            "\nPERINGATAN_LUAS_PERSIL: usulan luas tapak bangunan + RTH pemohon MELEBIHI luas "
+            "bidang persil yang tercatat di sistem. Sebutkan ini sbg catatan di reasoning & saran — "
+            "sarankan pemohon meninjau ulang proporsi KDB/KDH agar sesuai batas fisik persil."
+        )
+
     mitigasi = fakta.get("mitigasi") or {}
     if mitigasi.get("perlu_mitigasi"):
         lines.append("\nArah Mitigasi (FAKTA kualitatif, bukan angka pasti):")

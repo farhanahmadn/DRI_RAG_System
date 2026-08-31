@@ -122,6 +122,7 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "c_coefficients": impact.c_coefficients,
             "data_confidence": impact.data_confidence,
             "limitations": impact.limitations,
+            "luas_usulan_melebihi_persil": impact.luas_usulan_melebihi_persil,
             # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
             "mitigasi": sarankan_arah_mitigasi_dampak(impact),
             # Target kuantitatif (ambang runoff_change_index utk turun 1 kategori) — murni aritmatika

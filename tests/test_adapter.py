@@ -299,3 +299,37 @@ class TestFixtureAmplop8090:
     def test_rekomendasi_sistem_setuju_bersyarat(self):
         hasil = adaptasi(_muat_assessment("l2_sample_amplop_8090.json"))
         assert hasil.rekomendasi_sistem == "Setuju Bersyarat"
+
+
+class TestFixtureAmplop2428:
+    """APP-2026-2428: impact_assessment.dinilai=False dgn penyebab BARU (poligon bersinggungan
+    >1 persil, bukan gate berhenti di ITBX) — limitations bawa alasannya."""
+
+    def test_parse_tanpa_error(self):
+        _muat_assessment("l2_sample_amplop_2428.json")
+
+    def test_poin_dampak_status_tidak_dinilai_bawa_limitations(self):
+        assessment = _muat_assessment("l2_sample_amplop_2428.json")
+        hasil = adaptasi(assessment)
+        poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
+        assert poin_dampak.status == "Tidak Dinilai"
+        assert "lebih dari 1 persil" in poin_dampak.fakta["limitations"]
+
+    def test_poin_dampak_luas_usulan_melebihi_persil_terbawa(self):
+        # Simulasi kasus dinilai=True (skor tetap dihitung BE) TAPI luas usulan melebihi persil —
+        # butuh impact_category valid juga (fixture 2428 aslinya dinilai=False, kategori null).
+        assessment = _muat_assessment("l2_sample_amplop_8090.json")  # fixture dinilai=True, kategori terisi
+        assessment = assessment.model_copy(
+            update={"impact_assessment": assessment.impact_assessment.model_copy(
+                update={"luas_usulan_melebihi_persil": True}
+            )}
+        )
+        hasil = adaptasi(assessment)
+        poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
+        assert poin_dampak.fakta["luas_usulan_melebihi_persil"] is True
+
+    def test_poin_dampak_luas_usulan_melebihi_persil_default_none(self):
+        assessment = _muat_assessment("l2_sample_amplop_8090.json")  # fixture lama, tak punya field ini
+        hasil = adaptasi(assessment)
+        poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
+        assert poin_dampak.fakta["luas_usulan_melebihi_persil"] is None

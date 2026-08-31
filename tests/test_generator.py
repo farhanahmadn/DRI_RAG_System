@@ -10,6 +10,8 @@ from app.reasoning import llm_client as llm_client_module
 from app.reasoning.generator import (
     _QUERY_FALLBACK_PER_POIN,
     _SARAN_AMAN,
+    _SARAN_TIDAK_DINILAI,
+    _saran_tidak_dinilai,
     _zona_prefix_dari_nama,
     ambil_chunks_pendukung,
     apakah_aman,
@@ -491,6 +493,74 @@ def test_generate_poin_tidak_dinilai_saran_bukan_saran_aman(monkeypatch):
     assert hasil.rekomendasi.saran != _SARAN_AMAN
     assert "tidak dievaluasi" in hasil.rekomendasi.saran.lower()
     assert hasil.rekomendasi.target is None
+
+
+class TestSaranTidakDinilai:
+    """APP-2026-2428: _saran_tidak_dinilai echo `limitations` verbatim (FAITHFUL) kalau BE
+    mengirimnya, fallback ke pesan generik lama kalau tidak."""
+
+    def test_dgn_limitations_echo_verbatim(self):
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tidak Dinilai",
+            fakta={
+                "dinilai": False,
+                "limitations": "Permohonan bersinggungan dengan lebih dari 1 persil (memerlukan pengecekan manual)",
+            },
+        )
+        saran = _saran_tidak_dinilai(poin)
+        assert "Permohonan bersinggungan dengan lebih dari 1 persil" in saran
+        assert saran != _SARAN_TIDAK_DINILAI
+
+    def test_tanpa_limitations_fallback_generik(self):
+        poin = _poin(
+            poin_id="intensitas",
+            tipe_rekomendasi="numerik",
+            status="Tidak Dinilai",
+            fakta={"dinilai": False},
+        )
+        assert _saran_tidak_dinilai(poin) == _SARAN_TIDAK_DINILAI
+
+    def test_limitations_kosong_string_fallback_generik(self):
+        poin = _poin(
+            poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tidak Dinilai",
+            fakta={"dinilai": False, "limitations": ""},
+        )
+        assert _saran_tidak_dinilai(poin) == _SARAN_TIDAK_DINILAI
+
+
+def test_generate_poin_dampak_tidak_dinilai_multi_persil_saran_echo_limitations(monkeypatch):
+    """APP-2026-2428: end-to-end generate_poin() utk poin dampak Tidak Dinilai dgn limitations —
+    saran/target/langkah_konkret HARUS ditemplate (bukan dari LLM), reasoning tetap dari LLM."""
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "Dampak tidak dapat dinilai karena poligon bersinggungan >1 persil.",
+            "reasoning_panjang": "x",
+            "sitasi": [],
+            "saran": "Saran dari LLM ini HARUS diabaikan/ditimpa oleh template.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="dampak",
+        kategori="Dampak Tata Guna Lahan",
+        tipe_rekomendasi="numerik-mitigasi",
+        status="Tidak Dinilai",
+        fakta={
+            "dinilai": False,
+            "limitations": "Permohonan bersinggungan dengan lebih dari 1 persil (memerlukan pengecekan manual)",
+        },
+    )
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert "lebih dari 1 persil" in hasil.rekomendasi.saran
+    assert hasil.rekomendasi.saran != _SARAN_AMAN
+    assert hasil.rekomendasi.target is None
+    assert hasil.rekomendasi.langkah_konkret == []
 
 
 def test_generate_poin_merakit_dari_respons_llm_palsu(monkeypatch):

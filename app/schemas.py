@@ -133,6 +133,16 @@ class ImpactAssessment(BaseModel):
     luas_lahan_m2: float | None = None
     data_confidence: str | None = None
     limitations: str | None = None
+    # APP-2026-2428 (validasi batas persil, BE): `dinilai=False` sekarang punya penyebab BARU
+    # selain "gate berhenti di ITBX sebelum dampak dievaluasi" — poligon pemohon bersinggungan
+    # dgn >1 bidang persil, back-end sengaja tak menghitung skor hidrologi. `limitations` (sudah
+    # ada di atas) membawa alasan bebas-teks; field baru di bawah eksplisit boolean, dipakai saat
+    # dinilai=True TAPI usulan tapak+RTH melebihi luas persil tercatat (akurasi berkurang, bukan
+    # gagal total). Field lain versi baru (`delta_c`, `detailed_surface_breakdown`,
+    # `luas_persil_source`, `c_before_source`) SENGAJA tak dideklarasikan eksplisit di sini —
+    # Pydantic mengabaikan field tak dikenal secara default (bukan 422), dan tak ada logic reasoning
+    # yang butuh isinya saat ini — longgarkan lagi kalau nanti terbukti perlu.
+    luas_usulan_melebihi_persil: bool | None = None
 
 
 class MetaL2(BaseModel):

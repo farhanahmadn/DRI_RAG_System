@@ -32,6 +32,27 @@ _SARAN_TIDAK_DINILAI = (
     "tidak ada rekomendasi untuk poin ini."
 )
 
+
+def _saran_tidak_dinilai(poin: PoinKonteks) -> str:
+    """APP-2026-2428: status "Tidak Dinilai" sekarang punya >1 penyebab beda makna —
+    `_SARAN_TIDAK_DINILAI` generik di atas (gate berhenti di tahap sebelumnya) HANYA benar utk
+    kasus lama (mis. intensitas tanpa data krn ITBX gagal). Kasus baru: impact_assessment.dinilai=
+    False krn back-end SENGAJA menolak menghitung (mis. poligon bersinggungan >1 persil,
+    `poin.fakta['limitations']` terisi) — pesan generik "gate berhenti" jadi SALAH/menyesatkan di
+    sini (ITBX & intensitas bisa saja lolos normal, cuma dampak spesifik yg gagal, sebab spasial
+    bukan prosedural). Echo `limitations` VERBATIM (FAITHFUL, ground truth back-end, tak dikarang)
+    kalau tersedia — generalisasi otomatis ke alasan apa pun yg BE kirim nanti, bukan di-hardcode
+    ke "multi persil" doang. Fallback ke pesan generik lama kalau `limitations` kosong (kasus lama
+    tetap jalan spt sebelumnya, backward-compatible)."""
+    limitations = (poin.fakta or {}).get("limitations")
+    if limitations:
+        return (
+            f"Asesmen dampak tata guna lahan tidak dapat dilakukan: {limitations} Pemohon perlu "
+            "menindaklanjuti catatan tersebut sebelum penilaian dampak dapat diproses."
+        )
+    return _SARAN_TIDAK_DINILAI
+
+
 _LLM_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -260,8 +281,8 @@ def generate_poin(
 
     saran = llm_out["saran"]
     if poin.status == "Tidak Dinilai":
-        # Belum pernah dievaluasi (bukan "sudah memenuhi ketentuan") — lihat _SARAN_TIDAK_DINILAI.
-        saran = _SARAN_TIDAK_DINILAI
+        # Belum pernah dievaluasi (bukan "sudah memenuhi ketentuan") — lihat _saran_tidak_dinilai().
+        saran = _saran_tidak_dinilai(poin)
         target = None
         langkah_konkret = []
     elif apakah_aman(poin):

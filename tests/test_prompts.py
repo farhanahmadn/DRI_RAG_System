@@ -303,6 +303,63 @@ class TestFaktaDampak:
         prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=False), [])
         assert "Arah Mitigasi" not in prompt
 
+    def test_alasan_tidak_dinilai_muncul_dgn_limitations(self):
+        # APP-2026-2428: status "Tidak Dinilai" + limitations terisi -> WAJIB disuntikkan sbg
+        # ALASAN_TIDAK_DINILAI, instruksikan LLM jangan mengarang alasan/solusi teknis lain.
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tidak Dinilai",
+            fakta={
+                "dinilai": False,
+                "limitations": "Permohonan bersinggungan dengan lebih dari 1 persil (memerlukan pengecekan manual)",
+            },
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "ALASAN_TIDAK_DINILAI" in prompt
+        assert "lebih dari 1 persil" in prompt
+        assert "JANGAN mengarang alasan lain" in prompt
+        assert "JANGAN merekomendasikan solusi teknis drainase" in prompt
+
+    def test_alasan_tidak_dinilai_tak_muncul_tanpa_limitations(self):
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tidak Dinilai",
+            fakta={"dinilai": False},
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "ALASAN_TIDAK_DINILAI" not in prompt
+
+    def test_alasan_tidak_dinilai_tak_muncul_saat_status_bukan_tidak_dinilai(self):
+        poin = self._poin_dampak()
+        prompt = build_user_prompt(poin, [])
+        assert "ALASAN_TIDAK_DINILAI" not in prompt
+
+    def test_peringatan_luas_persil_muncul_saat_true(self):
+        poin = _poin(
+            poin_id="dampak",
+            kategori="Dampak Tata Guna Lahan",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Sedang",
+            fakta={
+                "impact_score": 65,
+                "mitigasi": {"perlu_mitigasi": False, "arah": []},
+                "luas_usulan_melebihi_persil": True,
+            },
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "PERINGATAN_LUAS_PERSIL" in prompt
+        assert "MELEBIHI" in prompt
+        assert "KDB/KDH" in prompt
+
+    def test_peringatan_luas_persil_tak_muncul_saat_false_atau_none(self):
+        poin = self._poin_dampak()  # tak set luas_usulan_melebihi_persil -> None
+        prompt = build_user_prompt(poin, [])
+        assert "PERINGATAN_LUAS_PERSIL" not in prompt
+
 
 class TestSitasi:
     def test_chunk_rag_muncul(self):

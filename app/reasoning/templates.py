@@ -15,7 +15,19 @@ from app.reasoning.calculator import (
     pilih_target_mitigasi_dampak,
     pilih_target_utama_intensitas,
 )
+from app.reasoning.generator import _saran_tidak_dinilai
 from app.schemas import LangkahKonkretOutput, PoinKonteks, PoinOutput, RekomendasiOutput
+
+
+def _saran_untuk_poin_aman(poin: PoinKonteks) -> str:
+    # APP-2026-2428: status "Tidak Dinilai" (mis. impact_assessment.dinilai=False krn poligon
+    # bersinggungan >1 persil) BUKAN "memenuhi ketentuan" — pesan "tidak diperlukan tindakan"
+    # SALAH/menyesatkan di sini, poin ini memang belum pernah dievaluasi sama sekali. Reuse
+    # _saran_tidak_dinilai dari generator.py (satu sumber kebenaran, bukan digandakan di sini —
+    # sama alasannya dgn kenapa _target_untuk_poin/_langkah_konkret_untuk_poin di bawah eksis).
+    if poin.status == "Tidak Dinilai":
+        return _saran_tidak_dinilai(poin)
+    return "Tidak diperlukan tindakan khusus untuk poin ini."
 
 
 def _target_untuk_poin(poin: PoinKonteks) -> float | str | None:
@@ -65,7 +77,7 @@ def template_aman(poin: PoinKonteks) -> PoinOutput:
         rekomendasi=RekomendasiOutput(
             tipe=poin.tipe_rekomendasi,
             target=_target_untuk_poin(poin),
-            saran="Tidak diperlukan tindakan khusus untuk poin ini.",
+            saran=_saran_untuk_poin_aman(poin),
             disclaimer=None,
             langkah_konkret=_langkah_konkret_untuk_poin(poin),
         ),
@@ -78,12 +90,26 @@ def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
 
     Status & target tetap dari fakta/calculator (kode, bukan LLM) — yang gagal cuma narasi bahasa.
     """
-    reasoning_pendek = "Penjelasan otomatis tidak tersedia untuk poin ini."
-    reasoning_panjang = (
-        f"Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin "
-        f"'{poin.kategori}' ({poin.poin_id}) setelah beberapa kali percobaan. Status ({poin.status}) "
-        "tetap berdasarkan data asli dari back-end; mohon dilakukan peninjauan manual oleh petugas."
-    )
+    # APP-2026-2428: status "Tidak Dinilai" (mis. impact_assessment.dinilai=False krn back-end
+    # SENGAJA menolak menghitung — poligon bersinggungan >1 persil) HARUS dapat saran & narasi yang
+    # mencerminkan alasan SEBENARNYA (echo poin.fakta['limitations']), BUKAN pesan generik "sistem
+    # gagal menghasilkan penjelasan" — itu keliru, generasi tetap bisa "gagal" (retry guardrail
+    # habis krn sebab lain, mis. rate limit) TAPI substansi jawabannya (kenapa dampak tak dinilai)
+    # sudah pasti & tetap harus akurat. `low_confidence` TETAP True di jalur fallback ini (sinyal
+    # operasional "generasi LLM sempat gagal", independen dari status poin) — cuma teksnya yg beda.
+    if poin.status == "Tidak Dinilai":
+        saran = _saran_tidak_dinilai(poin)
+        reasoning_pendek = saran
+        reasoning_panjang = saran
+    else:
+        saran = "Perlu peninjauan manual oleh petugas terkait poin ini."
+        reasoning_pendek = "Penjelasan otomatis tidak tersedia untuk poin ini."
+        reasoning_panjang = (
+            f"Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin "
+            f"'{poin.kategori}' ({poin.poin_id}) setelah beberapa kali percobaan. Status ({poin.status}) "
+            "tetap berdasarkan data asli dari back-end; mohon dilakukan peninjauan manual oleh petugas."
+        )
+    disclaimer = "Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual."
 
     return PoinOutput(
         poin_id=poin.poin_id,
@@ -95,8 +121,8 @@ def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
         rekomendasi=RekomendasiOutput(
             tipe=poin.tipe_rekomendasi,
             target=_target_untuk_poin(poin),
-            saran="Perlu peninjauan manual oleh petugas terkait poin ini.",
-            disclaimer="Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual.",
+            saran=saran,
+            disclaimer=disclaimer,
             langkah_konkret=_langkah_konkret_untuk_poin(poin),
         ),
         low_confidence=True,

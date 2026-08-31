@@ -1,0 +1,80 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "2fc5bfa5-17ef-46f6-85a7-fdd767b6972b",
+    "application_number": "APP-2026-2428",
+    "timestamp": "2026-08-31T08:34:08.302Z",
+    "lokasi": {
+      "koordinat": { "lat": -7.701900000000001, "lon": 110.32855000000002 },
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [[[110.3285, -7.70195], [110.3286, -7.70195], [110.3286, -7.70185], [110.3285, -7.70185], [110.3285, -7.70195]]]
+      },
+      "rdtr_zone": "Zona Pertanian",
+      "rdtr_subzone": "P-1",
+      "rdtr_subzone_source": "geojson_overlay",
+      "luas_lahan_m2": 850
+    },
+    "gate_hukum": {
+      "final_gate_status": "Lolos Bersyarat",
+      "rekomendasi_sistem": "Setuju Bersyarat",
+      "decisive_stage": "intensitas",
+      "tahapan": {
+        "itbx": {
+          "status": "I",
+          "lolos": true,
+          "kbli_diusulkan": "001",
+          "kegiatan_diusulkan": "Pertanian Tanaman Semusim",
+          "kegiatan_diizinkan": ["Pertanian Tanaman Semusim"],
+          "kegiatan_terbatas": [],
+          "kegiatan_bersyarat": [],
+          "keterangan_ketentuan": [],
+          "reason": "Lolos karena kegiatan Diizinkan (I) di zona Zona Pertanian",
+          "dasar_hukum": [
+            { "dokumen": "RDTR Sleman", "pasal": "Matriks ITBX", "kutipan": "Data KBLI referensi" }
+          ]
+        },
+        "intensitas": {
+          "status": "MELAMPAUI_BATAS",
+          "lolos": false,
+          "parameter": {
+            "kdb": { "usulan": 40, "ambang_maks": 10, "memenuhi": false, "satuan": "persen" },
+            "klb": { "usulan": 0.4, "ambang_maks": 1, "memenuhi": true, "satuan": "rasio" },
+            "kdh": { "usulan": 29.411764705882355, "ambang_min": 88, "memenuhi": false, "satuan": "persen" }
+          },
+          "luas_tapak_m2": 340,
+          "jumlah_lantai": 1,
+          "luas_rth_usulan_m2": 250,
+          "reason": "Melanggar Aturan: KDB (40 ) Max (10 ), KDH (29.411764705882355 ) Min (88 )",
+          "dasar_hukum": []
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": false,
+      "c_before": null,
+      "c_after": null,
+      "delta_c": null,
+      "runoff_change_index": null,
+      "impact_score": null,
+      "impact_category": null,
+      "calculation_details": null,
+      "threshold_bands": null,
+      "existing_surface_details": null,
+      "proposed_surface_details": null,
+      "detailed_surface_breakdown": null,
+      "c_coefficients": null,
+      "luas_lahan_m2": null,
+      "luas_persil_source": null,
+      "c_before_source": null,
+      "luas_usulan_melebihi_persil": null,
+      "data_confidence": null,
+      "limitations": "Permohonan bersinggungan dengan lebih dari 1 persil (memerlukan pengecekan manual)"
+    },
+    "meta": {
+      "data_confidence_keseluruhan": "Medium",
+      "caveats": []
+    }
+  }
+}

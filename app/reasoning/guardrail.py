@@ -432,6 +432,18 @@ def _paksa_field_wajib(
             if caveat not in teks_sudah_ada and caveat not in " ".join(disclaimer_tambahan):
                 disclaimer_tambahan.append(f"Catatan: {caveat}")
 
+    # Cek #3b — impact_assessment.luas_usulan_melebihi_persil (APP-2026-2428): peringatan WAJIB
+    # muncul di disclaimer, dirakit DETERMINISTIK di sini — TIDAK bergantung LLM mengingat
+    # menyebutnya sendiri di reasoning/saran (prompts.py sudah instruksikan LLM juga, tapi ini
+    # jaring pengaman kedua, pola sama spt Cek #3 di atas utk data_confidence/caveats).
+    if poin.poin_id == "dampak" and poin.fakta.get("luas_usulan_melebihi_persil"):
+        peringatan_persil = (
+            "Luas usulan tapak bangunan + RTH melebihi luas bidang persil yang tercatat — hasil "
+            "perhitungan dampak berikut berpotensi kurang akurat, perlu peninjauan manual."
+        )
+        if peringatan_persil.lower() not in teks_sudah_ada.lower() and peringatan_persil not in disclaimer_tambahan:
+            disclaimer_tambahan.append(peringatan_persil)
+
     # Cek #4 — wire cek_konsistensi_intensitas dari adapter.py. TIDAK PERNAH menimpa status/parameter.
     if poin.poin_id == "intensitas":
         masalah_konsistensi = cek_konsistensi_intensitas(assessment)
