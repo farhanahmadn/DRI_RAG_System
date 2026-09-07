@@ -79,6 +79,29 @@ class RetrieverAsli:
             return filters.model_copy(update={"dokumen": self._default_wilayah})
         return filters
 
+    def _pecah_seri_wilayah(self, conn, dok_ids: list[str]) -> list[str]:
+        """Pemecah seri utk `get_by_reference` saat rujukan back-end terlalu generik.
+
+        Bug terverifikasi 2026-09-07: `db._tok` membuang stopword rujukan ("rdtr", "kawasan",
+        "peraturan", "bupati", "rencana", "detail", "tata", "ruang"), sehingga rujukan BE
+        "RDTR Sleman Matriks ITBX" menyisakan token pembeda "sleman" saja — yang COCOK KE SEMUA
+        dokumen RDTR wilayah sekaligus dgn skor SERI, dan `match_dokumen` mengembalikan
+        Tengah+Timur+Barat (terukur: 1172 chunk lintas wilayah). `search()` sudah punya filter
+        wilayah (`_apply_default_wilayah`), `get_by_reference()` tidak — jadi jalur inilah satu-
+        satunya yang bisa menyodorkan sitasi wilayah lain ke LLM.
+
+        Sengaja PEMECAH SERI, bukan filter keras: hanya bertindak saat rujukan AMBIGU (>1 dokumen
+        cocok) DAN wilayah default termasuk di antaranya. Rujukan yang sudah spesifik (1 dokumen —
+        mis. "UU No. 41 Tahun 2009", "Permen PUPR 28/2015") TIDAK disentuh sama sekali, supaya
+        dokumen lintas-wilayah tetap bisa dirujuk apa adanya. Kalau wilayah default TIDAK ada di
+        antara yang cocok, daftar dikembalikan utuh (jangan mengosongkan hasil berdasar asumsi).
+        """
+        if not self._default_wilayah or len(dok_ids) < 2:
+            return dok_ids
+        wilayah_ids = set(db.match_dokumen(conn, set(db._tok(self._default_wilayah))))
+        cocok = [d for d in dok_ids if d in wilayah_ids]
+        return cocok or dok_ids
+
     def clear_cache(self) -> None:
         """Kosongkan cache retrieval in-memory milik instance ini. TIDAK dipanggil otomatis dari
         mana pun di kelas ini (retriever tak tahu kapan korpus di DB berubah) — dipanggil dari luar
@@ -153,6 +176,7 @@ class RetrieverAsli:
             dok_ids = db.match_dokumen(conn, set(db._tok(ref)))
             if not dok_ids:
                 continue
+            dok_ids = self._pecah_seri_wilayah(conn, dok_ids)
             hits = db.lookup_reference(conn, dok_ids, pasal, ayat, lampiran)
             # fallback: kalau minta pasal spesifik tapi kosong, ambil dokumen-level apa adanya
             if not hits and (pasal or lampiran):

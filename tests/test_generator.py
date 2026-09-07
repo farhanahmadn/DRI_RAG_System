@@ -11,6 +11,7 @@ from app.reasoning.generator import (
     _QUERY_FALLBACK_PER_POIN,
     _SARAN_AMAN,
     _SARAN_TIDAK_DINILAI,
+    _pilih_chunks_referensi,
     _saran_tidak_dinilai,
     _zona_prefix_dari_nama,
     ambil_chunks_pendukung,
@@ -762,3 +763,103 @@ def test_generate_poin_itbx_bersyarat_grounded_live():
     assert hasil.status == "B"
     assert hasil.low_confidence is False
     assert hasil.reasoning_pendek.strip() != ""
+
+
+class TestPilihChunksReferensiSadarZona:
+    """APP-2026-2428 — chunk dari `get_by_reference` dipilih menurut KECOCOKAN ZONA pemohon,
+    bukan urutan DB. Bug aslinya: pemohon Zona Pertanian (P-1) disodori Lampiran V.B zona
+    Cagar Alam/R-2/R-3 (3 teratas urutan DB) sementara tabel zonanya sendiri ada di urutan 47,
+    lalu LLM mengutip Cagar Alam itu & lolos guardrail dgn terverifikasi=True."""
+
+    @staticmethod
+    def _poin(zona: str | None = "Zona Pertanian", subzona: str | None = "P-1") -> PoinKonteks:
+        return PoinKonteks(
+            poin_id="itbx",
+            kategori="Klasifikasi Kegiatan (ITBX)",
+            tipe_rekomendasi="kategorikal",
+            status="I",
+            fakta={"lolos": True, "reason": "x"},
+            zona=zona,
+            zona_subzone=subzona,
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="x")],
+        )
+
+    @staticmethod
+    def _chunk(cid: str, zona: str | None) -> Chunk:
+        return Chunk(id=cid, level="tabel", teks=f"teks {cid}", dokumen="RDTR Sleman Tengah", zona=zona)
+
+    def test_zona_keluarga_lain_dibuang_walau_paling_atas_urutan_db(self):
+        # Persis kasus APP-2026-2428: CA/R-2/R-3 di urutan teratas, P-1 jauh di belakang.
+        chunks = [
+            self._chunk("vb-ca", "CA"),
+            self._chunk("vb-r-2", "R-2"),
+            self._chunk("vb-r-3", "R-3"),
+            self._chunk("vb-p-1", "P-1"),
+        ]
+
+        hasil = _pilih_chunks_referensi(chunks, self._poin(), top_k=3)
+
+        assert [c.id for c in hasil] == ["vb-p-1"]
+
+    def test_subzona_persis_didahulukan_atas_keluarga_zona(self):
+        chunks = [
+            self._chunk("vb-p-1-lp2b", "P-1 LP2B"),  # satu keluarga (P), bukan sub-zona persis
+            self._chunk("vb-p-1", "P-1"),            # sub-zona persis -> harus naik ke atas
+        ]
+
+        hasil = _pilih_chunks_referensi(chunks, self._poin(), top_k=2)
+
+        assert [c.id for c in hasil] == ["vb-p-1", "vb-p-1-lp2b"]
+
+    def test_chunk_tanpa_zona_tetap_dipertahankan(self):
+        # Prosa umum (mis. Pasal 43 ttg klasifikasi I/T/B/X) tak terikat zona — sah dikutip zona
+        # mana pun, jangan ikut dibuang bersama zona yang salah.
+        chunks = [self._chunk("vb-ca", "CA"), self._chunk("p43", None)]
+
+        hasil = _pilih_chunks_referensi(chunks, self._poin(), top_k=3)
+
+        assert [c.id for c in hasil] == ["p43"]
+
+    def test_zona_pemohon_tak_dikenal_pertahankan_perilaku_lama(self):
+        # Tanpa sub-zona DAN nama zona tak ada di _ZONA_KODE_PREFIX -> jangan menebak, potong saja.
+        chunks = [self._chunk("a", "CA"), self._chunk("b", "R-2"), self._chunk("c", "P-1")]
+
+        hasil = _pilih_chunks_referensi(chunks, self._poin(zona="Zona Antah Berantah", subzona=None), top_k=2)
+
+        assert [c.id for c in hasil] == ["a", "b"]
+
+    def test_hanya_nama_zona_induk_tanpa_subzona_saring_per_keluarga(self):
+        chunks = [self._chunk("vb-kt", "KT"), self._chunk("vb-r-4", "R-4"), self._chunk("vb-r-2", "R-2")]
+
+        hasil = _pilih_chunks_referensi(chunks, self._poin(zona="Zona Perumahan", subzona=None), top_k=3)
+
+        assert [c.id for c in hasil] == ["vb-r-4", "vb-r-2"]
+
+    def test_semua_kandidat_salah_zona_jatuh_ke_search_berfilter(self):
+        """Kalau tak ada satu pun kandidat yang cocok zona, lebih baik daftar kosong -> pemanggil
+        jatuh ke search() yang SUDAH berfilter zona, drpd menyodorkan Lampiran zona lain."""
+
+        class _RetrieverSalahZonaSemua:
+            def __init__(self):
+                self.query_search = None
+
+            def search(self, query, filters, top_k=5):
+                self.query_search = (query, filters)
+                return [Chunk(id="hasil-search", level="tabel", teks="t", dokumen="d", zona="P-1")]
+
+            def get_by_reference(self, referensi):
+                return [
+                    Chunk(id="vb-ca", level="tabel", teks="t", dokumen="d", zona="CA"),
+                    Chunk(id="vb-r-2", level="tabel", teks="t", dokumen="d", zona="R-2"),
+                ]
+
+            def get_parent(self, chunk_id):
+                return None
+
+        retriever = _RetrieverSalahZonaSemua()
+
+        hasil = ambil_chunks_pendukung(self._poin(), retriever)
+
+        assert [c.id for c in hasil] == ["hasil-search"]
+        assert retriever.query_search is not None, "harus jatuh ke search(), bukan diam-diam kosong"
+        assert retriever.query_search[1].zona == "P-1"

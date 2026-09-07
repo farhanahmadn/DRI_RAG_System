@@ -146,6 +146,61 @@ def _zona_prefix_dari_nama(nama_zona: str | None) -> str | None:
     return _ZONA_KODE_PREFIX.get(nama_zona.strip().lower())
 
 
+def _keluarga_zona(kode: str | None) -> str | None:
+    """Kode sub-zona -> keluarga zonanya: "P-1"/"P-1 LP2B" -> "P", "RTH-2" -> "RTH", "CA" -> "CA".
+    Sejalan dgn `_ZONA_KODE_PREFIX` di atas (nilai dict itu = keluarga zona yang sama)."""
+    if not kode:
+        return None
+    return kode.strip().upper().split("-")[0].split()[0] or None
+
+
+def _skor_kecocokan_zona(chunk_zona: str | None, subzona: str | None, prefix: str | None) -> int | None:
+    """Seberapa cocok satu chunk dgn zona pemohon. 3 = sub-zona persis, 2 = satu keluarga zona,
+    1 = chunk tak terikat zona apa pun (prosa umum spt Pasal 43 — sah dikutip zona mana pun).
+    None = chunk milik KELUARGA ZONA LAIN, harus DIBUANG (inilah sumber salah-sitasi)."""
+    if not chunk_zona:
+        return 1
+    kode = chunk_zona.strip().upper()
+    if subzona and kode == subzona.strip().upper():
+        return 3
+    if prefix and _keluarga_zona(kode) == prefix.strip().upper():
+        return 2
+    return None
+
+
+def _pilih_chunks_referensi(chunks: list[Chunk], poin: PoinKonteks, top_k: int) -> list[Chunk]:
+    """Pilih chunk hasil `get_by_reference` menurut KECOCOKAN ZONA pemohon, bukan urutan DB.
+
+    Bug nyata (APP-2026-2428, terverifikasi thd DB & logs/precheck.jsonl 2026-09-07): rujukan
+    generik back-end ("RDTR Sleman" + "Matriks ITBX") membuat `get_by_reference` mengembalikan
+    ribuan chunk seluruh korpus, lalu dipotong `[:top_k]` menurut urutan DB apa adanya. Untuk
+    pemohon Zona Pertanian (P-1), 3 chunk teratas urutan DB adalah Lampiran V.B zona CA/R-2/R-3 —
+    sehingga permohonan pertanian dijelaskan memakai Lampiran **Cagar Alam**, lolos guardrail dgn
+    `terverifikasi=True` (guardrail cuma mengecek citation_id ADA di daftar kandidat, bukan bahwa
+    kandidatnya relevan). Tabel zona pemohon sendiri (`vb-p-1`) ada jauh di urutan 47 — tak pernah
+    terkirim. Urutan DB memang bukan sinyal relevansi apa pun; di sinilah relevansi ditentukan.
+
+    Chunk keluarga zona LAIN dibuang, bukan cuma diturunkan peringkatnya — kalau semua kandidat
+    ternyata salah zona, lebih baik daftar kosong (pemanggil jatuh ke `search()` yang SUDAH
+    berfilter zona) drpd menyodorkan Lampiran zona lain ke LLM. Zona pemohon tak dikenal -> JANGAN
+    menebak, pertahankan perilaku lama (potong menurut urutan apa adanya).
+    """
+    subzona = poin.zona_subzone
+    prefix = _zona_prefix_dari_nama(poin.zona)
+    if not subzona and not prefix:
+        return chunks[:top_k]
+
+    berskor: list[tuple[int, int, Chunk]] = []
+    for urutan_asli, chunk in enumerate(chunks):
+        skor = _skor_kecocokan_zona(chunk.zona, subzona, prefix)
+        if skor is None:
+            continue
+        # -skor supaya skor tertinggi dulu; `urutan_asli` menjaga urutan semula utk skor yang sama.
+        berskor.append((-skor, urutan_asli, chunk))
+    berskor.sort()
+    return [chunk for _, _, chunk in berskor[:top_k]]
+
+
 def ambil_chunks_pendukung(
     poin: PoinKonteks,
     retriever: Retriever,
@@ -161,8 +216,9 @@ def ambil_chunks_pendukung(
     # yang membanjiri LLM bikin ia gagal memilih sitasi sama sekali. Batasi ke top_k_dukungan di sini
     # (bukan di retriever.py — bukan file saya) — anchor (dasar_hukum asli) tetap utuh dikirim terpisah
     # ke prompt (lihat build_user_prompt), jadi pembatasan ini TIDAK mengurangi sitasi yang faithful.
-    if len(chunks) > top_k_dukungan:
-        chunks = chunks[:top_k_dukungan]
+    # APP-2026-2428: pemotongan itu TIDAK BOLEH menurut urutan DB — pilih menurut kecocokan zona
+    # pemohon dulu (lihat _pilih_chunks_referensi utk bukti & alasan lengkapnya).
+    chunks = _pilih_chunks_referensi(chunks, poin, top_k_dukungan)
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
         # APP-2026-8090: filter EXACT ke sub-zona presisi (mis. "P-1") kalau BE mengirim &
