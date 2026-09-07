@@ -7,6 +7,7 @@ diterapkan konsisten (semantik sama dgn MockRetriever). Dipakai retriever.py.
 from __future__ import annotations
 
 import os
+import re
 from datetime import date
 
 try:  # muat .env (DATABASE_URL) bila belum diset shell — supaya retriever jalan dari entrypoint mana pun
@@ -115,13 +116,43 @@ def dense_search_ab(conn, query_vec: list[float], provider: str, filters: Retrie
         return [(r[0], float(r[1])) for r in cur.fetchall()]
 
 
+_RE_LEXEME = re.compile(r"\w+")
+
+
+def tsquery_or(query_text: str) -> str | None:
+    r"""Rakit tsquery ber-OR dari kata-kata `query_text`. None kalau tak ada kata yang layak.
+
+    Kenapa OR, bukan `plainto_tsquery` (2026-09-07): `plainto_tsquery` meng-AND-kan SEMUA lexeme,
+    jadi sebuah chunk harus memuat SELURUH kata query supaya cocok. Diukur atas korpus Sleman
+    Tengah, itu membuat sisi lexical hybrid praktis mati — "kegiatan" dan "dampak tata guna lahan"
+    mengembalikan 0 kandidat, "kdb"/"klb"/"kdh" cuma 1 — sehingga RRF (fusion.py) selama ini
+    hampir selalu memfusikan dense dengan sisi kosong, alias dense-only tanpa jaring pengaman.
+    Dengan OR: 48/47/37/74/73/10/25 kandidat utk kdb/klb/kdh/kegiatan/dampak/banjir/sempadan.
+
+    Token disaring `\w+` dan `len > 1` lalu di-dedup (urutan dijaga) — murni alfanumerik, jadi
+    tidak ada karakter operator tsquery (`&`, `|`, `!`, `:`, tanda kurung) yang bisa lolos ke
+    `to_tsquery` dan bikin syntax error / query liar.
+    """
+    token = [t for t in _RE_LEXEME.findall(query_text.lower()) if len(t) > 1]
+    if not token:
+        return None
+    return " | ".join(dict.fromkeys(token))
+
+
 def fts_search(conn, query_text: str, filters: RetrievalFilters | None, limit: int) -> list[tuple[str, float]]:
-    """Lexical FTS Postgres (BM25-ish, ts_rank_cd). Return [(id, rank)] terurut menurun."""
+    """Lexical FTS Postgres (BM25-ish, ts_rank_cd). Return [(id, rank)] terurut menurun.
+
+    PENTING: beri `query_text` yang ASLI (belum lewat `retriever._expand`). Expansion berguna utk
+    dense/rerank, tapi merusak sisi lexical — lihat `tsquery_or` di atas.
+    """
+    tsq = tsquery_or(query_text)
+    if tsq is None:
+        return []
     w, params = _where(filters)
-    sql = (f"SELECT id, ts_rank_cd(fts, q) AS rank FROM chunks, plainto_tsquery('simple', %s) q "
+    sql = (f"SELECT id, ts_rank_cd(fts, q) AS rank FROM chunks, to_tsquery('simple', %s) q "
            f"WHERE fts @@ q{w} ORDER BY rank DESC LIMIT %s")
     with conn.cursor() as cur:
-        cur.execute(sql, [query_text, *params, limit])
+        cur.execute(sql, [tsq, *params, limit])
         return [(r[0], float(r[1])) for r in cur.fetchall()]
 
 

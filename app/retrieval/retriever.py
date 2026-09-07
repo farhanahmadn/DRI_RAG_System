@@ -141,7 +141,9 @@ class RetrieverAsli:
             # HARUS dari model yang sama, jadi baca `chunk_embeddings_ab` (kandidat A/B), BUKAN
             # `chunks.embedding` (baseline bge-m3) yang ruang vektornya tak sepadan/tak bermakna.
             dense = db.dense_search_ab(conn, qvec, embedding_provider, filters, self._candidate_k)
-        lexical = db.fts_search(conn, q, filters, self._candidate_k)
+        # Query ASLI (bukan `q` yang sudah di-_expand): expansion ~10 kata membunuh sisi
+        # lexical karena FTS meng-OR-kan lexeme query — lihat db.tsquery_or().
+        lexical = db.fts_search(conn, query, filters, self._candidate_k)
 
         fused = fusion.reciprocal_rank_fusion([[i for i, _ in dense], [i for i, _ in lexical]])
         if not fused:
