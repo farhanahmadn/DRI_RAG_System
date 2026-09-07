@@ -19,7 +19,7 @@ from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
 from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
-from app.reasoning.guardrail import caveat_fallback_itbx, generate_poin_dengan_guardrail
+from app.reasoning.guardrail import DiagnosaPoin, caveat_fallback_itbx, generate_poin_terdiagnosis
 from app.reasoning.prompts import SYSTEM_PROMPT_KESIMPULAN, build_kesimpulan_prompt
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
@@ -54,17 +54,25 @@ _MAX_WORKERS = int(os.getenv("REASONING_MAX_WORKERS", "8"))
 _executor = ThreadPoolExecutor(max_workers=_MAX_WORKERS, thread_name_prefix="reasoning-poin")
 
 
-def _generate_poin_defensif(poin: PoinKonteks, retriever: Retriever, assessment: L2Assessment) -> PoinOutput:
+def _generate_poin_defensif(
+    poin: PoinKonteks, retriever: Retriever, assessment: L2Assessment
+) -> tuple[PoinOutput, DiagnosaPoin]:
     """Lapis pertahanan tambahan: guardrail.py seharusnya tidak pernah raise, tapi kalau suatu
-    saat ada bug tak terduga, batch tidak boleh gagal total gara-gara 1 poin."""
+    saat ada bug tak terduga, batch tidak boleh gagal total gara-gara 1 poin.
+
+    Ikut membawa keluar `DiagnosaPoin` (sebab poin ini berakhir spt itu) — dipakai `log_precheck`,
+    TIDAK ikut ke `OutputL3`. Lihat guardrail.DiagnosaPoin utk kenapa ini perlu ada."""
     try:
-        return generate_poin_dengan_guardrail(poin, retriever, assessment)
-    except Exception:
+        return generate_poin_terdiagnosis(poin, retriever, assessment)
+    except Exception as exc:
         logger.exception(
-            "generate_poin_dengan_guardrail gagal tak terduga utk %s — fallback low_confidence.",
+            "generate_poin_terdiagnosis gagal tak terduga utk %s — fallback low_confidence.",
             poin.poin_id,
         )
-        return template_low_confidence(poin)
+        diagnosa = DiagnosaPoin(
+            poin_id=poin.poin_id, berhasil=False, exception_terakhir=f"{type(exc).__name__}: {exc}"
+        )
+        return template_low_confidence(poin), diagnosa
 
 
 _KALIMAT_FALLBACK_ITBX = (
@@ -224,7 +232,9 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
         _executor.submit(_generate_poin_defensif, poin, retriever, assessment)
         for poin in hasil_adaptasi.poin
     ]
-    poin_list = [f.result() for f in futures]  # urutan submit == urutan hasil (itbx, intensitas, dampak)
+    hasil_poin = [f.result() for f in futures]  # urutan submit == urutan hasil (itbx, intensitas, dampak)
+    poin_list = [p for p, _ in hasil_poin]
+    diagnostik = [d for _, d in hasil_poin]
 
     output = OutputL3(
         ringkasan_gate=_rakit_ringkasan_gate(assessment, itbx_fallback),
@@ -239,7 +249,7 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     )
 
     try:
-        log_precheck(assessment, output)
+        log_precheck(assessment, output, diagnostik=[vars(d) | {"sebab": d.sebab()} for d in diagnostik])
     except Exception:
         logger.exception("Gagal menulis log precheck — melanjutkan tanpa menggagalkan respons.")
 

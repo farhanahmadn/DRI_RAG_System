@@ -4,6 +4,7 @@ from pathlib import Path
 
 from app.adapter import adaptasi
 from app.reasoning import assemble as assemble_module
+from app.reasoning.guardrail import DiagnosaPoin
 from app.reasoning.assemble import (
     CAVEAT_DI_LUAR_CAKUPAN,
     _rakit_catatan_global,
@@ -39,22 +40,30 @@ def _poin_output(**overrides) -> PoinOutput:
     return PoinOutput(**defaults)
 
 
+def _diagnosa_stub(poin_id: str, berhasil: bool = True) -> DiagnosaPoin:
+    """Diagnosa minimal utk stub — assemble sekarang menerima (PoinOutput, DiagnosaPoin)."""
+    return DiagnosaPoin(poin_id=poin_id, berhasil=berhasil, percobaan=1, jumlah_chunk=1)
+
+
 def _patch_guardrail(monkeypatch, poin_by_id: dict[str, PoinOutput]):
     dipanggil = []
 
     def _stub(poin, retriever, assessment, *, max_retry=2):
         dipanggil.append(poin.poin_id)
-        return poin_by_id[poin.poin_id]
+        return poin_by_id[poin.poin_id], _diagnosa_stub(poin.poin_id)
 
-    monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub)
+    monkeypatch.setattr(assemble_module, "generate_poin_terdiagnosis", _stub)
     return dipanggil
 
 
 def _patch_log(monkeypatch):
     panggilan = []
-    monkeypatch.setattr(
-        assemble_module, "log_precheck", lambda request, response: panggilan.append((request, response))
-    )
+
+    # **kwargs: assemble sekarang meneruskan `diagnostik=` (lihat guardrail.DiagnosaPoin).
+    def _stub(request, response, **kwargs):
+        panggilan.append((request, response, kwargs))
+
+    monkeypatch.setattr(assemble_module, "log_precheck", _stub)
     return panggilan
 
 
@@ -444,9 +453,25 @@ class TestJalankanPrecheckEndToEnd:
         output = jalankan_precheck(assessment, MockRetriever())
 
         assert len(panggilan) == 1
-        logged_request, logged_response = panggilan[0]
+        logged_request, logged_response, kwargs = panggilan[0]
         assert logged_request == assessment
         assert logged_response == output
+        # Diagnostik ikut ke log (bukan ke OutputL3) — satu entri per poin, lengkap dgn label sebab.
+        diagnostik = kwargs["diagnostik"]
+        assert [d["poin_id"] for d in diagnostik] == ["itbx", "intensitas", "dampak"]
+        assert all("sebab" in d for d in diagnostik)
+
+    def test_diagnostik_tidak_bocor_ke_output_l3(self, monkeypatch):
+        """Diagnostik itu data operasional — `OutputL3` adalah kontrak dgn back-end/reviewer dan
+        tidak boleh membengkak olehnya."""
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)
+        _patch_log(monkeypatch)
+
+        output = jalankan_precheck(_muat_assessment("l2_sample_lolos.json"), MockRetriever())
+
+        serialisasi = output.model_dump(mode="json")
+        assert "diagnostik" not in serialisasi
+        assert all("diagnostik" not in p for p in serialisasi["poin"])
 
 
 class TestPemrosesanParalel:
@@ -455,9 +480,9 @@ class TestPemrosesanParalel:
 
         def _stub_lambat(poin, retriever, assessment, *, max_retry=2):
             time.sleep(durasi_tidur)
-            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori)
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori), _diagnosa_stub(poin.poin_id)
 
-        monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_lambat)
+        monkeypatch.setattr(assemble_module, "generate_poin_terdiagnosis", _stub_lambat)
         _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
         _patch_log(monkeypatch)
 
@@ -475,9 +500,9 @@ class TestPemrosesanParalel:
         def _stub_durasi_terbalik(poin, retriever, assessment, *, max_retry=2):
             durasi = {"itbx": 0.3, "intensitas": 0.15, "dampak": 0.05}[poin.poin_id]
             time.sleep(durasi)
-            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori)
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori), _diagnosa_stub(poin.poin_id)
 
-        monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_durasi_terbalik)
+        monkeypatch.setattr(assemble_module, "generate_poin_terdiagnosis", _stub_durasi_terbalik)
         _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
         _patch_log(monkeypatch)
 
@@ -490,9 +515,9 @@ class TestPemrosesanParalel:
         def _stub_campuran(poin, retriever, assessment, *, max_retry=2):
             if poin.poin_id == "intensitas":
                 raise RuntimeError("bug tak terduga di guardrail")
-            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori)
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori), _diagnosa_stub(poin.poin_id)
 
-        monkeypatch.setattr(assemble_module, "generate_poin_dengan_guardrail", _stub_campuran)
+        monkeypatch.setattr(assemble_module, "generate_poin_terdiagnosis", _stub_campuran)
         _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
         _patch_log(monkeypatch)
 

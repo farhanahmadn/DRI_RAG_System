@@ -3,6 +3,7 @@ from pathlib import Path
 
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.guardrail import (
+    DiagnosaPoin,
     _bersihkan_disclaimer_fallback_palsu,
     _cari_band_untuk_index,
     _cek_invers_skor,
@@ -14,12 +15,13 @@ from app.reasoning.guardrail import (
     _paksa_field_wajib,
     caveat_fallback_itbx,
     generate_poin_dengan_guardrail,
+    generate_poin_terdiagnosis,
     perbaiki_poin,
     verifikasi_entailment_sitasi,
 )
 from app.retrieval.base import Chunk
 from app.retrieval.mock import MockRetriever
-from app.schemas import L2Assessment, LangkahKonkretOutput, MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
+from app.schemas import DasarHukum, L2Assessment, LangkahKonkretOutput, MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -1001,3 +1003,129 @@ class TestGeneratePoinDenganGuardrail:
 
 def test_verifikasi_entailment_sitasi_stub_selalu_true():
     assert verifikasi_entailment_sitasi(_poin_output(), []) is True
+
+
+class TestDiagnosaSebab:
+    """`DiagnosaPoin.sebab()` — label kasar yang memisahkan tiga sebab low_confidence yang selama
+    ini tak terbedakan di logs/precheck.jsonl (51% permohonan nyata punya minimal 1 poin
+    low_confidence, tanpa satu pun petunjuk kenapa)."""
+
+    def test_berhasil(self):
+        assert DiagnosaPoin(poin_id="itbx", berhasil=True).sebab() == "berhasil"
+
+    def test_panggilan_llm_gagal_menang_atas_sebab_lain(self):
+        # Rate limit / timeout: sebab paling akar, walau masalah guardrail juga terisi.
+        d = DiagnosaPoin(
+            poin_id="itbx", berhasil=False, jumlah_chunk=3,
+            masalah_terakhir=["sitasi kosong"], exception_terakhir="RateLimitError: 429",
+        )
+        assert d.sebab() == "panggilan_llm_gagal"
+
+    def test_retrieval_kosong(self):
+        d = DiagnosaPoin(poin_id="itbx", berhasil=False, jumlah_chunk=0, masalah_terakhir=["sitasi kosong"])
+        assert d.sebab() == "retrieval_kosong"
+
+    def test_guardrail_menolak(self):
+        d = DiagnosaPoin(poin_id="itbx", berhasil=False, jumlah_chunk=3, masalah_terakhir=["verdict kontradiktif"])
+        assert d.sebab() == "guardrail_menolak"
+
+    def test_tak_diketahui_saat_tak_ada_petunjuk(self):
+        assert DiagnosaPoin(poin_id="itbx", berhasil=False, jumlah_chunk=3).sebab() == "tak_diketahui"
+
+
+class TestGeneratePoinTerdiagnosis:
+    """Diagnosa dari jalur sungguhan — perilaku PoinOutput-nya wajib identik dgn
+    `generate_poin_dengan_guardrail` (yang kini cuma pembungkus tipis)."""
+
+    def test_llm_gagal_terus_sebab_panggilan_llm_gagal(self, monkeypatch):
+        def _stub_raise(*args, **kwargs):
+            raise RuntimeError("simulasi RateLimitError")
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub_raise)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        hasil, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert hasil.low_confidence is True
+        assert diagnosa.berhasil is False
+        assert diagnosa.percobaan == 2                      # max_retry=1 -> 2 percobaan
+        assert diagnosa.sebab() == "panggilan_llm_gagal"
+        assert "simulasi RateLimitError" in diagnosa.exception_terakhir
+
+    def test_guardrail_menolak_terus_sebab_guardrail_menolak(self, monkeypatch):
+        def _stub_reasoning_kosong(prompt, json_schema, *, schema_name="response", system=None,
+                                   temperature=0.0, max_tokens=1024):
+            return {"reasoning_pendek": "", "reasoning_panjang": "", "sitasi": [],
+                    "saran": "", "disclaimer": None}
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub_reasoning_kosong)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        hasil, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert hasil.low_confidence is True
+        assert diagnosa.exception_terakhir is None          # LLM-nya menjawab, isinya yang ditolak
+        assert diagnosa.masalah_terakhir, "temuan guardrail terakhir harus terekam, bukan dibuang"
+        assert diagnosa.sebab() == "guardrail_menolak"
+
+    def test_exception_lalu_berhasil_tidak_salah_label(self, monkeypatch):
+        """Percobaan 1 kena exception, percobaan 2 lolos -> `berhasil`, BUKAN
+        `panggilan_llm_gagal`. Tanpa reset eksplisit, exception basi akan salah melabeli."""
+        n = {"i": 0}
+
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            n["i"] += 1
+            if n["i"] == 1:
+                raise RuntimeError("gagal sekali")
+            return {
+                "reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+                "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Bersyarat (B) sesuai ketentuan zona.",
+                "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
+                "disclaimer": None,
+            }
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(
+            status="B",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+        )
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        hasil, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=2)
+
+        assert hasil.low_confidence is False
+        assert diagnosa.berhasil is True
+        assert diagnosa.percobaan == 2
+        assert diagnosa.exception_terakhir is None
+        assert diagnosa.sebab() == "berhasil"
+
+    def test_pembungkus_lama_mengembalikan_poinoutput_yang_sama(self, monkeypatch):
+        def _stub_raise(*args, **kwargs):
+            raise RuntimeError("gagal")
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub_raise)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        lama = generate_poin_dengan_guardrail(poin, MockRetriever(), assessment, max_retry=1)
+        baru, _ = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert lama == baru
+
+    def test_fallback_dilog_dgn_sebabnya(self, monkeypatch, caplog):
+        def _stub_raise(*args, **kwargs):
+            raise RuntimeError("simulasi RateLimitError")
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub_raise)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        with caplog.at_level("WARNING", logger="app.reasoning.guardrail"):
+            generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert "low_confidence" in caplog.text
+        assert "sebab=panggilan_llm_gagal" in caplog.text

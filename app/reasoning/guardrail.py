@@ -22,6 +22,7 @@ Verifikasi entailment sitasi/verdict (NLI/LLM) DITUNDA sampai eval membuktikan p
 
 import logging
 import re
+from dataclasses import dataclass, field
 
 from app.adapter import cek_konsistensi_intensitas
 from app.reasoning.calculator import (
@@ -556,26 +557,75 @@ def verifikasi_entailment_sitasi(poin: PoinOutput, chunks: list[Chunk]) -> bool:
     return True
 
 
-def generate_poin_dengan_guardrail(
+@dataclass
+class DiagnosaPoin:
+    """Kenapa satu poin berakhir seperti itu — sebab, bukan cuma akibat.
+
+    Motivasi (2026-09-07): dari 76 permohonan dgn LLM sungguhan di `logs/precheck.jsonl`, 39 (51%)
+    punya minimal satu poin `low_confidence`. Tapi begitu retry habis, `generate_poin_dengan_guardrail`
+    hanya mengembalikan `template_low_confidence` — daftar `masalah` terakhir dibuang, dan
+    `log_precheck` cuma menyimpan request+response akhir. Akibatnya tiga sebab yang butuh
+    penanganan BERBEDA jadi tak terbedakan sama sekali:
+      1. guardrail menolak isi/gaya bahasa jawaban model (mis. `_cek_konsistensi_verdict` menuntut
+         frasa persis "dilarang"/"tidak diizinkan" — peninggalan tuning `llama-3.3-70b`),
+      2. panggilan LLM gagal total (rate limit Groq / timeout / BadRequestError),
+      3. retrieval tak memberi chunk pendukung sama sekali.
+    Struktur ini membawa sebabnya keluar supaya bisa dihitung, BUKAN ditebak.
+
+    TIDAK ikut ke `OutputL3` — ini data operasional, bukan bagian kontrak dgn back-end/reviewer.
+    """
+
+    poin_id: str
+    berhasil: bool
+    percobaan: int = 0                              # berapa kali generate_poin benar-benar dipanggil
+    jumlah_chunk: int = 0                           # chunk pendukung yang berhasil diretrieve
+    masalah_terakhir: list[str] = field(default_factory=list)   # temuan guardrail di percobaan terakhir
+    exception_terakhir: str | None = None           # "RateLimitError: ..." kalau LLM-nya yang gagal
+
+    def sebab(self) -> str:
+        """Satu label kasar utk dihitung agregat: kenapa poin ini jatuh ke low_confidence."""
+        if self.berhasil:
+            return "berhasil"
+        if self.exception_terakhir:
+            return "panggilan_llm_gagal"
+        if self.jumlah_chunk == 0:
+            return "retrieval_kosong"
+        if self.masalah_terakhir:
+            return "guardrail_menolak"
+        return "tak_diketahui"
+
+
+def generate_poin_terdiagnosis(
     poin: PoinKonteks,
     retriever: Retriever,
     assessment: L2Assessment,
     *,
     max_retry: int = 2,
-) -> PoinOutput:
-    """Entrypoint utama: generate_poin + guardrail + retry terarah + fallback low_confidence.
+) -> tuple[PoinOutput, DiagnosaPoin]:
+    """Sama persis dgn `generate_poin_dengan_guardrail`, TAPI ikut mengembalikan sebabnya.
 
-    APP-2026-3468: SEMUA poin (termasuk yang aman/lolos) lewat jalur LLM+guardrail penuh — poin
-    aman sebelumnya short-circuit ke template_aman() (reasoning generik, sitasi selalu kosong),
-    padahal reviewer tetap butuh tahu KENAPA poin ini lolos. Saran/target poin aman tetap
-    ditemplate deterministik di dalam generate_poin() sendiri (lihat generator.py).
+    Alur & perilaku TIDAK berubah sedikit pun — ini murni penambahan pengamatan (lihat DiagnosaPoin).
     """
-    chunks = ambil_chunks_pendukung(poin, retriever)
+    diagnosa = DiagnosaPoin(poin_id=poin.poin_id, berhasil=False)
+
+    try:
+        chunks = ambil_chunks_pendukung(poin, retriever)
+    except Exception as exc:
+        # Retrieval gagal (mis. PIIDetectedError, DB putus) — sebelumnya exception ini merambat ke
+        # assemble._generate_poin_defensif dan sebabnya cuma muncul di traceback. Catat dulu, lalu
+        # teruskan apa adanya supaya perilaku isolasi per-poin di assemble tetap sama.
+        diagnosa.exception_terakhir = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            "ambil_chunks_pendukung gagal utk poin %r: %s", poin.poin_id, diagnosa.exception_terakhir
+        )
+        raise
+    diagnosa.jumlah_chunk = len(chunks)
 
     masalah: list[str] = []
     for percobaan in range(max_retry + 1):
         catatan = "; ".join(masalah) if percobaan > 0 else None
         suhu = 0.4 if percobaan > 0 else 0.0
+        diagnosa.percobaan = percobaan + 1
 
         try:
             hasil = generate_poin(
@@ -595,11 +645,49 @@ def generate_poin_dengan_guardrail(
                 "generate_poin gagal (percobaan %d/%d) utk poin %r: %s: %s",
                 percobaan + 1, max_retry + 1, poin.poin_id, type(exc).__name__, exc,
             )
+            diagnosa.exception_terakhir = f"{type(exc).__name__}: {exc}"
             masalah = [str(exc)]
+            diagnosa.masalah_terakhir = list(masalah)
             continue
 
+        # Percobaan ini sampai ke LLM & dapat jawaban -> exception percobaan SEBELUMNYA (kalau ada)
+        # tak lagi menjadi sebab; jangan sampai salah melabeli "panggilan_llm_gagal".
+        diagnosa.exception_terakhir = None
         poin_bersih, masalah = perbaiki_poin(hasil, poin, chunks, assessment)
+        diagnosa.masalah_terakhir = list(masalah)
         if not masalah:
-            return poin_bersih
+            diagnosa.berhasil = True
+            if percobaan > 0:
+                # Lolos TAPI butuh retry — near-miss. Cek guardrail mana yang paling sering menggigit
+                # cuma kelihatan dari sini, bukan dari output akhir yang terlihat mulus.
+                logger.info(
+                    "poin %r lolos guardrail di percobaan ke-%d/%d", poin.poin_id, percobaan + 1, max_retry + 1
+                )
+            return poin_bersih, diagnosa
 
-    return _paksa_field_wajib(template_low_confidence(poin), poin, assessment)
+    logger.warning(
+        "poin %r jatuh ke low_confidence setelah %d percobaan (sebab=%s, chunk=%d): %s",
+        poin.poin_id, diagnosa.percobaan, diagnosa.sebab(), diagnosa.jumlah_chunk,
+        "; ".join(diagnosa.masalah_terakhir) or "-",
+    )
+    return _paksa_field_wajib(template_low_confidence(poin), poin, assessment), diagnosa
+
+
+def generate_poin_dengan_guardrail(
+    poin: PoinKonteks,
+    retriever: Retriever,
+    assessment: L2Assessment,
+    *,
+    max_retry: int = 2,
+) -> PoinOutput:
+    """Entrypoint utama: generate_poin + guardrail + retry terarah + fallback low_confidence.
+
+    APP-2026-3468: SEMUA poin (termasuk yang aman/lolos) lewat jalur LLM+guardrail penuh — poin
+    aman sebelumnya short-circuit ke template_aman() (reasoning generik, sitasi selalu kosong),
+    padahal reviewer tetap butuh tahu KENAPA poin ini lolos. Saran/target poin aman tetap
+    ditemplate deterministik di dalam generate_poin() sendiri (lihat generator.py).
+
+    Pembungkus tipis atas `generate_poin_terdiagnosis` — dipertahankan supaya pemanggil yang tak
+    peduli sebab (test, skrip) tak perlu ikut membongkar tuple.
+    """
+    return generate_poin_terdiagnosis(poin, retriever, assessment, max_retry=max_retry)[0]
