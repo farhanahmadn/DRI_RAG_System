@@ -15,7 +15,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 
-from app.adapter import adaptasi, deteksi_fallback_itbx
+from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
 from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
@@ -170,8 +170,18 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> K
         return _rakit_kesimpulan_fallback(poin_list)
 
 
+CAVEAT_DI_LUAR_CAKUPAN = (
+    "Koordinat permohonan berada di luar delineasi wilayah RDTR yang menjadi dasar seluruh sitasi "
+    "di dokumen ini — dasar hukum yang dikutip kemungkinan tidak berlaku untuk lokasi ini dan wajib "
+    "ditinjau manual."
+)
+
+
 def _rakit_catatan_global(
-    assessment: L2Assessment, itbx_fallback: bool, poin_list: list[PoinOutput]
+    assessment: L2Assessment,
+    itbx_fallback: bool,
+    poin_list: list[PoinOutput],
+    di_luar_wilayah: bool = False,
 ) -> list[str]:
     """Blueprint §5.4: meta.caveats WAJIB muncul di output, tidak disembunyikan — plus caveat
     fallback ITBX (§5.2) kalau berlaku. Terpisah dari disclaimer per-poin (guardrail._paksa_field_wajib)
@@ -186,6 +196,9 @@ def _rakit_catatan_global(
     if itbx_fallback:
         caveat = caveat_fallback_itbx(assessment.gate_hukum.tahapan.itbx.status)
         catatan.append(caveat.capitalize() + ".")
+
+    if di_luar_wilayah:
+        catatan.append(CAVEAT_DI_LUAR_CAKUPAN)
 
     poin_low_confidence = [p.poin_id for p in poin_list if p.low_confidence]
     if poin_low_confidence:
@@ -202,6 +215,10 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     """Jalankan precheck penuh: generate tiap poin PARALEL (dengan guardrail), rakit output dua-jalur."""
     hasil_adaptasi = adaptasi(assessment)
     itbx_fallback = deteksi_fallback_itbx(assessment.gate_hukum.tahapan.itbx.reason)
+    # Dihitung SEKALI di sini (bukan per poin): ini properti permohonan, bukan properti poin.
+    # Retrieval dikunci ke satu wilayah lewat RETRIEVER_WILAYAH, jadi kalau lokasinya di luar
+    # wilayah itu, SELURUH sitasi di output ini berpotensi tak berlaku — bukan cuma satu poin.
+    di_luar_wilayah = di_luar_cakupan(assessment.lokasi)
 
     futures = [
         _executor.submit(_generate_poin_defensif, poin, retriever, assessment)
@@ -215,8 +232,10 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
         poin=poin_list,
         rekomendasi_sistem=hasil_adaptasi.rekomendasi_sistem,
         kesimpulan=_rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem),
-        catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list),
-        low_confidence_keseluruhan=any(p.low_confidence for p in poin_list),
+        catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list, di_luar_wilayah),
+        # Di luar cakupan = seluruh dasar hukum patut diragukan -> tandai low_confidence walau
+        # ketiga poin sendiri lolos guardrail dgn mulus.
+        low_confidence_keseluruhan=any(p.low_confidence for p in poin_list) or di_luar_wilayah,
     )
 
     try:

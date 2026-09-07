@@ -3,8 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from app.adapter import _bangun_poin_intensitas, deteksi_fallback_itbx, adaptasi, cek_konsistensi_intensitas
-from app.schemas import L2Assessment
+from app.adapter import (
+    _bangun_poin_intensitas,
+    adaptasi,
+    cek_konsistensi_intensitas,
+    deteksi_fallback_itbx,
+    di_luar_cakupan,
+)
+from app.schemas import L2Assessment, Lokasi
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -333,3 +339,62 @@ class TestFixtureAmplop2428:
         hasil = adaptasi(assessment)
         poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
         assert poin_dampak.fakta["luas_usulan_melebihi_persil"] is None
+
+
+class TestDiLuarCakupanWilayah:
+    """Pagar cakupan wilayah. Bukti kenapa perlu (logs/precheck.jsonl, 2026-09-07): APP-2026-6191/
+    -3335/-3468 di koordinat (-7.78329, 110.47835) berada di luar batas bujur Sleman Tengah menurut
+    Perbup 80/2023 Pasal 3, tapi tetap dijawab & disitasi rdtr-sleman-tengah-* tanpa peringatan."""
+
+    # Delineasi RDTR Kawasan Sleman Tengah, Perbup 80/2023 Pasal 3.
+    BBOX = "-7.8352,-7.6621,110.2804,110.4483"
+
+    @staticmethod
+    def _lokasi(lat: float, lon: float) -> Lokasi:
+        return Lokasi(
+            koordinat={"lat": lat, "lon": lon},
+            geojson={"type": "Point", "coordinates": [lon, lat]},
+            rdtr_zone="Zona Perumahan",
+            luas_lahan_m2=1000.0,
+        )
+
+    def test_titik_di_dalam_tidak_ditandai(self, monkeypatch):
+        monkeypatch.setenv("CAKUPAN_BBOX", self.BBOX)
+        # APP-2026-2428 (Zona Pertanian) — koordinat nyata di dalam delineasi.
+        assert di_luar_cakupan(self._lokasi(-7.70190, 110.32855)) is False
+
+    def test_titik_nyata_di_luar_ditandai(self, monkeypatch):
+        monkeypatch.setenv("CAKUPAN_BBOX", self.BBOX)
+        # APP-2026-6191 — bujur 110.478 melewati batas timur 110.4483.
+        assert di_luar_cakupan(self._lokasi(-7.78329, 110.47835)) is True
+
+    @pytest.mark.parametrize(
+        "sisi, lat, lon",
+        [
+            ("utara", -7.6000, 110.3500),
+            ("selatan", -7.9000, 110.3500),
+            ("timur", -7.7500, 110.5000),
+            ("barat", -7.7500, 110.2000),
+        ],
+    )
+    def test_di_luar_tiap_sisi(self, monkeypatch, sisi, lat, lon):
+        monkeypatch.setenv("CAKUPAN_BBOX", self.BBOX)
+        assert di_luar_cakupan(self._lokasi(lat, lon)) is True, f"sisi {sisi} tak terdeteksi"
+
+    def test_tepat_di_batas_dihitung_di_dalam(self, monkeypatch):
+        # Inklusif — jangan menuduh "di luar" utk titik yang persis di garis batas.
+        monkeypatch.setenv("CAKUPAN_BBOX", self.BBOX)
+        assert di_luar_cakupan(self._lokasi(-7.8352, 110.4483)) is False
+
+    def test_env_kosong_guard_nonaktif(self, monkeypatch):
+        monkeypatch.delenv("CAKUPAN_BBOX", raising=False)
+        assert di_luar_cakupan(self._lokasi(-7.78329, 110.47835)) is False
+
+    @pytest.mark.parametrize(
+        "nilai", ["ngawur", "-7.8,-7.6,110.2", "a,b,c,d", "", "   ", "-7.6,-7.8,110.2804,110.4483"]
+    )
+    def test_env_cacat_guard_nonaktif_bukan_crash(self, monkeypatch, nilai):
+        """Termasuk kasus min>max (urutan kebalik) — salah ketik konfigurasi tidak boleh
+        menjatuhkan permohonan, dan diam lebih baik drpd peringatan palsu."""
+        monkeypatch.setenv("CAKUPAN_BBOX", nilai)
+        assert di_luar_cakupan(self._lokasi(-7.78329, 110.47835)) is False

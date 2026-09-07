@@ -5,6 +5,7 @@ from pathlib import Path
 from app.adapter import adaptasi
 from app.reasoning import assemble as assemble_module
 from app.reasoning.assemble import (
+    CAVEAT_DI_LUAR_CAKUPAN,
     _rakit_catatan_global,
     _rakit_kalimat_gate,
     _rakit_kesimpulan,
@@ -502,3 +503,65 @@ class TestPemrosesanParalel:
         assert poin_by_id["itbx"].low_confidence is False
         assert poin_by_id["dampak"].low_confidence is False
         assert poin_by_id["intensitas"].low_confidence is True
+
+
+class TestPagarCakupanWilayah:
+    """Permohonan di luar delineasi wilayah yang dilayani tetap dijawab, tapi ditandai jelas —
+    caveat di catatan_global + low_confidence_keseluruhan=True. Dua fixture nyata dipakai sbg
+    pasangan: 6191 di luar delineasi Sleman Tengah, 2428 di dalam."""
+
+    BBOX = "-7.8352,-7.6621,110.2804,110.4483"  # Perbup 80/2023 Pasal 3
+
+    def _siapkan(self, monkeypatch, bbox: str | None):
+        """Stub LLM + log_precheck. WAJIB: tanpa ini `jalankan_precheck` memanggil Groq sungguhan
+        (lambat, kena rate limit) DAN menulis ke logs/precheck.jsonl yang berisi data nyata."""
+        monkeypatch.setattr(
+            assemble_module.llm_client, "generate", TestJalankanPrecheckEndToEnd()._stub_llm_generic
+        )
+        _patch_log(monkeypatch)
+        if bbox is None:
+            monkeypatch.delenv("CAKUPAN_BBOX", raising=False)
+        else:
+            monkeypatch.setenv("CAKUPAN_BBOX", bbox)
+
+    def test_di_luar_cakupan_memicu_caveat_dan_low_confidence(self, monkeypatch):
+        self._siapkan(monkeypatch, self.BBOX)
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
+
+        hasil = jalankan_precheck(assessment, MockRetriever())
+
+        assert CAVEAT_DI_LUAR_CAKUPAN in hasil.catatan_global
+        assert hasil.low_confidence_keseluruhan is True
+
+    def test_di_dalam_cakupan_tanpa_caveat(self, monkeypatch):
+        self._siapkan(monkeypatch, self.BBOX)
+        assessment = _muat_assessment("l2_sample_amplop_2428.json")
+
+        hasil = jalankan_precheck(assessment, MockRetriever())
+
+        assert CAVEAT_DI_LUAR_CAKUPAN not in hasil.catatan_global
+
+    def test_guard_nonaktif_tak_mengubah_apa_pun(self, monkeypatch):
+        self._siapkan(monkeypatch, None)
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
+
+        hasil = jalankan_precheck(assessment, MockRetriever())
+
+        assert CAVEAT_DI_LUAR_CAKUPAN not in hasil.catatan_global
+
+    def test_caveat_tidak_mengklaim_yang_lolos_sudah_terverifikasi(self):
+        """Bbox lebih besar dari poligon aslinya — guard cuma bisa memastikan "di LUAR". Kalimatnya
+        tak boleh menyiratkan bahwa permohonan tanpa caveat sudah terbukti di dalam delineasi."""
+        assert "di luar delineasi" in CAVEAT_DI_LUAR_CAKUPAN
+        assert "ditinjau manual" in CAVEAT_DI_LUAR_CAKUPAN
+
+    def test_caveat_menyatu_dgn_catatan_global_lain(self, monkeypatch):
+        # Caveat cakupan TIDAK boleh menimpa/menghapus catatan low_confidence per-poin yang sudah ada.
+        monkeypatch.setenv("CAKUPAN_BBOX", self.BBOX)
+        assessment = _muat_assessment("l2_sample_amplop_6191.json")
+        poin_list = [_poin_output(poin_id="intensitas", low_confidence=True)]
+
+        catatan = _rakit_catatan_global(assessment, False, poin_list, True)
+
+        assert CAVEAT_DI_LUAR_CAKUPAN in catatan
+        assert any("intensitas" in c for c in catatan)

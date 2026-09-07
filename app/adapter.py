@@ -4,6 +4,8 @@ Murni transformasi data deterministik — tidak ada LLM/RAG di sini (itu tugas g
 berikutnya). Lihat CLAUDE.md § Kontrak Input untuk kontrak gate_hukum/impact_assessment.
 """
 
+import os
+
 from app.reasoning.calculator import (
     hitung_target_intensitas,
     hitung_target_mitigasi_dampak,
@@ -11,7 +13,7 @@ from app.reasoning.calculator import (
     sarankan_arah_mitigasi_dampak,
 )
 from app.reasoning.rekomendasi import turunkan_rekomendasi
-from app.schemas import AdapterResult, L2Assessment, PoinKonteks
+from app.schemas import AdapterResult, L2Assessment, Lokasi, PoinKonteks
 
 # Kata kunci heuristik deteksi fallback ITBX (Blueprint §5.2: "kolom matriks RDTR kosong/otomatis").
 # TIDAK ADA contoh nyata kasus fallback di fixture kita saat ini (keduanya status "I" dgn reason
@@ -22,6 +24,53 @@ _KATA_KUNCI_FALLBACK_ITBX = ("kosong", "otomatis", "tidak ditemukan", "default")
 def deteksi_fallback_itbx(reason: str) -> bool:
     reason_lower = reason.lower()
     return any(kata in reason_lower for kata in _KATA_KUNCI_FALLBACK_ITBX)
+
+
+def _bbox_cakupan() -> tuple[float, float, float, float] | None:
+    """Baca `CAKUPAN_BBOX` ("lat_min,lat_max,lon_min,lon_max") dari env. None = guard NONAKTIF.
+
+    Dibaca per-panggilan (bukan konstanta modul) supaya test bisa set/unset env tanpa reload modul,
+    pola yang sama dgn os.getenv di app/api/dependencies.py. Env kosong/cacat -> None, BUKAN raise:
+    salah ketik konfigurasi tidak boleh menjatuhkan permohonan, dan diam jauh lebih baik daripada
+    memberi peringatan palsu ke petugas.
+    """
+    mentah = os.getenv("CAKUPAN_BBOX", "").strip()
+    if not mentah:
+        return None
+    bagian = mentah.split(",")
+    if len(bagian) != 4:
+        return None
+    try:
+        lat_min, lat_max, lon_min, lon_max = (float(b) for b in bagian)
+    except ValueError:
+        return None
+    if lat_min > lat_max or lon_min > lon_max:
+        return None
+    return lat_min, lat_max, lon_min, lon_max
+
+
+def di_luar_cakupan(lokasi: Lokasi) -> bool:
+    """True kalau koordinat permohonan DIPASTIKAN di luar wilayah RDTR yang dilayani.
+
+    Bukti kenapa perlu (2026-09-07): retrieval dikunci ke satu wilayah lewat `RETRIEVER_WILAYAH`,
+    tapi tidak ada satu pun titik di sistem yang memeriksa apakah lokasi permohonan memang ada di
+    wilayah itu. Terbukti di `logs/precheck.jsonl`: 3 permohonan (APP-2026-6191/-3335/-3468) di
+    koordinat (-7.78329, 110.47835) — di luar batas bujur Sleman Tengah — tetap dijawab & disitasi
+    `rdtr-sleman-tengah-*` tanpa peringatan apa pun.
+
+    ARAH PEMERIKSAAN SENGAJA SATU SISI. Bounding box bukan poligon: titik di LUAR bbox pasti di luar
+    wilayah (aman disimpulkan), tapi titik di DALAM bbox BELUM TENTU di dalam wilayah (bbox selalu
+    lebih besar dari poligon aslinya). Jadi fungsi ini hanya boleh dipakai utk menandai "pasti di
+    luar" — `False` TIDAK berarti "terverifikasi berada di dalam delineasi", dan kalimat caveat di
+    app/reasoning/assemble.py sengaja tidak mengklaim itu.
+    """
+    bbox = _bbox_cakupan()
+    if bbox is None:
+        return False
+    lat_min, lat_max, lon_min, lon_max = bbox
+    lat = lokasi.koordinat.lat
+    lon = lokasi.koordinat.lon
+    return not (lat_min <= lat <= lat_max and lon_min <= lon <= lon_max)
 
 
 def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
