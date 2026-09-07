@@ -25,7 +25,7 @@ target numerik pasti, dan rekomendasi** — sebagai JSON siap-render untuk revie
 | **Output** | JSON terstruktur (`OutputL3`) — ringkasan, 3 poin reasoning+sitasi+rekomendasi, kesimpulan |
 | **Endpoint** | `POST /reasoning` (+ `GET /health`), FastAPI, lihat Swagger di `/docs` |
 | **LLM** | Groq `openai/gpt-oss-20b` — **hanya** merangkai narasi, tidak pernah memutuskan angka/status |
-| **Retrieval** | Hybrid RAG (Postgres + pgvector): dense + lexical (FTS) → Reciprocal Rank Fusion → rerank |
+| **Retrieval** | Hybrid RAG (Postgres + pgvector): dense + lexical (FTS, tsquery ber-OR atas query asli) → Reciprocal Rank Fusion → rerank |
 | **Embedding/Reranker** | **Jina AI** (`jina-embeddings-v3` / `jina-reranker-v3`, default produksi) atau **lokal** (`BAAI/bge-m3` / `bge-reranker-v2-m3`) — pilih via `.env`, nol perubahan kode |
 | **Guardrail** | 6+ cek deterministik (konsistensi angka/verdict/sitasi) + retry terarah + fallback aman |
 
