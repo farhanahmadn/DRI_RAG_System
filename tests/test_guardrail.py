@@ -4,6 +4,7 @@ from pathlib import Path
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.guardrail import (
     DiagnosaPoin,
+    _teks_chunk_disitasi,
     _bersihkan_disclaimer_fallback_palsu,
     _cari_band_untuk_index,
     _cek_invers_skor,
@@ -1180,3 +1181,94 @@ class TestGeneratePoinTerdiagnosis:
 
         assert "low_confidence" in caplog.text
         assert "sebab=panggilan_llm_gagal" in caplog.text
+
+
+class TestAngkaDariChunkYangDisitasi:
+    """Pelonggaran provenance angka ke teks chunk RAG — TAPI hanya chunk yang benar-benar DISITASI.
+
+    Bukti (replay 8 fixture, 2026-09-08): angka yang ditolak `_cek_konsistensi_numerik` ternyata
+    nilai asli Lampiran VI untuk sub-zona pemohon ("KDB maksimum 10%, KLB 0.1, KDH 85-88% untuk zona
+    P-1"), dikutip verbatim dari chunk yang sistem sodorkan sendiri lengkap dgn atribusi pasalnya —
+    bukan halusinasi. Whitelist lama tak pernah mencakup isi chunk, jadi retry selalu terbuang dan
+    poin jatuh ke low_confidence."""
+
+    CHUNK_VI = Chunk(
+        id="rdtr-sleman-tengah-vi-p-1",
+        level="tabel",
+        teks="Lampiran VI — Zona P-1: KDB maksimum 10%, KLB maksimum 0.1, KDH minimum 85%.",
+        dokumen="Perbup Sleman 80/2023",
+    )
+
+    @staticmethod
+    def _output(teks: str, citation_ids: tuple[str, ...]) -> PoinOutput:
+        return PoinOutput(
+            poin_id="itbx",
+            kategori="Klasifikasi Kegiatan (ITBX)",
+            status="I",
+            reasoning_pendek=teks,
+            reasoning_panjang=teks,
+            sitasi=[
+                # pasal/halaman sengaja TANPA digit yang dipakai kasus uji (10/77) — `pasal` ikut
+                # masuk `sumber` di _angka_terlacak_ke_sumber, jadi angka di situ akan mencemari hasil.
+                SitasiOutput(
+                    citation_id=cid, dokumen="Perbup Sleman", pasal="Lampiran VI", halaman=1,
+                    kutipan="x", terverifikasi=True,
+                )
+                for cid in citation_ids
+            ],
+            rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Ikuti ketentuan."),
+        )
+
+    def test_angka_dari_chunk_yang_disitasi_diterima(self):
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
+        out = self._output(
+            "Lampiran VI menetapkan KDB maksimum 10% untuk zona P-1.",
+            ("rdtr-sleman-tengah-vi-p-1",),
+        )
+
+        assert _cek_konsistensi_numerik(out, poin, [self.CHUNK_VI]) == []
+
+    def test_angka_dari_chunk_yang_TIDAK_disitasi_tetap_ditolak(self):
+        """Inti pembedaannya: chunk disodorkan ke LLM, tapi tidak disitasi -> angka yang diseret
+        darinya tetap ditolak. Tanpa syarat ini, model bebas menarik ambang intensitas ke narasi
+        ITBX/dampak tanpa menyebut sumbernya — pola yang justru terlihat di replay."""
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
+        out = self._output("Ketentuan menetapkan KDB maksimum 10% untuk zona ini.", ())
+
+        masalah = _cek_konsistensi_numerik(out, poin, [self.CHUNK_VI])
+
+        assert masalah and "10" in masalah[0]
+
+    def test_tanpa_chunk_perilaku_lama_dipertahankan(self):
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
+        out = self._output("Ketentuan menetapkan KDB maksimum 10%.", ("rdtr-sleman-tengah-vi-p-1",))
+
+        assert _cek_konsistensi_numerik(out, poin, None) != []
+
+    def test_angka_karangan_tetap_ditolak_walau_chunk_disitasi(self):
+        # 77 tidak ada di chunk manapun — pelonggaran ini TIDAK boleh jadi pintu masuk halusinasi.
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
+        out = self._output("Ketentuan menetapkan KDB maksimum 77%.", ("rdtr-sleman-tengah-vi-p-1",))
+
+        masalah = _cek_konsistensi_numerik(out, poin, [self.CHUNK_VI])
+
+        assert masalah and "77" in masalah[0]
+
+
+class TestTeksChunkDisitasi:
+    def test_hanya_chunk_yang_id_nya_disitasi(self):
+        a = Chunk(id="chunk-a", level="pasal", teks="isi A", dokumen="d")
+        b = Chunk(id="chunk-b", level="pasal", teks="isi B", dokumen="d")
+        out = PoinOutput(
+            poin_id="itbx", kategori="k", status="I", reasoning_pendek="x", reasoning_panjang="x",
+            sitasi=[SitasiOutput(citation_id="chunk-b", dokumen="d", pasal="p", halaman=1, kutipan="x", terverifikasi=True)],
+            rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="x"),
+        )
+
+        hasil = _teks_chunk_disitasi(out, [a, b])
+
+        assert "isi B" in hasil and "isi A" not in hasil
+
+    def test_aman_saat_output_atau_chunk_kosong(self):
+        assert _teks_chunk_disitasi(None, None) == ""
+        assert _teks_chunk_disitasi(None, [Chunk(id="c", level="pasal", teks="t", dokumen="d")]) == ""

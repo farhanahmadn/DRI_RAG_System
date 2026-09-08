@@ -287,7 +287,31 @@ def _dekat_dgn_pembulatan(angka_str: str, sumber: str) -> bool:
     return False
 
 
-def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOutput | None = None) -> bool:
+def _teks_chunk_disitasi(poin_output: PoinOutput | None, chunks: list[Chunk] | None) -> str:
+    """Teks chunk RAG yang BENAR-BENAR DISITASI output ini (`sitasi[].citation_id` -> `chunk.id`),
+    bukan semua chunk yang kebetulan disodorkan ke LLM.
+
+    Pembedaan itu inti dari pelonggaran ini (bukti replay 8 fixture, 2026-09-08): angka yang selama
+    ini ditolak ternyata nilai asli Lampiran VI utk sub-zona pemohon ("KDB maksimum 10%, KLB 0.1,
+    KDH 85-88% untuk zona P-1"), dikutip verbatim dari chunk yang kita sodorkan sendiri lengkap dgn
+    atribusi pasalnya — jelas BUKAN halusinasi, tapi ditolak karena whitelist tak pernah mencakup isi
+    chunk. Kalau dilonggarkan ke SEMUA chunk yang disodorkan, model bebas menyeret ambang intensitas
+    ke narasi ITBX/dampak tanpa menyebut sumbernya — persis pola yang terlihat di replay itu. Dgn
+    syarat "harus disitasi", tiap angka yang muncul selalu punya sumber yang tercantum di output dan
+    bisa diaudit reviewer; mengutip tanpa menyitasi TETAP ditolak seperti semula.
+    """
+    if poin_output is None or not chunks:
+        return ""
+    id_disitasi = {s.citation_id for s in poin_output.sitasi if s.citation_id}
+    return " ".join(c.teks for c in chunks if c.id in id_disitasi)
+
+
+def _angka_terlacak_ke_sumber(
+    angka: str,
+    poin: PoinKonteks,
+    poin_output: PoinOutput | None = None,
+    chunks: list[Chunk] | None = None,
+) -> bool:
     """Investigasi ITBX APP-2026-6191: Cek #6 versi lama melarang SEMUA angka tanpa pandang sumber
     — menangkap angka ambang yang dikutip verbatim dari `keterangan_ketentuan`/`dasar_hukum` back-end
     (mis. "RTH minimal 20 dari luas persil"), padahal itu FAKTA sah, bukan halusinasi/hitungan LLM.
@@ -303,7 +327,9 @@ def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOu
     "Peraturan Bupati Sleman Nomor 80 Tahun 2023...", LLM menyebut "Nomor 80 Tahun 2023" saat
     merujuk sumbernya, angka itu bagian nama dokumen yang benar-benar disitasi, bukan karangan)
     ATAU versi DIBULATKAN dari salah satu angka fakta di atas (`_dekat_dgn_pembulatan`, APP-2026-8376
-    — LLM wajar membulatkan angka float presisi tinggi saat menulis prosa).
+    — LLM wajar membulatkan angka float presisi tinggi saat menulis prosa)
+    ATAU tercantum di teks chunk RAG yang BENAR-BENAR DISITASI output ini (`_teks_chunk_disitasi`,
+    2026-09-08 — lihat helper itu utk bukti & alasan kenapa dibatasi ke yang disitasi saja).
     Angka yang tak cocok sumber manapun TETAP ditolak — ini MEMPERKETAT presisi cek, bukan melonggarkan.
     """
     sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
@@ -314,12 +340,15 @@ def _angka_terlacak_ke_sumber(angka: str, poin: PoinKonteks, poin_output: PoinOu
     if poin_output is not None:
         sumber += " " + " ".join(s.pasal or "" for s in poin_output.sitasi)
         sumber += " " + " ".join(s.dokumen or "" for s in poin_output.sitasi)
+    sumber += " " + _teks_chunk_disitasi(poin_output, chunks)
     if re.search(rf"\b{re.escape(angka)}\b", sumber) is not None:
         return True
     return _dekat_dgn_pembulatan(angka, sumber)
 
 
-def _cek_konsistensi_numerik(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+def _cek_konsistensi_numerik(
+    poin_output: PoinOutput, poin: PoinKonteks, chunks: list[Chunk] | None = None
+) -> list[str]:
     """SYSTEM_PROMPT (prompts.py) aturan #8 melarang LLM menyebut angka yang TIDAK bisa dilacak ke
     fakta sumber (angka final tetap dirakit kode dari calculator/back-end, tidak pernah dari sini).
     Tidak scan `sitasi[].kutipan` — kutipan pasal boleh memuat angka (nomor pasal/ayat) yang sah.
@@ -327,7 +356,7 @@ def _cek_konsistensi_numerik(poin_output: PoinOutput, poin: PoinKonteks) -> list
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
     for match in _RE_ANGKA_MENCURIGAKAN.finditer(teks):
         angka = match.group(0)
-        if not _angka_terlacak_ke_sumber(angka, poin, poin_output):
+        if not _angka_terlacak_ke_sumber(angka, poin, poin_output, chunks):
             return [
                 f"Reasoning/saran menyebutkan angka {angka!r} yang tidak tercantum di fakta sumber "
                 "poin ini — dilarang (SYSTEM_PROMPT aturan #8). Angka harus berasal dari "
@@ -541,7 +570,7 @@ def perbaiki_poin(
 
     masalah.extend(_cek_invers_skor(poin_bersih, poin))
     masalah.extend(_cek_konsistensi_verdict(poin_bersih, poin))
-    masalah.extend(_cek_konsistensi_numerik(poin_bersih, poin))
+    masalah.extend(_cek_konsistensi_numerik(poin_bersih, poin, chunks))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 
