@@ -5,7 +5,34 @@ on:
     branches: [main]
 
 jobs:
+  # Gerbang: deploy TIDAK jalan kalau suite offline merah. Sebelumnya push ke main langsung
+  # rsync+restart PM2 tanpa menjalankan satu test pun — 528 test hijau tidak menjaga apa pun.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # pyproject: requires-python >=3.11. IDEALNYA disamakan dgn versi Python di VPS supaya
+          # gerbang ini benar-benar mewakili runtime produksi — belum diverifikasi, sesuaikan
+          # begitu versi di VPS diketahui.
+          python-version: "3.11"
+          cache: pip
+
+      # Cukup extra [dev] (pytest): seluruh impor berat (psycopg, torch, transformers) LAZY di
+      # dalam fungsi, dan suite offline dipaksa RETRIEVER=mock oleh tests/conftest.py — diverifikasi
+      # dgn memeriksa sys.modules setelah suite selesai, satu-satunya modul berat yang termuat
+      # adalah httpx (transitif dari openai). Jangan tambahkan [rag]/[rag-serverless] di sini:
+      # menarik torch ~2-3GB tanpa dipakai sama sekali.
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Suite offline (tanpa API key / DB)
+        run: pytest -q -m "not live"
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
