@@ -13,7 +13,12 @@ jobs:
       - name: rsync source ke VPS (ml user)
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avz --delete --exclude '.venv/' --exclude '.git/' --exclude '__pycache__/' --exclude '.env' --exclude 'data/'
+          # 'logs/' WAJIB di-exclude: folder itu ada di .gitignore sehingga checkout CI tidak
+          # memilikinya, dan --delete menghapus apa pun di tujuan yang tak ada di sumber —
+          # artinya logs/precheck.jsonl di VPS (satu-satunya rekaman request/response +
+          # diagnostik sebab low_confidence) terhapus SETIAP kali deploy. Pola sama dgn
+          # '.env' & 'data/': berkas milik VPS, bukan milik repo.
+          switches: -avz --delete --exclude '.venv/' --exclude '.git/' --exclude '__pycache__/' --exclude '.env' --exclude 'data/' --exclude 'logs/'
           path: .
           remote_path: /home/ml/project-2026-07-DRISleman-ai/
           remote_host: ${{ secrets.ML_HOST }}
