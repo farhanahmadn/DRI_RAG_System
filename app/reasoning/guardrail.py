@@ -604,7 +604,10 @@ class DiagnosaPoin:
         return "tak_diketahui"
 
 
-_MAKS_TEKS_DITOLAK = 400
+# 400 terbukti terlalu kecil (replay 8 fixture, 2026-09-08): KELIMA teks yang ditolak terpotong
+# persis di batas, dan di 4 dari 5 kasus angka yang dipermasalahkan berada SETELAH titik potong —
+# jadi rekamannya ada tapi tak menjawab apa pun. reasoning_panjang sendiri biasanya ~500-900 char.
+_MAKS_TEKS_DITOLAK = 1600
 
 
 def _ringkas_teks_ditolak(poin_output: PoinOutput) -> str:
