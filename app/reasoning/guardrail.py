@@ -581,6 +581,15 @@ class DiagnosaPoin:
     jumlah_chunk: int = 0                           # chunk pendukung yang berhasil diretrieve
     masalah_terakhir: list[str] = field(default_factory=list)   # temuan guardrail di percobaan terakhir
     exception_terakhir: str | None = None           # "RateLimitError: ..." kalau LLM-nya yang gagal
+    # Narasi yang DITOLAK di percobaan terakhir (dipotong). `masalah_terakhir` cuma menyebut LABEL
+    # temuannya — mis. "menyebutkan angka '10' yang tidak tercantum di fakta sumber" — dan label itu
+    # TIDAK cukup utk memutuskan perbaikan: "10" bisa berarti "Pasal 10" (rujukan sah yang dibaca
+    # LLM dari chunk RAG yang kita sodorkan sendiri) ATAU "kurangi 10%" (angka karangan). Dua hal itu
+    # penanganannya BERLAWANAN — longgarkan cek vs perketat prompt — jadi kalimatnya wajib ikut.
+    # SENGAJA tidak dimasukkan ke `masalah_terakhir`: daftar itu dirangkai jadi `catatan_perbaikan`
+    # yang dikirim balik ke LLM saat retry, sehingga menambahinya = mengubah perilaku yang sedang
+    # diukur. Ini murni pengamatan, satu arah keluar.
+    teks_ditolak_terakhir: str | None = None
 
     def sebab(self) -> str:
         """Satu label kasar utk dihitung agregat: kenapa poin ini jatuh ke low_confidence."""
@@ -593,6 +602,20 @@ class DiagnosaPoin:
         if self.masalah_terakhir:
             return "guardrail_menolak"
         return "tak_diketahui"
+
+
+_MAKS_TEKS_DITOLAK = 400
+
+
+def _ringkas_teks_ditolak(poin_output: PoinOutput) -> str:
+    """Gabung field narasi yang memang dipindai guardrail (`_cek_konsistensi_numerik` &
+    `_cek_konsistensi_verdict` membaca ketiganya), lalu potong supaya baris log tetap wajar."""
+    bagian = (
+        poin_output.reasoning_pendek,
+        poin_output.reasoning_panjang,
+        poin_output.rekomendasi.saran,
+    )
+    return " | ".join(b for b in bagian if b)[:_MAKS_TEKS_DITOLAK]
 
 
 def generate_poin_terdiagnosis(
@@ -655,6 +678,7 @@ def generate_poin_terdiagnosis(
         diagnosa.exception_terakhir = None
         poin_bersih, masalah = perbaiki_poin(hasil, poin, chunks, assessment)
         diagnosa.masalah_terakhir = list(masalah)
+        diagnosa.teks_ditolak_terakhir = _ringkas_teks_ditolak(poin_bersih) if masalah else None
         if not masalah:
             diagnosa.berhasil = True
             if percobaan > 0:

@@ -1103,6 +1103,57 @@ class TestGeneratePoinTerdiagnosis:
         assert diagnosa.exception_terakhir is None
         assert diagnosa.sebab() == "berhasil"
 
+    def test_teks_ditolak_direkam_tapi_tidak_masuk_prompt_retry(self, monkeypatch):
+        """Kalimat yang ditolak wajib terekam di diagnosa, TAPI tidak boleh bocor ke
+        `catatan_perbaikan` — daftar `masalah` dirangkai jadi prompt retry, jadi menambahinya
+        berarti mengubah perilaku yang justru sedang diukur."""
+        prompt_retry = []
+
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            prompt_retry.append(prompt)
+            return {
+                "reasoning_pendek": "Mengacu pada Pasal 10 ketentuan zona ini.",
+                "reasoning_panjang": "Berdasarkan Pasal 10, kegiatan wajib memenuhi ketentuan yang berlaku.",
+                "sitasi": [],
+                "saran": "Penuhi ketentuan tersebut.",
+                "disclaimer": None,
+            }
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        _, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert diagnosa.teks_ditolak_terakhir, "kalimat yang ditolak harus terekam"
+        assert "Pasal 10" in diagnosa.teks_ditolak_terakhir
+        # Prompt retry hanya boleh memuat label temuan, bukan kalimat yang kita rekam utk diagnosa.
+        assert len(prompt_retry) == 2, "harus ada 1 retry"
+        assert diagnosa.teks_ditolak_terakhir not in prompt_retry[1]
+
+    def test_teks_ditolak_kosong_saat_poin_berhasil(self, monkeypatch):
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            return {
+                "reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+                "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Bersyarat (B) sesuai ketentuan zona.",
+                "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
+                "disclaimer": None,
+            }
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(
+            status="B",
+            fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+        )
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        _, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+        assert diagnosa.berhasil is True
+        assert diagnosa.teks_ditolak_terakhir is None
+
     def test_pembungkus_lama_mengembalikan_poinoutput_yang_sama(self, monkeypatch):
         def _stub_raise(*args, **kwargs):
             raise RuntimeError("gagal")
