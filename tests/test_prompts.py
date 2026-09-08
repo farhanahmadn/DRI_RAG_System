@@ -506,3 +506,27 @@ def test_system_prompt_melarang_bahasa_sistem_di_narasi():
     yang dipahami petugas tata ruang."""
     assert "BAHASA UNTUK PETUGAS" in SYSTEM_PROMPT
     assert "KATEGORI_DAMPAK" in SYSTEM_PROMPT
+
+
+class TestKonteksIndukDiPrompt:
+    def test_konteks_induk_muncul_dgn_larangan_menyitasinya(self):
+        chunk = _chunk(id="p41-a3", level="ayat", teks="(3) Lokasi sebagaimana dimaksud pada ayat (1).")
+
+        prompt = build_user_prompt(_poin(), [chunk], konteks_induk={"p41-a3": "Pasal 41 teks lengkap"})
+
+        assert "Pasal 41 teks lengkap" in prompt
+        assert "JANGAN" in prompt and "disitasi" in prompt
+        # citation_id ayat tetap yang ditawarkan sbg sitasi
+        assert "citation_id=p41-a3" in prompt
+
+    def test_tanpa_konteks_induk_prompt_tak_berubah(self):
+        chunk = _chunk(id="p41-a3", level="ayat", teks="(3) Lokasi.")
+
+        assert build_user_prompt(_poin(), [chunk]) == build_user_prompt(_poin(), [chunk], konteks_induk={})
+
+    def test_konteks_induk_chunk_lain_tidak_nyasar(self):
+        chunk = _chunk(id="p41-a3", level="ayat", teks="(3) Lokasi.")
+
+        prompt = build_user_prompt(_poin(), [chunk], konteks_induk={"chunk-lain": "teks nyasar"})
+
+        assert "teks nyasar" not in prompt

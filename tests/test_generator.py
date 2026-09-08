@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 from app.adapter import adaptasi
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.generator import (
+    _MAKS_CHAR_INDUK,
+    _MAKS_CHUNK_DGN_INDUK,
+    _butuh_konteks_induk,
     _QUERY_FALLBACK_PER_POIN,
     _SARAN_AMAN,
     _SARAN_TIDAK_DINILAI,
@@ -15,6 +18,7 @@ from app.reasoning.generator import (
     _saran_tidak_dinilai,
     _zona_prefix_dari_nama,
     ambil_chunks_pendukung,
+    ambil_konteks_induk,
     apakah_aman,
     generate_poin,
 )
@@ -863,3 +867,125 @@ class TestPilihChunksReferensiSadarZona:
         assert [c.id for c in hasil] == ["hasil-search"]
         assert retriever.query_search is not None, "harus jatuh ke search(), bukan diam-diam kosong"
         assert retriever.query_search[1].zona == "P-1"
+
+
+class TestAmbilKonteksInduk:
+    """Small-to-big: chunk ayat dilengkapi teks pasal induknya. 62% dari 895 chunk ayat di korpus
+    nyata memuat "sebagaimana dimaksud pada ayat (N)" — merujuk teks yang tak ikut terkirim ke LLM.
+    Chunker & get_parent sudah menyiapkan ini sejak awal, tapi tak pernah tersambung ke reasoning."""
+
+    class _RetrieverInduk:
+        def __init__(self, induk_by_child=None, raise_exc=None):
+            self._induk = induk_by_child or {}
+            self._raise = raise_exc
+            self.dipanggil = []
+
+        def search(self, query, filters, top_k=5):
+            return []
+
+        def get_by_reference(self, referensi):
+            return []
+
+        def get_parent(self, chunk_id):
+            self.dipanggil.append(chunk_id)
+            if self._raise:
+                raise self._raise
+            return self._induk.get(chunk_id)
+
+    @staticmethod
+    def _ayat(cid: str, parent: str, teks: str | None = None) -> Chunk:
+        # Default memuat rujukan silang — itu prasyarat ekspansi induk (lihat _butuh_konteks_induk).
+        return Chunk(
+            id=cid, level="ayat", parent_id=parent, dokumen="d",
+            teks=teks if teks is not None else f"({cid}) sebagaimana dimaksud pada ayat (1) berlaku.",
+        )
+
+    @staticmethod
+    def _pasal(cid: str, teks: str) -> Chunk:
+        return Chunk(id=cid, level="pasal", teks=teks, dokumen="d")
+
+    def test_ayat_dapat_teks_induknya(self):
+        anak = self._ayat("p41-a3", "p41")
+        rt = self._RetrieverInduk({"p41-a3": self._pasal("p41", "Pasal 41 lengkap")})
+
+        assert ambil_konteks_induk([anak], rt) == {"p41-a3": "Pasal 41 lengkap"}
+
+    def test_chunk_bukan_ayat_dilewati(self):
+        rt = self._RetrieverInduk()
+        chunks = [self._pasal("p41", "x"), Chunk(id="vb-p-1", level="tabel", teks="t", dokumen="d")]
+
+        assert ambil_konteks_induk(chunks, rt) == {}
+        assert rt.dipanggil == [], "get_parent tak perlu dipanggil utk pasal/tabel"
+
+    def test_induk_sama_hanya_dilampirkan_sekali(self):
+        # Dua ayat dari pasal yang sama -> teks induk identik, jangan digandakan di prompt.
+        a1, a2 = self._ayat("p41-a1", "p41"), self._ayat("p41-a3", "p41")
+        rt = self._RetrieverInduk({"p41-a1": self._pasal("p41", "Pasal 41 lengkap"),
+                                   "p41-a3": self._pasal("p41", "Pasal 41 lengkap")})
+
+        hasil = ambil_konteks_induk([a1, a2], rt)
+
+        assert list(hasil) == ["p41-a1"]
+
+    def test_dibatasi_beberapa_chunk_teratas(self):
+        """Batas ada karena alasan nyata: pasal induk terpanjang di korpus 30.748 char — tanpa
+        batas, satu pasal bisa memicu ulang 413/429 (APP-2026-9461)."""
+        chunks = [self._ayat(f"p{i}-a1", f"p{i}") for i in range(5)]
+        rt = self._RetrieverInduk({f"p{i}-a1": self._pasal(f"p{i}", f"teks {i}") for i in range(5)})
+
+        hasil = ambil_konteks_induk(chunks, rt)
+
+        assert len(hasil) == _MAKS_CHUNK_DGN_INDUK
+        assert len(rt.dipanggil) == _MAKS_CHUNK_DGN_INDUK
+
+    def test_induk_kepanjangan_dipotong(self):
+        anak = self._ayat("p1-a1", "p1")
+        rt = self._RetrieverInduk({"p1-a1": self._pasal("p1", "x" * (_MAKS_CHAR_INDUK + 5000))})
+
+        hasil = ambil_konteks_induk([anak], rt)["p1-a1"]
+
+        assert len(hasil) < _MAKS_CHAR_INDUK + 50
+        assert hasil.endswith("[…dipotong]")
+
+    def test_get_parent_gagal_tidak_menggagalkan_generasi(self):
+        anak = self._ayat("p1-a1", "p1")
+        rt = self._RetrieverInduk(raise_exc=RuntimeError("DB putus"))
+
+        assert ambil_konteks_induk([anak], rt) == {}  # tidak raise
+
+    def test_induk_tak_ditemukan_dilewati(self):
+        anak = self._ayat("p1-a1", "p1")
+
+        assert ambil_konteks_induk([anak], self._RetrieverInduk({})) == {}
+
+
+class TestButuhKonteksInduk:
+    """Saringan yang mencegah ekspansi induk jadi pemborosan. Tanpa ini, definisi Pasal 1 ikut
+    ditempeli induknya — padahal definisi sudah mandiri DAN induknya pasal terpanjang di korpus
+    (30.748 char). Terbukti live: chunk p1-a117 menarik 2.511 char berisi 126 definisi tak terkait."""
+
+    def test_ayat_dgn_rujukan_silang_butuh_induk(self):
+        assert _butuh_konteks_induk("(3) Ketentuan sebagaimana dimaksud pada ayat (1) berlaku.")
+        assert _butuh_konteks_induk("(2) Lokasi pada ayat (1) huruf b.")
+
+    def test_definisi_mandiri_tidak_butuh_induk(self):
+        # Bentuk nyata definisi Pasal 1 (p1-a117) — self-contained.
+        assert not _butuh_konteks_induk(
+            "117. Koefisien Dasar Bangunan yang selanjutnya disingkat KDB adalah angka persentase "
+            "perbandingan antara luas seluruh lantai dasar bangunan dan luas lahan."
+        )
+
+    def test_tidak_peka_huruf_besar_kecil(self):
+        assert _butuh_konteks_induk("(3) SEBAGAIMANA DIMAKSUD pada ayat (1).")
+
+
+def test_ayat_mandiri_tidak_menarik_induk():
+    """Integrasi saringan ke ambil_konteks_induk: chunk mandiri tak memicu get_parent sama sekali."""
+    rt = TestAmbilKonteksInduk._RetrieverInduk({"p1-a117": Chunk(id="p1", level="pasal", teks="x" * 5000, dokumen="d")})
+    mandiri = Chunk(
+        id="p1-a117", level="ayat", parent_id="p1", dokumen="d",
+        teks="117. Koefisien Dasar Bangunan adalah angka persentase perbandingan luas lantai dasar.",
+    )
+
+    assert ambil_konteks_induk([mandiri], rt) == {}
+    assert rt.dipanggil == [], "get_parent tak perlu dipanggil utk chunk yang sudah mandiri"

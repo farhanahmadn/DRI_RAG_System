@@ -101,7 +101,7 @@ def _urutkan_relevansi_ketentuan(ketentuan: list[str], kegiatan_diusulkan: str |
     return sorted(ketentuan, key=_skor, reverse=True)
 
 
-def _format_chunk(chunk: Chunk) -> str:
+def _format_chunk(chunk: Chunk, konteks_induk: str | None = None) -> str:
     lokasi = f"{chunk.dokumen} Pasal {chunk.pasal}" if chunk.pasal else chunk.dokumen
     if chunk.ayat:
         lokasi += f" Ayat {chunk.ayat}"
@@ -109,7 +109,18 @@ def _format_chunk(chunk: Chunk) -> str:
         lokasi += f" ({chunk.istilah_kode})"
     if chunk.halaman is not None:
         lokasi += f" (hal. {chunk.halaman})"
-    return f"- citation_id={chunk.id} | {lokasi}\n  Teks: {chunk.teks}"
+    baris = f"- citation_id={chunk.id} | {lokasi}\n  Teks: {chunk.teks}"
+    if konteks_induk:
+        # Small-to-big: teks pasal induk ditempel sbg KONTEKS, BUKAN kandidat sitasi baru. 62%
+        # chunk ayat memuat "sebagaimana dimaksud pada ayat (N)" — tanpa induknya, LLM membaca
+        # rujukan ke teks yang tak pernah ia lihat. Sitasi TETAP memakai citation_id ayat di
+        # atas: id pasal induk tidak masuk daftar kandidat, jadi menyitasinya akan ditolak
+        # guardrail dan membuang retry — karena itu larangannya ditulis eksplisit ke LLM.
+        baris += (
+            "\n  Konteks pasal induk (untuk memahami rujukan antar-ayat — JANGAN "
+            "disitasi, tetap kutip citation_id ayat di atas): "
+        ) + konteks_induk
+    return baris
 
 
 def _format_anchor(index: int, dasar_hukum: DasarHukum) -> str:
@@ -295,8 +306,14 @@ def build_user_prompt(
     chunks: list[Chunk],
     meta: MetaL2 | None = None,
     catatan_perbaikan: str | None = None,
+    *,
+    konteks_induk: dict[str, str] | None = None,
 ) -> str:
-    """Susun prompt user, deterministik dari poin (fakta adapter) + chunk yang diretrieve."""
+    """Susun prompt user, deterministik dari poin (fakta adapter) + chunk yang diretrieve.
+
+    `konteks_induk` ({chunk_id: teks pasal induk}, dari generator.ambil_konteks_induk) melengkapi
+    small-to-big: chunk ayat sering merujuk ayat lain ("sebagaimana dimaksud pada ayat (1)") yang
+    tak ikut terkirim. Ditempel sbg konteks baca, BUKAN kandidat sitasi baru."""
     lines: list[str] = []
 
     lines.append("## Poin (SUDAH FINAL — jangan diubah/dihitung ulang)")
@@ -336,7 +353,7 @@ def build_user_prompt(
     if chunks:
         lines.append("Pasal tambahan dari RAG:")
         for chunk in chunks:
-            lines.append(_format_chunk(chunk))
+            lines.append(_format_chunk(chunk, (konteks_induk or {}).get(chunk.id)))
         ada_sitasi = True
     if not ada_sitasi:
         lines.append(

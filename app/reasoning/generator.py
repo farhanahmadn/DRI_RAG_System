@@ -6,6 +6,8 @@ metadata sitasi (dokumen/pasal/halaman) dirakit DI SINI dari poin/calculator/chu
 diretrieve — bukan dipercaya dari output LLM. citation_id yang tidak dikenal (halusinasi) dibuang.
 """
 
+import logging
+
 from app.reasoning import llm_client
 from app.reasoning.calculator import (
     bangun_langkah_konkret_dampak,
@@ -16,6 +18,8 @@ from app.reasoning.calculator import (
 from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.retrieval.base import Chunk, RetrievalFilters, Retriever
 from app.schemas import MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
+
+logger = logging.getLogger(__name__)
 
 # APP-2026-3468: saran deterministik utk poin aman/lolos — reasoning_pendek/panjang & sitasi TETAP
 # dari LLM (poin aman WAJIB tetap dijelaskan KENAPA lolos, bukan reasoning generik tanpa sitasi),
@@ -238,6 +242,68 @@ def ambil_chunks_pendukung(
     return chunks
 
 
+# Batas ekspansi small-to-big. Diukur dari korpus nyata (2026-09-08): 137 pasal induk, median 1.449
+# char, p90 3.214, tapi ada ekor ekstrem sampai 30.748 — tanpa batas, satu pasal saja bisa memicu
+# ulang 413/429 "Request too large" (APP-2026-9461). Ambil induk hanya utk chunk paling relevan.
+_MAKS_CHUNK_DGN_INDUK = 2
+_MAKS_CHAR_INDUK = 2500
+
+# Penanda bahwa sebuah ayat MERUJUK bagian lain sehingga tak bermakna sendirian. Substring biasa,
+# bukan regex — cukup, dan tak ada escaping yang bisa salah. Terukur di korpus nyata: 65% chunk ayat
+# ter-embed memuat salah satunya.
+_PENANDA_RUJUKAN_SILANG = ("sebagaimana dimaksud", "ayat (", "huruf ")
+
+
+def _butuh_konteks_induk(teks: str) -> bool:
+    """Hanya ayat yang MERUJUK bagian lain yang perlu induknya.
+
+    Tanpa saringan ini, definisi di Pasal 1 (mis. "Koefisien Dasar Bangunan ... adalah angka
+    persentase...") ikut ditempeli induknya — padahal definisi sudah mandiri, DAN induknya adalah
+    pasal definisi terpanjang di korpus (30.748 char). Terbukti live: chunk `p1-a117` menarik 2.511
+    char berisi 126 definisi tak terkait ke prompt. Menyaring di sini menghemat prompt sekaligus
+    mengurangi derau — bukan cuma soal ukuran.
+    """
+    rendah = teks.lower()
+    return any(penanda in rendah for penanda in _PENANDA_RUJUKAN_SILANG)
+
+
+def ambil_konteks_induk(chunks: list[Chunk], retriever: Retriever) -> dict[str, str]:
+    """Ambil teks pasal INDUK untuk chunk ayat — melengkapi separuh desain small-to-big yang selama
+    ini terbangun tapi tak pernah dipakai.
+
+    Bukti kenapa perlu (korpus nyata, 2026-09-08): 62% dari 895 chunk ayat yang di-embed memuat
+    "sebagaimana dimaksud", yaitu merujuk ayat lain yang TIDAK ikut terkirim ke LLM. Contohnya
+    "(3) Lokasi sebagaimana dimaksud pada ayat (1) huruf b terdapat di blok dalam SWP." — verbatim
+    benar, tapi tak bermakna sendirian. Chunker sudah menyimpan pasal induk khusus untuk ini
+    (`to_embed=False`, lihat app/ingest/chunk.py) dan `get_parent` sudah ada di seluruh lapis
+    retrieval, tapi tak pernah dipanggil dari app/reasoning/ — jadi konteksnya menganggur di DB.
+
+    Return: {chunk_id: teks_induk}. Induk yang SAMA hanya dilampirkan sekali (beberapa ayat dari
+    pasal yang sama tak perlu mengulang teks induk yang identik). Kegagalan retrieval di sini
+    TIDAK PERNAH menggagalkan generasi — konteks ini penyempurna, bukan syarat.
+    """
+    hasil: dict[str, str] = {}
+    induk_terpakai: set[str] = set()
+    for chunk in chunks[:_MAKS_CHUNK_DGN_INDUK]:
+        if chunk.level != "ayat" or not chunk.parent_id or chunk.parent_id in induk_terpakai:
+            continue
+        if not _butuh_konteks_induk(chunk.teks):
+            continue
+        try:
+            induk = retriever.get_parent(chunk.id)
+        except Exception:
+            logger.warning("get_parent gagal utk chunk %r — lanjut tanpa konteks induk.", chunk.id, exc_info=True)
+            continue
+        if induk is None or not induk.teks:
+            continue
+        induk_terpakai.add(chunk.parent_id)
+        teks = induk.teks
+        if len(teks) > _MAKS_CHAR_INDUK:
+            teks = teks[:_MAKS_CHAR_INDUK].rstrip() + " […dipotong]"
+        hasil[chunk.id] = teks
+    return hasil
+
+
 def apakah_aman(poin: PoinKonteks) -> bool:
     """Poin jelas aman/lolos -> boleh template tanpa LLM (hemat kuota). REUSE fakta yang sudah
     dihitung adapter/calculator, tidak menurunkan ulang di sini.
@@ -273,8 +339,9 @@ def generate_poin(
     chunks = ambil_chunks_pendukung(poin, retriever, top_k_dukungan)
     chunk_by_id = {chunk.id: chunk for chunk in chunks}
     anchor_by_id = {f"anchor-{i}": d for i, d in enumerate(poin.dasar_hukum)}
+    konteks_induk = ambil_konteks_induk(chunks, retriever)
 
-    prompt = build_user_prompt(poin, chunks, meta, catatan_perbaikan)
+    prompt = build_user_prompt(poin, chunks, meta, catatan_perbaikan, konteks_induk=konteks_induk)
 
     llm_out = llm_client.generate(
         prompt,
