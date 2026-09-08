@@ -24,6 +24,7 @@ ATURAN WAJIB (jangan dilanggar):
 7. Kalau ada daftar kegiatan diizinkan/terbatas/bersyarat, kegiatan alternatif yang Anda sebutkan HARUS berasal dari daftar itu — JANGAN mengarang nama kegiatan lain.
 8. JANGAN MENGHITUNG atau MENGARANG angka apa pun. Kamu BOLEH menyebut angka FAKTA yang diberikan di atas (usulan/ambang/target/skor) secara verbatim di reasoning_pendek, reasoning_panjang, maupun saran untuk memperjelas narasi (contoh BENAR: "KDB usulan 90% melampaui batas maksimum 60%") — SELAMA angka itu persis tercantum di fakta yang diberikan, bukan dihitung/diperkirakan/dikarang sendiri. Angka final rekomendasi (target) tetap dirakit sistem di field terpisah.
 9. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda/pengambil keputusan) yang akan meng-ACC atau memberi feedback atas permohonan — BUKAN nasihat langsung ke pemohon. Sebut pemohon sebagai orang ketiga ("pemohon"/"permohonan ini"), JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, analitis, dan dapat diaudit, agar reviewer dapat menilai dan memutuskan.
+10a. BAHASA UNTUK PETUGAS, BUKAN BAHASA SISTEM — DILARANG menyalin nama field/label teknis dari prompt ini ke dalam narasi (mis. "KATEGORI_DAMPAK", "STATUS_ITBX", "FALLBACK_DATA_KOSONG", "ambang_maks"), dan DILARANG menjelaskan mekanisme internal sistem (mis. "karena status tidak I", "karena fallback data tidak kosong", "berdasarkan data yang dihitung oleh sistem"). Tulis substansinya dalam Bahasa Indonesia biasa yang dipahami petugas tata ruang — sebut kategori/status dengan kata-katanya sendiri ("dampak tergolong Rendah", "kegiatan termasuk kategori Bersyarat"), bukan nama variabelnya.
 10. POIN AMAN/LOLOS TETAP WAJIB DIJELASKAN — kalau fakta di atas menunjukkan poin ini lolos/memenuhi (mis. STATUS_ITBX "I", STATUS_INTENSITAS "MEMENUHI_SYARAT", atau KATEGORI_DAMPAK "Rendah"/"Sedang"), JANGAN menulis reasoning generik seperti "tidak ada catatan berisiko" atau "tidak ada tindakan lebih lanjut" tanpa alasan. WAJIB jelaskan KONKRET mengapa poin ini lolos — sebut fakta relevan (mis. kategori kegiatan di zona ini, angka usulan dibanding ambang, kategori dampak) dan sitasi pasal yang tersedia — sama persis seperti menjelaskan poin yang tidak lolos.
 11. SARAN HARUS KONKRET & DAPAT DITINDAKLANJUTI, bukan pernyataan terbuka/umum. "saran" adalah bahan reviewer memutuskan syarat ACC — JANGAN menulis kalimat umum seperti "menyesuaikan desain agar memenuhi ketentuan" TANPA menyebutkan APA yang disesuaikan dan (kalau ada FAKTA angka target/ambang di atas) angka targetnya persis. Kalau ada LEBIH DARI SATU langkah/opsi konkret yang tersedia di fakta (mis. beberapa "Arah Mitigasi", beberapa syarat di "Keterangan Ketentuan"), tulis "saran" sebagai daftar bernomor ("1. ...\\n2. ...") satu opsi per baris — JANGAN digabung jadi satu kalimat panjang. Kalau ada FAKTA "TARGET_MITIGASI_KUANTITATIF" atau target numerik lain, WAJIB sebutkan angkanya persis di salah satu baris saran (bukan cuma di reasoning). KHUSUS poin intensitas: kalau baris "[TARGET PATUH: ...]" menyebut angka FISIK dalam meter persegi (mis. "luas lantai dasar bangunan maksimal 510.0 m²", "RTH dibutuhkan minimal 255.0 m²", "masih kurang 45.0 m²") — angka m² itu WAJIB dikutip persis di saran, BUKAN cuma angka persentase ambang (mis. "KDB maksimal 60%") tanpa terjemahan fisiknya. Angka persentase saja tidak actionable bagi pemohon; angka m² menjawab langsung "berapa luas yang boleh dibangun/berapa RTH yang masih harus ditambahkan".
 
@@ -164,6 +165,24 @@ def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
     return lines
 
 
+def _angka_prompt(nilai: object) -> str:
+    """Format angka utk prompt: bulatkan float berekor panjang ke maks 2 desimal.
+
+    Ditemukan live (replay 2026-09-08, APP-2026-3468): `usulan` KDB dikirim BE sebagai
+    47.05882352941176 dan disuntikkan APA ADANYA ke prompt, lalu LLM menyalinnya utuh ke narasi
+    ("KDB pemohon sebesar 47.05882352941176%") — presisi palsu yang tak berarti apa pun bagi petugas.
+    Dibulatkan DI PROMPT saja; fakta/kalkulator tetap presisi penuh, dan guardrail sudah menerima
+    versi bulat lewat `_dekat_dgn_pembulatan` (APP-2026-8376) sehingga cek provenance tidak terganggu.
+    Nilai yang pembulatannya akan menghilangkan angka (mis. 0.004 -> 0.0) dibiarkan apa adanya.
+    """
+    if isinstance(nilai, bool) or not isinstance(nilai, float):
+        return str(nilai)
+    dibulatkan = round(nilai, 2)
+    if dibulatkan == nilai or dibulatkan == 0:
+        return str(nilai)
+    return f"{dibulatkan:.2f}".rstrip("0").rstrip(".")
+
+
 def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
     # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
     # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
@@ -174,8 +193,9 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
     target_map = fakta.get("target") or {}
     for nama, param in (fakta.get("parameter") or {}).items():
         baris = (
-            f"- {nama}: usulan={param['usulan']} {param['satuan']}, "
-            f"ambang_maks={param['ambang_maks']}, ambang_min={param['ambang_min']}, "
+            f"- {nama}: usulan={_angka_prompt(param['usulan'])} {param['satuan']}, "
+            f"ambang_maks={_angka_prompt(param['ambang_maks'])}, "
+            f"ambang_min={_angka_prompt(param['ambang_min'])}, "
             f"memenuhi={param['memenuhi']}"
         )
         if nama in target_map:
@@ -183,11 +203,11 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
         lines.append(baris)
 
     if fakta.get("luas_tapak_m2") is not None:
-        lines.append(f"luas_tapak_m2: {fakta['luas_tapak_m2']}")
+        lines.append(f"luas_tapak_m2: {_angka_prompt(fakta['luas_tapak_m2'])}")
     if fakta.get("jumlah_lantai") is not None:
         lines.append(f"jumlah_lantai: {fakta['jumlah_lantai']}")
     if fakta.get("luas_rth_usulan_m2") is not None:
-        lines.append(f"luas_rth_usulan_m2: {fakta['luas_rth_usulan_m2']}")
+        lines.append(f"luas_rth_usulan_m2: {_angka_prompt(fakta['luas_rth_usulan_m2'])}")
 
     return lines
 

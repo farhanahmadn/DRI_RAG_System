@@ -4,6 +4,7 @@ from pathlib import Path
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.guardrail import (
     DiagnosaPoin,
+    _bersihkan_label_teknis,
     _teks_chunk_disitasi,
     _bersihkan_disclaimer_fallback_palsu,
     _cari_band_untuk_index,
@@ -1272,3 +1273,46 @@ class TestTeksChunkDisitasi:
     def test_aman_saat_output_atau_chunk_kosong(self):
         assert _teks_chunk_disitasi(None, None) == ""
         assert _teks_chunk_disitasi(None, [Chunk(id="c", level="pasal", teks="t", dokumen="d")]) == ""
+
+
+class TestBersihkanLabelTeknis:
+    """Label teknis prompt yang tersalin mentah ke narasi petugas. Scrub DETERMINISTIK (tidak memicu
+    retry) — alasan sama dgn _bersihkan_disclaimer_fallback_palsu: satu kata salah tak sebanding dgn
+    membuang seluruh reasoning + sitasi yang sudah benar."""
+
+    def test_label_dikenal_diganti_bahasa_biasa(self):
+        assert _bersihkan_label_teknis("KATEGORI_DAMPAK: Rendah menunjukkan...").startswith("kategori dampak:")
+        assert "kelengkapan data matriks RDTR" in _bersihkan_label_teknis("FALLBACK_DATA_KOSONG bernilai False")
+
+    def test_akronim_sah_tidak_ikut_tergilas(self):
+        # Tanpa syarat garis bawah, akronim domain akan rusak — ini yang menjaga RDTR/KDB/ITBX utuh.
+        teks = "Zona RDTR dengan KDB, KLB, KDH, ITBX, LP2B, PBG, RTH tetap utuh"
+        assert _bersihkan_label_teknis(teks) == teks
+
+    def test_label_tak_dikenal_tetap_dinormalkan(self):
+        # Label BARU yang ditambahkan ke prompt nanti tidak boleh diam-diam bocor lagi.
+        assert _bersihkan_label_teknis("nilai TOKEN_BARU_X di sini") == "nilai token baru x di sini"
+
+    def test_none_dan_kosong_aman(self):
+        assert _bersihkan_label_teknis(None) is None
+        assert _bersihkan_label_teknis("") == ""
+
+    def test_diterapkan_ke_semua_field_narasi(self):
+        poin = _poin(status="I", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        keluaran = PoinOutput(
+            poin_id="itbx", kategori="Klasifikasi Kegiatan (ITBX)", status="I",
+            reasoning_pendek="STATUS_ITBX: I",
+            reasoning_panjang="KATEGORI_DAMPAK tidak relevan di sini",
+            sitasi=[],
+            rekomendasi=RekomendasiOutput(
+                tipe="kategorikal", saran="Perhatikan KEGIATAN_DIUSULKAN.",
+                disclaimer="FALLBACK_DATA_KOSONG bernilai False.",
+            ),
+        )
+
+        hasil = _paksa_field_wajib(keluaran, poin, assessment)
+
+        gabungan = f"{hasil.reasoning_pendek} {hasil.reasoning_panjang} {hasil.rekomendasi.saran} {hasil.rekomendasi.disclaimer}"
+        for token in ("STATUS_ITBX", "KATEGORI_DAMPAK", "KEGIATAN_DIUSULKAN", "FALLBACK_DATA_KOSONG"):
+            assert token not in gabungan, f"{token} masih bocor ke narasi"

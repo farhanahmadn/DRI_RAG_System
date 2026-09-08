@@ -393,6 +393,36 @@ _FRASA_CAVEAT_FALLBACK = (
 
 _RE_PEMISAH_KALIMAT = re.compile(r"(?<=[.!?])\s+")
 
+# Nama label teknis yang memang disuntikkan ke prompt (prompts.py) dan terbukti disalin mentah oleh
+# LLM ke narasi utk petugas — replay 2026-09-08: "KATEGORI_DAMPAK: Rendah menunjukkan bahwa...",
+# "KATEGORI_DAMPAK 'Rendah' menunjukkan...". Pola sama persis dgn kebocoran "DATA_CONFIDENCE: X"
+# yang dulu diperbaiki dgn tidak menyuntikkan tokennya sama sekali — tapi label-label ini TIDAK bisa
+# dihapus dari prompt (model memang butuh nilainya), jadi ditangani di sisi keluaran.
+# SCRUB DETERMINISTIK, TIDAK memicu retry — alasannya sama dgn _bersihkan_disclaimer_fallback_palsu
+# di atas: satu kata salah tak sebanding dgn membuang seluruh reasoning+sitasi yang sudah benar.
+_LABEL_TEKNIS = {
+    "KATEGORI_DAMPAK": "kategori dampak",
+    "STATUS_ITBX": "status kegiatan",
+    "STATUS_INTENSITAS": "status intensitas",
+    "KEGIATAN_DIUSULKAN": "kegiatan yang diusulkan",
+    "FALLBACK_DATA_KOSONG": "kelengkapan data matriks RDTR",
+}
+# WAJIB ada garis bawah: cegah akronim sah ikut tergilas (RDTR, KDB, KLB, KDH, ITBX, LP2B, PBG, RTH).
+_RE_LABEL_TEKNIS = re.compile(
+    "(?<![A-Za-z0-9_])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?![A-Za-z0-9_])"
+)
+
+
+def _bersihkan_label_teknis(teks: str | None) -> str | None:
+    """Ganti nama label teknis yang tersalin dari prompt dgn padanan Bahasa Indonesia biasa.
+    Label tak dikenal tetap dinormalkan (huruf kecil, garis bawah -> spasi) supaya label BARU yang
+    ditambahkan ke prompt nanti tidak diam-diam bocor lagi."""
+    if not teks:
+        return teks
+    return _RE_LABEL_TEKNIS.sub(
+        lambda m: _LABEL_TEKNIS.get(m.group(0), m.group(0).lower().replace("_", " ")), teks
+    )
+
 
 def _bersihkan_disclaimer_fallback_palsu(disclaimer: str | None) -> str | None:
     """Buang kalimat yang menyerupai caveat fallback-data-kosong dari `disclaimer` — dipanggil HANYA
@@ -491,6 +521,20 @@ def _paksa_field_wajib(
 
     if update:
         poin_output = poin_output.model_copy(update=update)
+
+    # Cek #5 — label teknis prompt yang tersalin mentah ke narasi petugas (replay 2026-09-08:
+    # "KATEGORI_DAMPAK: Rendah menunjukkan bahwa..."). Dijalankan TERAKHIR supaya juga membersihkan
+    # disclaimer hasil rakitan di atas, dan diterapkan ke SEMUA jalur keluar (aman/template/bersih).
+    # Deterministik, TIDAK memicu retry — lihat _bersihkan_label_teknis.
+    rekomendasi = poin_output.rekomendasi
+    poin_output = poin_output.model_copy(update={
+        "reasoning_pendek": _bersihkan_label_teknis(poin_output.reasoning_pendek),
+        "reasoning_panjang": _bersihkan_label_teknis(poin_output.reasoning_panjang),
+        "rekomendasi": rekomendasi.model_copy(update={
+            "saran": _bersihkan_label_teknis(rekomendasi.saran),
+            "disclaimer": _bersihkan_label_teknis(rekomendasi.disclaimer),
+        }),
+    })
     return poin_output
 
 

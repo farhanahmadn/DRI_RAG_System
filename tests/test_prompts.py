@@ -1,4 +1,10 @@
-from app.reasoning.prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_KESIMPULAN, build_kesimpulan_prompt, build_user_prompt
+from app.reasoning.prompts import (
+    SYSTEM_PROMPT,
+    SYSTEM_PROMPT_KESIMPULAN,
+    _angka_prompt,
+    build_kesimpulan_prompt,
+    build_user_prompt,
+)
 from app.retrieval.base import Chunk
 from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput
 
@@ -450,3 +456,53 @@ class TestBuildKesimpulanPrompt:
     def test_system_prompt_kesimpulan_larang_langkah_utk_saran_aman(self):
         assert "tidak diperlukan tindakan khusus" in SYSTEM_PROMPT_KESIMPULAN.lower()
         assert "hanya dari" in SYSTEM_PROMPT_KESIMPULAN.lower()
+
+
+class TestAngkaPromptDibulatkan:
+    """Replay 2026-09-08 (APP-2026-3468): `usulan` KDB dikirim BE sebagai 47.05882352941176 dan
+    disuntikkan apa adanya ke prompt, lalu disalin utuh oleh LLM ke narasi petugas — presisi palsu."""
+
+    def test_float_ekor_panjang_dibulatkan_2_desimal(self):
+        assert _angka_prompt(47.05882352941176) == "47.06"
+
+    def test_float_pendek_tidak_diubah(self):
+        assert _angka_prompt(1.8) == "1.8"
+        assert _angka_prompt(60.0) == "60.0"
+
+    def test_nilai_kecil_tidak_dibulatkan_jadi_nol(self):
+        # 0.004 -> 0.0 akan MENGHILANGKAN angkanya; lebih baik apa adanya.
+        assert _angka_prompt(0.004) == "0.004"
+
+    def test_bukan_float_apa_adanya(self):
+        assert _angka_prompt(None) == "None"
+        assert _angka_prompt(True) == "True"
+        assert _angka_prompt(12) == "12"
+
+    def test_prompt_intensitas_tidak_memuat_float_ekor_panjang(self):
+        poin = _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status="MEMENUHI_SYARAT",
+            fakta={
+                "parameter": {
+                    "kdb": {
+                        "usulan": 47.05882352941176, "ambang_maks": 60.0, "ambang_min": None,
+                        "memenuhi": True, "satuan": "persen",
+                    }
+                }
+            },
+        )
+
+        prompt = build_user_prompt(poin, [])
+
+        assert "47.05882352941176" not in prompt
+        assert "47.06" in prompt
+
+
+def test_system_prompt_melarang_bahasa_sistem_di_narasi():
+    """Replay 2026-09-08: LLM menulis "KATEGORI_DAMPAK: Rendah menunjukkan..." dan "karena status
+    tidak I (tidak terverifikasi) dan fallback data tidak kosong" — bahasa internal, bukan bahasa
+    yang dipahami petugas tata ruang."""
+    assert "BAHASA UNTUK PETUGAS" in SYSTEM_PROMPT
+    assert "KATEGORI_DAMPAK" in SYSTEM_PROMPT
