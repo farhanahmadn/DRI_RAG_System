@@ -153,7 +153,44 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment) -> dict:
     Return {} (bukan angka) kalau: index/threshold_bands tidak ada, kategori BUKAN Tinggi/Sangat
     Tinggi (selaras `KATEGORI_DAMPAK_BERSYARAT`), band kategori target tak bisa di-parse, atau band
     target berbentuk "> n" (tak ada batas atas terhingga utk dijadikan target).
+
+    APP-2026-8025/-5067: BE kini (kadang) kirim `impact.rekomendasi_mitigasi` — target indeks +
+    rincian penyesuaian lahan (m²/KDB%/KDH% KONKRET) + dimensi minimum sumur/kolam resapan + narasi
+    `saran` SUDAH DIHITUNG PENUH di sisi BE. Diprioritaskan kalau ada (echo APA ADANYA, bukan
+    dihitung ulang — prinsip sama dgn limitations/luas_usulan_melebihi_persil): jauh lebih presisi &
+    actionable drpd rekonstruksi kita dari threshold_bands (band cuma kasih ambang KATEGORI, tak
+    pernah kasih angka fisik lahan). Fallback ke logika band lama di bawah kalau field ini absen
+    (fixture lama / BE belum kirim untuk kasus ini) — backward-compatible.
     """
+    rekom = impact.rekomendasi_mitigasi
+    if rekom and rekom.get("target_indeks_maks") is not None:
+        hasil: dict = {
+            "runoff_change_index_maks": rekom["target_indeks_maks"],
+            "kategori_target": normalisasi_kategori_dampak(rekom.get("target_kategori")) or "",
+            "index_saat_ini": impact.runoff_change_index,
+        }
+        penyesuaian = rekom.get("rekomendasi_penyesuaian_lahan")
+        if penyesuaian:
+            hasil["penyesuaian_lahan"] = penyesuaian
+            # "nilai_saat_ini" (luas bangunan/RTH TERUSULKAN, sebelum penyesuaian) — dari
+            # `detailed_surface_breakdown` (echo apa adanya, bukan dihitung ulang) kalau BE
+            # menyertakannya; None kalau tak ada (langkah_konkret tetap tampil, cuma tanpa
+            # perbandingan "saat ini vs target").
+            breakdown = impact.detailed_surface_breakdown or {}
+            bangunan = breakdown.get("Bangunan/Atap")
+            if isinstance(bangunan, dict) and bangunan.get("luas_m2") is not None:
+                hasil["luas_bangunan_saat_ini_m2"] = bangunan["luas_m2"]
+            rth = breakdown.get("Taman/RTH")
+            if isinstance(rth, dict) and rth.get("luas_m2") is not None:
+                hasil["luas_rth_saat_ini_m2"] = rth["luas_m2"]
+        dimensi = rekom.get("dimensi_minimum")
+        if dimensi:
+            hasil["dimensi_minimum_resapan"] = dimensi
+        saran_be = rekom.get("saran")
+        if saran_be:
+            hasil["saran_be"] = saran_be
+        return hasil
+
     index = impact.runoff_change_index
     bands = impact.threshold_bands
     kategori = normalisasi_kategori_dampak(impact.impact_category)
@@ -258,10 +295,69 @@ def bangun_langkah_konkret_intensitas(parameter: dict, target_map: dict) -> list
 
 
 def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:
-    """Satu item langkah_konkret utk mitigasi dampak (runoff_change_index) — kosong kalau tak ada
-    target (poin aman/kategori tak bersyarat, lihat `hitung_target_mitigasi_dampak` di atas)."""
+    """langkah_konkret utk mitigasi dampak — kosong kalau tak ada target (poin aman/kategori tak
+    bersyarat, lihat `hitung_target_mitigasi_dampak` di atas).
+
+    APP-2026-8025/-5067: kalau `target_mitigasi` bawa rincian dari BE (`penyesuaian_lahan`/
+    `dimensi_minimum_resapan`, lihat `hitung_target_mitigasi_dampak`) — pecah jadi HINGGA 3 item
+    KONKRET (luas bangunan m², luas RTH m², dimensi sumur/kolam resapan) alih-alih 1 item abstrak
+    "runoff_change_index" — jauh lebih actionable bagi reviewer/pemohon (bisa langsung dibandingkan
+    dgn gambar kerja, bukan angka indeks tanpa satuan fisik). Fallback ke item generik lama kalau
+    BE tak kirim rincian ini (fixture lama/provider lama) — backward-compatible.
+    """
     if not target_mitigasi or "runoff_change_index_maks" not in target_mitigasi:
         return []
+
+    penyesuaian = target_mitigasi.get("penyesuaian_lahan")
+    dimensi = target_mitigasi.get("dimensi_minimum_resapan")
+    if penyesuaian or dimensi:
+        langkah_rinci: list[dict] = []
+        penyesuaian = penyesuaian or {}
+        kategori_target = target_mitigasi.get("kategori_target") or ""
+        luas_bangunan_maks = penyesuaian.get("luas_bangunan_maks_m2")
+        if luas_bangunan_maks is not None:
+            kdb_maks = penyesuaian.get("kdb_maks_persen")
+            langkah_rinci.append({
+                "parameter": "Luas Bangunan (Atap)",
+                "deskripsi": (
+                    f"Turunkan luas lantai dasar bangunan ke maksimal {luas_bangunan_maks} m²"
+                    + (f" (KDB maks {kdb_maks}%)" if kdb_maks is not None else "")
+                    + f" agar indeks limpasan turun ke kategori {kategori_target}."
+                ),
+                "nilai_saat_ini": target_mitigasi.get("luas_bangunan_saat_ini_m2"),
+                "nilai_target": luas_bangunan_maks,
+                "satuan": "m²",
+            })
+        luas_rth_min = penyesuaian.get("luas_rth_min_m2")
+        if luas_rth_min is not None:
+            kdh_min = penyesuaian.get("kdh_min_persen")
+            langkah_rinci.append({
+                "parameter": "Luas RTH",
+                "deskripsi": (
+                    f"Tingkatkan luas RTH ke minimal {luas_rth_min} m²"
+                    + (f" (KDH min {kdh_min}%)" if kdh_min is not None else "")
+                    + " untuk memperluas daerah peresapan air alami."
+                ),
+                "nilai_saat_ini": target_mitigasi.get("luas_rth_saat_ini_m2"),
+                "nilai_target": luas_rth_min,
+                "satuan": "m²",
+            })
+        if dimensi and dimensi.get("nilai") is not None:
+            satuan_dimensi = dimensi.get("satuan") or ""
+            langkah_rinci.append({
+                "parameter": "Dimensi Minimum Sumur Resapan",
+                "deskripsi": (
+                    f"Alternatif: sediakan sumur atau kolam resapan dengan dimensi minimum "
+                    f"{dimensi['nilai']} {satuan_dimensi} berdasarkan rumus mitigasi hidrologi."
+                ),
+                "nilai_saat_ini": 0,
+                "nilai_target": dimensi["nilai"],
+                "satuan": satuan_dimensi or None,
+            })
+        if langkah_rinci:
+            return langkah_rinci
+        # penyesuaian/dimensi ADA tapi tak satu pun angkanya valid -> jatuh ke item generik di bawah.
+
     ambang = target_mitigasi["runoff_change_index_maks"]
     return [{
         "parameter": "runoff_change_index",

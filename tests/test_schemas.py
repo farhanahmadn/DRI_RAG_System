@@ -30,6 +30,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
         "l2_sample_amplop_8913.json",
         "l2_sample_amplop_8090.json",
         "l2_sample_amplop_2428.json",
+        "l2_sample_amplop_8025.json",
+        "l2_sample_amplop_5067.json",
     ],
 )
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
@@ -141,12 +143,41 @@ class TestKontrakBackendBerubah:
         assert assessment.impact_assessment.luas_usulan_melebihi_persil is True
 
     def test_field_impact_assessment_baru_tak_dikenal_diabaikan_bukan_422(self):
-        # delta_c/detailed_surface_breakdown/luas_persil_source/c_before_source — sengaja TAK
-        # dideklarasikan eksplisit di skema, harus diam-diam diabaikan (Pydantic default), bukan
-        # bikin request gagal validasi.
+        # delta_c/luas_persil_source/c_before_source — sengaja TAK dideklarasikan eksplisit di
+        # skema, harus diam-diam diabaikan (Pydantic default), bukan bikin request gagal validasi.
         payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_2428.json").read_text(encoding="utf-8"))
         assessment = L2Assessment.model_validate(payload["data"])  # tak boleh raise
         assert assessment.impact_assessment.dinilai is False
+
+    def test_rekomendasi_mitigasi_diterima(self):
+        # APP-2026-8025: dampak Tinggi -> BE kirim rekomendasi_mitigasi lengkap (target indeks +
+        # rincian penyesuaian lahan + dimensi sumur resapan + saran siap-pakai).
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8025.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        rekom = assessment.impact_assessment.rekomendasi_mitigasi
+        assert rekom["target_indeks_maks"] == 2.5
+        assert rekom["rekomendasi_penyesuaian_lahan"]["luas_bangunan_maks_m2"] == 11551.06
+        assert "menurunkan dampak" in rekom["saran"].lower()
+
+    def test_rekomendasi_mitigasi_null_diterima(self):
+        # APP-2026-5067: dampak Rendah -> tak perlu mitigasi, BE kirim null.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_5067.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.impact_assessment.rekomendasi_mitigasi is None
+
+    def test_multi_persil_dan_detailed_surface_breakdown_diterima(self):
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8025.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.impact_assessment.multi_persil is False
+        assert assessment.impact_assessment.detailed_surface_breakdown["Bangunan/Atap"]["luas_m2"] == 14800
+
+    def test_gate_hukum_tahapan_lp2b_sempadan_diabaikan_bukan_422(self):
+        # APP-2026-8025/-5067: gate_hukum.tahapan kini (kadang) sertakan lp2b/sempadan di samping
+        # itbx/intensitas — belum diproses jadi poin (sistem tetap 3 poin: itbx/intensitas/dampak),
+        # HARUS diam-diam diabaikan, bukan 422.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_8025.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])  # tak boleh raise
+        assert assessment.gate_hukum.tahapan.itbx.status == "B"
 
 
 def test_parameter_intensitas_ambang_null_toleran():

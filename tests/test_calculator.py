@@ -261,6 +261,77 @@ class TestHitungTargetMitigasiDampak:
         assert hasil["runoff_change_index_maks"] == 9.0
 
 
+class TestHitungTargetMitigasiDampakDariBE:
+    """APP-2026-8025/-5067: BE kini (kadang) kirim `rekomendasi_mitigasi` — target + rincian
+    penyesuaian lahan (m²/KDB%/KDH%) + dimensi sumur resapan SUDAH DIHITUNG PENUH. Diprioritaskan
+    di atas rekonstruksi band lama kalau ada (echo apa adanya, FAITHFUL)."""
+
+    _REKOMENDASI_MITIGASI = {
+        "status_dampak": "TINGGI",
+        "target_kategori": "SEDANG",
+        "target_indeks_maks": 2.5,
+        "rekomendasi_penyesuaian_lahan": {
+            "luas_bangunan_maks_m2": 11551.06,
+            "luas_rth_min_m2": 3850.35,
+            "kdb_maks_persen": 75,
+            "kdh_min_persen": 25,
+            "catatan": "Agar indeks runoff turun ke <= 2.5 (kategori Sedang).",
+        },
+        "dimensi_minimum": {"nilai": 19.01, "satuan": "m³"},
+        "saran": "Untuk menurunkan dampak dari TINGGI menjadi SEDANG...",
+    }
+
+    def _impact_dgn_rekomendasi(self, **override) -> ImpactAssessment:
+        default = dict(
+            dinilai=True, impact_category="Tinggi", runoff_change_index=2.923,
+            threshold_bands=_THRESHOLD_BANDS_STANDAR,
+            rekomendasi_mitigasi=self._REKOMENDASI_MITIGASI,
+        )
+        default.update(override)
+        return ImpactAssessment(**default)
+
+    def test_target_indeks_dari_be_dipakai_bukan_dihitung_ulang(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact_dgn_rekomendasi())
+        assert hasil["runoff_change_index_maks"] == 2.5
+        assert hasil["kategori_target"] == "Sedang"  # dinormalisasi dari "SEDANG" BE
+        assert hasil["index_saat_ini"] == 2.923
+
+    def test_penyesuaian_lahan_dan_dimensi_diteruskan_apa_adanya(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact_dgn_rekomendasi())
+        assert hasil["penyesuaian_lahan"]["luas_bangunan_maks_m2"] == 11551.06
+        assert hasil["dimensi_minimum_resapan"]["nilai"] == 19.01
+        assert "menurunkan dampak" in hasil["saran_be"]
+
+    def test_nilai_saat_ini_bangunan_rth_dari_detailed_surface_breakdown(self):
+        impact = self._impact_dgn_rekomendasi(
+            detailed_surface_breakdown={
+                "Bangunan/Atap": {"luas_m2": 14800},
+                "Taman/RTH": {"luas_m2": 100},
+            }
+        )
+        hasil = hitung_target_mitigasi_dampak(impact)
+        assert hasil["luas_bangunan_saat_ini_m2"] == 14800
+        assert hasil["luas_rth_saat_ini_m2"] == 100
+
+    def test_tanpa_detailed_surface_breakdown_tetap_jalan_tanpa_nilai_saat_ini(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact_dgn_rekomendasi())
+        assert "luas_bangunan_saat_ini_m2" not in hasil
+
+    def test_rekomendasi_mitigasi_none_fallback_ke_logika_band_lama(self):
+        # Fixture lama / BE belum kirim rekomendasi_mitigasi utk kasus ini -> perilaku band lama.
+        impact = self._impact_dgn_rekomendasi(rekomendasi_mitigasi=None)
+        hasil = hitung_target_mitigasi_dampak(impact)
+        assert hasil["runoff_change_index_maks"] == 2.5
+        assert "penyesuaian_lahan" not in hasil
+
+    def test_rekomendasi_mitigasi_tanpa_target_indeks_maks_fallback_ke_band_lama(self):
+        # rekomendasi_mitigasi ADA tapi tak lengkap (mis. respons null-heavy) -> jangan setengah pakai.
+        impact = self._impact_dgn_rekomendasi(rekomendasi_mitigasi={"saran": "x"})
+        hasil = hitung_target_mitigasi_dampak(impact)
+        assert hasil["runoff_change_index_maks"] == 2.5
+        assert "saran_be" not in hasil
+
+
 class TestPilihTargetMitigasiDampak:
     def test_ambil_runoff_change_index_maks(self):
         assert pilih_target_mitigasi_dampak({"runoff_change_index_maks": 2.5}) == 2.5
@@ -345,3 +416,53 @@ class TestBangunLangkahKonkretDampak:
     def test_target_mitigasi_kosong_return_kosong(self):
         assert bangun_langkah_konkret_dampak({}) == []
         assert bangun_langkah_konkret_dampak({"perlu_mitigasi": False, "arah": []}) == []
+
+    def test_rincian_be_hasilkan_3_item_konkret_bukan_1_item_abstrak(self):
+        # APP-2026-8025/-5067: BE kirim rincian lengkap -> 3 item KONKRET (m²/dimensi resapan),
+        # bukan 1 item abstrak "runoff_change_index" lama.
+        target_mitigasi = {
+            "runoff_change_index_maks": 2.5, "index_saat_ini": 2.923, "kategori_target": "Sedang",
+            "penyesuaian_lahan": {
+                "luas_bangunan_maks_m2": 11551.06, "luas_rth_min_m2": 3850.35,
+                "kdb_maks_persen": 75, "kdh_min_persen": 25,
+            },
+            "dimensi_minimum_resapan": {"nilai": 19.01, "satuan": "m³"},
+            "luas_bangunan_saat_ini_m2": 14800, "luas_rth_saat_ini_m2": 100,
+        }
+        hasil = bangun_langkah_konkret_dampak(target_mitigasi)
+        assert len(hasil) == 3
+        parameter = {h["parameter"] for h in hasil}
+        assert parameter == {"Luas Bangunan (Atap)", "Luas RTH", "Dimensi Minimum Sumur Resapan"}
+
+        bangunan = next(h for h in hasil if h["parameter"] == "Luas Bangunan (Atap)")
+        assert bangunan["nilai_saat_ini"] == 14800
+        assert bangunan["nilai_target"] == 11551.06
+        assert bangunan["satuan"] == "m²"
+        assert "75%" in bangunan["deskripsi"]
+
+        rth = next(h for h in hasil if h["parameter"] == "Luas RTH")
+        assert rth["nilai_saat_ini"] == 100
+        assert rth["nilai_target"] == 3850.35
+
+        sumur = next(h for h in hasil if h["parameter"] == "Dimensi Minimum Sumur Resapan")
+        assert sumur["nilai_target"] == 19.01
+        assert sumur["satuan"] == "m³"
+
+    def test_rincian_be_tanpa_nilai_saat_ini_tetap_muncul_dgn_none(self):
+        # detailed_surface_breakdown tak dikirim BE -> nilai_saat_ini None, item TETAP tampil
+        # (bukan dibuang) — reviewer tetap dapat angka target walau tanpa pembanding "saat ini".
+        target_mitigasi = {
+            "runoff_change_index_maks": 2.5, "index_saat_ini": 2.923, "kategori_target": "Sedang",
+            "penyesuaian_lahan": {"luas_bangunan_maks_m2": 11551.06, "luas_rth_min_m2": 3850.35},
+        }
+        hasil = bangun_langkah_konkret_dampak(target_mitigasi)
+        assert len(hasil) == 2
+        assert all(h["nilai_saat_ini"] is None for h in hasil)
+
+    def test_tanpa_rincian_be_fallback_ke_item_abstrak_lama(self):
+        # target_mitigasi TANPA penyesuaian_lahan/dimensi_minimum_resapan (fixture lama/band lama)
+        # -> perilaku lama tak berubah (1 item abstrak runoff_change_index).
+        target_mitigasi = {"runoff_change_index_maks": 1.5, "index_saat_ini": 2.8, "kategori_target": "Sedang"}
+        hasil = bangun_langkah_konkret_dampak(target_mitigasi)
+        assert len(hasil) == 1
+        assert hasil[0]["parameter"] == "runoff_change_index"

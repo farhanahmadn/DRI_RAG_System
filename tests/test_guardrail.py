@@ -355,6 +355,62 @@ class TestCekKonsistensiNumerik:
         output = _poin_output(poin_id="dampak", reasoning_panjang="Dampaknya diperkirakan mencapai 99 persen dari total kawasan.")
         assert _cek_konsistensi_numerik(output, poin) != []
 
+    def _poin_dampak_rekomendasi_mitigasi_be(self) -> PoinKonteks:
+        return _poin(
+            poin_id="dampak",
+            tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi",
+            fakta={
+                "impact_score": 40,
+                "runoff_change_index": 2.923,
+                "target_mitigasi": {
+                    "runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.923,
+                    "penyesuaian_lahan": {
+                        "luas_bangunan_maks_m2": 11551.06, "luas_rth_min_m2": 3850.35,
+                        "kdb_maks_persen": 75, "kdh_min_persen": 25,
+                        "catatan": "Agar indeks runoff turun ke <= 2.5 (kategori Sedang), luas bangunan maksimal adalah 11.551,06 m² dan RTH minimal 3.850,35 m².",
+                    },
+                    "dimensi_minimum_resapan": {"nilai": 19.01, "satuan": "m³"},
+                    "saran_be": (
+                        "Untuk menurunkan dampak dari TINGGI menjadi SEDANG (indeks <= 2.5): pemohon "
+                        "disarankan menyesuaikan luas lantai dasar bangunan menjadi maksimal 11.551,06 m² "
+                        "(KDB maks 75%) dan menyediakan RTH minimal 3.850,35 m² (KDH min 25%), atau "
+                        "menyediakan fasilitas sumur/kolam resapan air hujan dengan dimensi kapasitas "
+                        "minimum 19.01 m³."
+                    ),
+                },
+            },
+        )
+
+    def test_diagnosis_dampak_saran_be_format_indonesia_terlacak_lolos(self):
+        # APP-2026-8025: `saran_be` (echo verbatim di rekomendasi.saran, generator.py::
+        # _saran_mitigasi_dampak) ditulis format Indonesia (titik ribuan, koma desimal) — regex
+        # ekstraksi angka guardrail tokenize BEDA dari representasi float Python. HARUS tetap lolos
+        # (bukan ditolak sbg "angka karangan") krn ground truth-nya memang BE, bukan LLM.
+        poin = self._poin_dampak_rekomendasi_mitigasi_be()
+        output = _poin_output(
+            poin_id="dampak",
+            reasoning_panjang="Dampak Tinggi krn indeks limpasan 2.923 melebihi ambang 2.5.",
+            rekomendasi=RekomendasiOutput(
+                tipe="numerik-mitigasi",
+                saran=poin.fakta["target_mitigasi"]["saran_be"],  # echo verbatim spt generator.py
+            ),
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
+    def test_diagnosis_dampak_angka_penyesuaian_lahan_plain_format_terlacak_lolos(self):
+        # Angka polos (bukan format Indonesia) dari rincian BE juga harus terlacak via
+        # _angka_fakta_poin (jaga-jaga LLM menulis reasoning_panjang sendiri dgn format plain).
+        poin = self._poin_dampak_rekomendasi_mitigasi_be()
+        output = _poin_output(
+            poin_id="dampak",
+            reasoning_panjang=(
+                "Perlu menurunkan luas bangunan ke 11551.06 m2 dan menaikkan RTH ke 3850.35 m2, "
+                "atau sumur resapan dimensi 19.01 m3."
+            ),
+        )
+        assert _cek_konsistensi_numerik(output, poin) == []
+
     def test_fix1_nomor_pasal_dari_sitasi_llm_terlacak_lolos(self):
         # Fix #1 (opsional, retry sia-sia "Pasal 62"): nomor pasal yang BENAR-BENAR disitasi LLM
         # (poin_output.sitasi[].pasal) sah muncul di narasi — bukan dikarang, memang dirujuk.

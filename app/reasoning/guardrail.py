@@ -258,6 +258,18 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
         target_mitigasi = fakta.get("target_mitigasi") or {}
         _tambah(target_mitigasi.get("runoff_change_index_maks"))
         _tambah(target_mitigasi.get("index_saat_ini"))
+        # APP-2026-8025/-5067: angka rincian penyesuaian lahan/dimensi sumur resapan dari
+        # rekomendasi_mitigasi BE (lihat calculator.py::hitung_target_mitigasi_dampak) — GROUND
+        # TRUTH BE, sah dikutip verbatim persis spt angka lain di atas.
+        penyesuaian = target_mitigasi.get("penyesuaian_lahan") or {}
+        _tambah(penyesuaian.get("luas_bangunan_maks_m2"))
+        _tambah(penyesuaian.get("luas_rth_min_m2"))
+        _tambah(penyesuaian.get("kdb_maks_persen"))
+        _tambah(penyesuaian.get("kdh_min_persen"))
+        _tambah(target_mitigasi.get("luas_bangunan_saat_ini_m2"))
+        _tambah(target_mitigasi.get("luas_rth_saat_ini_m2"))
+        dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
+        _tambah(dimensi.get("nilai"))
 
     return angka
 
@@ -329,7 +341,9 @@ def _angka_terlacak_ke_sumber(
     ATAU versi DIBULATKAN dari salah satu angka fakta di atas (`_dekat_dgn_pembulatan`, APP-2026-8376
     — LLM wajar membulatkan angka float presisi tinggi saat menulis prosa)
     ATAU tercantum di teks chunk RAG yang BENAR-BENAR DISITASI output ini (`_teks_chunk_disitasi`,
-    2026-09-08 — lihat helper itu utk bukti & alasan kenapa dibatasi ke yang disitasi saja).
+    2026-09-08 — lihat helper itu utk bukti & alasan kenapa dibatasi ke yang disitasi saja)
+    ATAU tercantum verbatim di narasi `rekomendasi_mitigasi` BE (APP-2026-8025/-5067 — lihat
+    catatan di bawah kenapa teks MENTAH, bukan cuma angkanya, yang ditambahkan).
     Angka yang tak cocok sumber manapun TETAP ditolak — ini MEMPERKETAT presisi cek, bukan melonggarkan.
     """
     sumber = " ".join(poin.fakta.get("keterangan_ketentuan") or [])
@@ -337,6 +351,20 @@ def _angka_terlacak_ke_sumber(
     sumber += " " + " ".join(_angka_fakta_poin(poin))
     sumber += " " + " ".join(d.pasal or "" for d in poin.dasar_hukum)
     sumber += " " + " ".join(d.dokumen or "" for d in poin.dasar_hukum)
+    # APP-2026-8025/-5067: `rekomendasi_mitigasi.saran`/`catatan` BE ditulis format Indonesia
+    # (titik ribuan, koma desimal, mis. "11.551,06 m²") — `_RE_ANGKA_MENCURIGAKAN` men-tokenize ini
+    # BEDA dari representasi float Python (`_angka_fakta_poin` di atas sudah menambah
+    # "11551.06"/"11551", TAK match token "11.551"/"06" hasil tokenisasi format Indonesia).
+    # Drpd menormalisasi format angka (rapuh, banyak kasus tepi ribuan/desimal), tambahkan teks BE
+    # VERBATIM (byte-identik, TANPA reformat) ke `sumber` — saran poin dampak di sini SELALU echo
+    # persis teks ini (generator.py::_saran_mitigasi_dampak), jadi token apa pun yang diekstrak dari
+    # situ otomatis ketemu via substring match di bawah, terlepas skema tokenisasi.
+    target_mitigasi = poin.fakta.get("target_mitigasi") or {}
+    if target_mitigasi.get("saran_be"):
+        sumber += " " + target_mitigasi["saran_be"]
+    penyesuaian_lahan = target_mitigasi.get("penyesuaian_lahan") or {}
+    if penyesuaian_lahan.get("catatan"):
+        sumber += " " + penyesuaian_lahan["catatan"]
     if poin_output is not None:
         sumber += " " + " ".join(s.pasal or "" for s in poin_output.sitasi)
         sumber += " " + " ".join(s.dokumen or "" for s in poin_output.sitasi)

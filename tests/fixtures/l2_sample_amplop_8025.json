@@ -1,0 +1,118 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "69640d11-910c-48bb-9926-1b66d7c9e6e8",
+    "application_number": "APP-2026-8025",
+    "timestamp": "2026-09-08T02:46:42.183Z",
+    "lokasi": {
+      "koordinat": { "lat": -7.692882416028513, "lon": 110.32129765978426 },
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [[[110.320904042, -7.692007187], [110.322120174, -7.693012075], [110.321537013, -7.693672849], [110.320797888, -7.69318545], [110.320721292, -7.693156816], [110.320867358, -7.692775724], [110.320612831, -7.692567196], [110.3207988, -7.692345769], [110.320672354, -7.69224197], [110.320904042, -7.692007187]]]
+      },
+      "rdtr_zone": "Zona Kawasan Peruntukan Industri",
+      "rdtr_subzone": "KPI",
+      "rdtr_subzone_source": "geojson_overlay",
+      "luas_lahan_m2": 15401.41
+    },
+    "gate_hukum": {
+      "final_gate_status": "Lolos Bersyarat",
+      "rekomendasi_sistem": "Setuju Bersyarat",
+      "decisive_stage": "intensitas",
+      "tahapan": {
+        "itbx": {
+          "status": "B",
+          "lolos": true,
+          "kbli_diusulkan": "066",
+          "kegiatan_diusulkan": "Industri Logam Dasar",
+          "kegiatan_diizinkan": [],
+          "kegiatan_terbatas": [],
+          "kegiatan_bersyarat": ["Industri Logam Dasar"],
+          "keterangan_ketentuan": ["Ketentuan Umum kegiatan yang diperbolehkan secara Terbatas (T): a. Kegiatan pada kelompok konstruksi wajib memenuhi ketentuan."],
+          "reason": "Lolos karena kegiatan Bersyarat (B) di zona Zona Kawasan Peruntukan Industri",
+          "dasar_hukum": [{ "dokumen": "RDTR Sleman", "pasal": "Matriks ITBX", "kutipan": "Data KBLI referensi" }]
+        },
+        "lp2b": { "status": "AMAN", "lolos": true, "reason": null },
+        "sempadan": { "status": "AMAN", "lolos": true, "reason": null },
+        "intensitas": {
+          "status": "MELAMPAUI_BATAS",
+          "lolos": false,
+          "parameter": {
+            "kdb": { "usulan": 96.09509778650137, "ambang_maks": 70, "memenuhi": false, "satuan": "persen" },
+            "klb": { "usulan": 1.9219019557300274, "ambang_maks": 4, "memenuhi": true, "satuan": "rasio" },
+            "kdh": { "usulan": 0.6492912012601443, "ambang_min": 18, "memenuhi": false, "satuan": "persen" }
+          },
+          "luas_tapak_m2": 14800,
+          "jumlah_lantai": 2,
+          "luas_rth_usulan_m2": 100,
+          "reason": "Melanggar Aturan: KDB (96.09509778650137 ) Max (70 ), KDH (0.6492912012601443 ) Min (18 )",
+          "dasar_hukum": []
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": true,
+      "c_before": 0.3,
+      "c_after": 0.877,
+      "delta_c": 0.577,
+      "runoff_change_index": 2.923,
+      "impact_score": 40,
+      "impact_category": "TINGGI",
+      "calculation_details": "C_Sebelum = 0.3; C_Sesudah = 0.877 (Luas Persil: 15401.41 m2, Permohonan: 14900 m2)",
+      "threshold_bands": { "Rendah": "index < 1.5", "Sedang": "1.5-2.5", "Tinggi": "2.5-4.0", "Sangat Tinggi": "> 4.0" },
+      "rekomendasi_mitigasi": {
+        "status_dampak": "TINGGI",
+        "target_kategori": "SEDANG",
+        "target_indeks_maks": 2.5,
+        "c_target_sedang": 0.75,
+        "dimensi_minimum": {
+          "nilai": 19.01,
+          "satuan": "m³",
+          "rumus": "(C_sesudah - 2.5 x C_sebelum) x 0.013659 x Luas Lahan terbangun / (5 x 3.14 x 0.086)",
+          "parameter": {
+            "c_sesudah": 0.877, "c_sebelum": 0.3, "c_target_sedang": 0.75,
+            "luas_lahan_terbangun_m2": 14800, "faktor_pembilang": 0.013659, "faktor_penyebut": 1.3502
+          }
+        },
+        "rekomendasi_penyesuaian_lahan": {
+          "luas_bangunan_maks_m2": 11551.06,
+          "luas_rth_min_m2": 3850.35,
+          "kdb_maks_persen": 75,
+          "kdh_min_persen": 25,
+          "catatan": "Agar indeks runoff turun ke <= 2.5 (kategori Sedang), luas bangunan maksimal adalah 11.551,06 m² dan RTH minimal 3.850,35 m²."
+        },
+        "saran": "Untuk menurunkan dampak dari TINGGI menjadi SEDANG (indeks <= 2.5): pemohon disarankan menyesuaikan luas lantai dasar bangunan menjadi maksimal 11.551,06 m² (KDB maks 75%) dan menyediakan RTH minimal 3.850,35 m² (KDH min 25%), atau menyediakan fasilitas sumur/kolam resapan air hujan dengan dimensi kapasitas minimum 19.01 m³."
+      },
+      "existing_surface_details": {
+        "kelas": "Daerah tak Terbangun / RTH", "luas_persil_m2": 15401.41, "luas_persil_source": "land_area",
+        "c_before_source": "rth_baseline_taman", "proporsi": 1, "C": 0.3
+      },
+      "proposed_surface_details": { "Bangunan/Atap": 96.1, "Taman/RTH": 0.6, "Sisa Persil Eksisting": 3.3 },
+      "detailed_surface_breakdown": {
+        "luas_persil_m2": 15401.41, "luas_persil_source": "land_area", "luas_permohonan_m2": 14900,
+        "luas_sisa_m2": 501.41, "proporsi_sisa": 0.033, "proporsi_permohonan": 0.967,
+        "proporsi_terbangun": 0.993, "proporsi_taman": 0.007, "is_persil_found": false,
+        "is_multi_persil": false, "persil_count": 0, "persil_unioned": false,
+        "luas_usulan_melebihi_persil": false, "kdb_usulan_persen": 96.09509778650137, "kdh_usulan_persen": 0.6492912012601443,
+        "Bangunan/Atap": { "luas_m2": 14800, "proporsi": 0.961, "proporsi_dlm_permohonan": 0.993, "C": 0.9, "kelas": "Industri Berat" },
+        "Taman/RTH": { "luas_m2": 100, "proporsi": 0.006, "proporsi_dlm_permohonan": 0.007, "C": 0.3, "kelas": "Taman / RTH" },
+        "Sisa Persil Eksisting": { "luas_m2": 501.41, "proporsi": 0.033, "C": 0.3, "kelas": "Daerah tak Terbangun / RTH" }
+      },
+      "c_coefficients": {
+        "C_Atap_KBLI": 0.9, "Kelas_Atap": "Industri Berat", "C_Taman": 0.3, "C_Sisa_Persil": 0.3,
+        "Kelas_Eksisting": "Daerah tak Terbangun / RTH", "Luas_Persil_m2": 15401.41, "Luas_Permohonan_m2": 14900,
+        "Luas_Sisa_m2": 501.41, "Proporsi_Sisa": 0.033, "Proporsi_Permohonan": 0.967,
+        "Proporsi_Terbangun": 0.993, "Proporsi_Taman": 0.007, "Luas_Persil_Source": "land_area", "C_Before_Source": "rth_baseline_taman"
+      },
+      "luas_lahan_m2": 15401.41,
+      "luas_persil_source": "land_area",
+      "c_before_source": "rth_baseline_taman",
+      "luas_usulan_melebihi_persil": false,
+      "data_confidence": "Medium",
+      "limitations": null,
+      "multi_persil": false
+    },
+    "meta": { "data_confidence_keseluruhan": "Medium", "caveats": [] }
+  }
+}

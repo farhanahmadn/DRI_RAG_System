@@ -291,6 +291,33 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "reasoning_pendek dan saran (kutip apa adanya, JANGAN dihitung ulang)."
         )
 
+    # APP-2026-8025/-5067: BE kini (kadang) kirim rincian penyesuaian lahan KONKRET (bukan cuma
+    # ambang index abstrak di atas) — luas bangunan/RTH dalam m², persen KDB/KDH target, dimensi
+    # sumur/kolam resapan. `saran` final poin ini AKAN ditimpa verbatim dgn narasi BE sendiri
+    # (generator.py::_saran_mitigasi_dampak, tak bergantung LLM) — fakta ini disuntikkan HANYA
+    # supaya reasoning_pendek/panjang LLM (yg TETAP murni dari LLM, tak ditimpa) konsisten & tak
+    # menyebut angka lain yang kontradiktif dgn saran final.
+    penyesuaian = target_mitigasi.get("penyesuaian_lahan") or {}
+    if penyesuaian:
+        detail = []
+        if penyesuaian.get("luas_bangunan_maks_m2") is not None:
+            detail.append(f"luas bangunan maksimal {penyesuaian['luas_bangunan_maks_m2']} m²")
+        if penyesuaian.get("luas_rth_min_m2") is not None:
+            detail.append(f"RTH minimal {penyesuaian['luas_rth_min_m2']} m²")
+        dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
+        if dimensi.get("nilai") is not None:
+            detail.append(
+                f"ATAU sumur/kolam resapan dimensi minimum {dimensi['nilai']} {dimensi.get('satuan') or ''}"
+            )
+        if detail:
+            lines.append(
+                "\nRINCIAN_MITIGASI_KONKRET (SUDAH dihitung penuh oleh back-end, FINAL): "
+                + "; ".join(detail) + ". Rekomendasi resmi poin ini SUDAH ditetapkan persis angka "
+                "ini — jelaskan di reasoning_pendek/panjang KENAPA mitigasi ini diperlukan (kategori "
+                f"{poin.status}), sebutkan angka-angka di atas APA ADANYA, JANGAN mengarang angka "
+                "lain atau menghitung ulang."
+            )
+
     return lines
 
 

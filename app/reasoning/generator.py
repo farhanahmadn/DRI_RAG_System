@@ -57,6 +57,25 @@ def _saran_tidak_dinilai(poin: PoinKonteks) -> str:
     return _SARAN_TIDAK_DINILAI
 
 
+def _saran_mitigasi_dampak(poin: PoinKonteks) -> str | None:
+    """APP-2026-8025/-5067: BE kini (kadang) kirim `impact_assessment.rekomendasi_mitigasi.saran` —
+    narasi mitigasi SUDAH DIHITUNG PENUH (angka fisik m²/KDB%/KDH% konkret + dimensi sumur/kolam
+    resapan, bukan cuma ambang indeks abstrak). Echo VERBATIM (FAITHFUL, sama prinsip dgn
+    `_saran_tidak_dinilai` di atas) alih-alih biarkan LLM menulis ulang/improvisasi dari arah
+    kualitatif generik (`sarankan_arah_mitigasi_dampak`, calculator.py) — BE lebih otoritatif krn
+    rumus C/index & konversi ke luasan fisik ada di sisi mereka, bukan kita.
+
+    Diteruskan lewat `poin.fakta['target_mitigasi']['saran_be']` (dirakit
+    `calculator.py::hitung_target_mitigasi_dampak`), BUKAN baca `rekomendasi_mitigasi` mentah
+    langsung di sini — satu jalur perakitan fakta dampak, satu sumber kebenaran. None kalau BE tak
+    kirim (fixture lama / kategori dampak tak butuh mitigasi) -> caller pakai saran LLM apa adanya
+    (perilaku lama, backward-compatible)."""
+    if poin.poin_id != "dampak":
+        return None
+    target_mitigasi = (poin.fakta or {}).get("target_mitigasi") or {}
+    return target_mitigasi.get("saran_be") or None
+
+
 _LLM_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -414,6 +433,13 @@ def generate_poin(
         saran = _SARAN_AMAN
         target = None
         langkah_konkret = []
+    else:
+        saran_mitigasi = _saran_mitigasi_dampak(poin)
+        if saran_mitigasi:
+            # target/langkah_konkret SUDAH dirakit dari fakta['target_mitigasi'] di atas (yg,
+            # via calculator.py, JUGA sudah prioritaskan rekomendasi_mitigasi BE) — cuma saran yg
+            # ditimpa verbatim di sini, satu sumber kebenaran dgn target/langkah_konkret di atas.
+            saran = saran_mitigasi
 
     return PoinOutput(
         poin_id=poin.poin_id,

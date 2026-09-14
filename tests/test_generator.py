@@ -15,6 +15,7 @@ from app.reasoning.generator import (
     _SARAN_AMAN,
     _SARAN_TIDAK_DINILAI,
     _pilih_chunks_referensi,
+    _saran_mitigasi_dampak,
     _saran_tidak_dinilai,
     _zona_prefix_dari_nama,
     ambil_chunks_pendukung,
@@ -534,6 +535,81 @@ class TestSaranTidakDinilai:
             fakta={"dinilai": False, "limitations": ""},
         )
         assert _saran_tidak_dinilai(poin) == _SARAN_TIDAK_DINILAI
+
+
+class TestSaranMitigasiDampak:
+    """APP-2026-8025/-5067: _saran_mitigasi_dampak echo `target_mitigasi['saran_be']` verbatim
+    (dirakit calculator.py::hitung_target_mitigasi_dampak dari rekomendasi_mitigasi BE) kalau ada,
+    None kalau tidak (fixture lama / dampak tak perlu mitigasi)."""
+
+    def test_dgn_saran_be_echo_verbatim(self):
+        poin = _poin(
+            poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+            fakta={"target_mitigasi": {"runoff_change_index_maks": 2.5, "saran_be": "Saran resmi BE."}},
+        )
+        assert _saran_mitigasi_dampak(poin) == "Saran resmi BE."
+
+    def test_tanpa_saran_be_return_none(self):
+        poin = _poin(
+            poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+            fakta={"target_mitigasi": {"runoff_change_index_maks": 2.5}},
+        )
+        assert _saran_mitigasi_dampak(poin) is None
+
+    def test_target_mitigasi_kosong_return_none(self):
+        poin = _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Sedang", fakta={})
+        assert _saran_mitigasi_dampak(poin) is None
+
+    def test_bukan_poin_dampak_selalu_none(self):
+        poin = _poin(
+            poin_id="intensitas", tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS",
+            fakta={"target_mitigasi": {"saran_be": "seharusnya tak pernah dibaca utk poin ini"}},
+        )
+        assert _saran_mitigasi_dampak(poin) is None
+
+
+def test_generate_poin_dampak_mitigasi_saran_be_ditimpa_target_dan_langkah_konkret_terisi(monkeypatch):
+    """APP-2026-8025: end-to-end generate_poin() dampak Tinggi dgn rekomendasi_mitigasi BE — saran
+    HARUS ditimpa verbatim, target & langkah_konkret (3 item konkret) tetap dari calculator.py
+    (dipanggil via poin.fakta['target_mitigasi'] yg sudah dirakit adapter.py)."""
+    def _stub_generate(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        return {
+            "reasoning_pendek": "Dampak Tinggi krn indeks limpasan melebihi ambang.",
+            "reasoning_panjang": "x",
+            "sitasi": [],
+            "saran": "Saran dari LLM ini HARUS diabaikan/ditimpa BE.",
+            "disclaimer": None,
+        }
+
+    monkeypatch.setattr(llm_client_module, "generate", _stub_generate)
+
+    poin = _poin(
+        poin_id="dampak",
+        kategori="Dampak Tata Guna Lahan",
+        tipe_rekomendasi="numerik-mitigasi",
+        status="Tinggi",
+        fakta={
+            "dinilai": True,
+            "mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB", "naikkan KDH/RTH"]},
+            "target_mitigasi": {
+                "runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.923,
+                "penyesuaian_lahan": {
+                    "luas_bangunan_maks_m2": 11551.06, "luas_rth_min_m2": 3850.35,
+                    "kdb_maks_persen": 75, "kdh_min_persen": 25,
+                },
+                "dimensi_minimum_resapan": {"nilai": 19.01, "satuan": "m³"},
+                "saran_be": "Untuk menurunkan dampak dari TINGGI menjadi SEDANG, sesuaikan lahan.",
+            },
+        },
+    )
+    hasil = generate_poin(poin, MockRetriever())
+
+    assert hasil.rekomendasi.saran == "Untuk menurunkan dampak dari TINGGI menjadi SEDANG, sesuaikan lahan."
+    assert hasil.rekomendasi.target == 2.5
+    assert len(hasil.rekomendasi.langkah_konkret) == 3
+    assert {l.parameter for l in hasil.rekomendasi.langkah_konkret} == {
+        "Luas Bangunan (Atap)", "Luas RTH", "Dimensi Minimum Sumur Resapan",
+    }
 
 
 def test_generate_poin_dampak_tidak_dinilai_multi_persil_saran_echo_limitations(monkeypatch):

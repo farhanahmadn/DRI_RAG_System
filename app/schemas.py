@@ -138,11 +138,34 @@ class ImpactAssessment(BaseModel):
     # dgn >1 bidang persil, back-end sengaja tak menghitung skor hidrologi. `limitations` (sudah
     # ada di atas) membawa alasan bebas-teks; field baru di bawah eksplisit boolean, dipakai saat
     # dinilai=True TAPI usulan tapak+RTH melebihi luas persil tercatat (akurasi berkurang, bukan
-    # gagal total). Field lain versi baru (`delta_c`, `detailed_surface_breakdown`,
-    # `luas_persil_source`, `c_before_source`) SENGAJA tak dideklarasikan eksplisit di sini —
-    # Pydantic mengabaikan field tak dikenal secara default (bukan 422), dan tak ada logic reasoning
-    # yang butuh isinya saat ini — longgarkan lagi kalau nanti terbukti perlu.
+    # gagal total). Field lain versi baru (`delta_c`, `luas_persil_source`, `c_before_source`)
+    # SENGAJA tak dideklarasikan eksplisit di sini — Pydantic mengabaikan field tak dikenal
+    # secara default (bukan 422), dan tak ada logic reasoning yang butuh isinya saat ini —
+    # longgarkan lagi kalau nanti terbukti perlu.
     luas_usulan_melebihi_persil: bool | None = None
+    # APP-2026-8025/-5067 (hidrologi Tinggi/Sedang, BE): `multi_persil` — flag boolean eksplisit
+    # (duplikat makna dari `detailed_surface_breakdown.is_multi_persil` versi nested), pendamping
+    # `limitations` bebas-teks di atas. Dideklarasikan longgar (bukan dipakai branching baru saat
+    # ini — `limitations` tetap sumber utama deteksi kasus multi-persil, lihat generator.py::
+    # _saran_tidak_dinilai) supaya tersedia begitu logic butuh nanti tanpa 422 di antaranya.
+    multi_persil: bool | None = None
+    # `detailed_surface_breakdown` — SEBELUMNYA sengaja tak dideklarasikan (lihat catatan APP-2026-2428
+    # di atas), TAPI sekarang dibutuhkan: `Bangunan/Atap.luas_m2`/`Taman/RTH.luas_m2` dipakai sbg
+    # "nilai_saat_ini" saat merakit langkah_konkret mitigasi dampak (calculator.py::
+    # bangun_langkah_konkret_dampak) berdampingan dgn `rekomendasi_mitigasi` di bawah. Dict longgar
+    # (bukan model eksplisit) — bentuknya masih volatile di sisi BE & kita cuma baca 2 key spesifik,
+    # bukan memvalidasi/mempercayai seluruh isinya.
+    detailed_surface_breakdown: dict[str, Any] | None = None
+    # APP-2026-8025/-5067: BE kini (kadang, saat kategori dampak Tinggi/Sangat Tinggi butuh mitigasi)
+    # kirim rekomendasi mitigasi SUDAH DIHITUNG PENUH — target indeks + rincian penyesuaian lahan
+    # (m²/KDB%/KDH% konkret, bukan cuma ambang indeks abstrak) + dimensi minimum sumur/kolam resapan
+    # + narasi `saran` siap-pakai Bahasa Indonesia. `None` kalau dampak tak perlu mitigasi (kategori
+    # Rendah/Sedang) — perilaku lama (kalkulasi target dari threshold_bands di calculator.py) tetap
+    # jadi fallback kalau field ini absen sama sekali (fixture lama/provider lama). Dict longgar
+    # (bukan model eksplisit bersarang) — struktur internal (dimensi_minimum.parameter dst) murni
+    # diteruskan apa adanya ke calculator.py/prompts.py, tak pernah dihitung ulang di kode kita
+    # (FAITHFUL, sama prinsip dgn c_coefficients/threshold_bands di atas).
+    rekomendasi_mitigasi: dict[str, Any] | None = None
 
 
 class MetaL2(BaseModel):

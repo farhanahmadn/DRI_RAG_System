@@ -309,6 +309,37 @@ class TestFaktaDampak:
         prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=False), [])
         assert "Arah Mitigasi" not in prompt
 
+    def test_rincian_mitigasi_konkret_muncul_saat_be_kirim_penyesuaian_lahan(self):
+        # APP-2026-8025/-5067: rincian m²/KDB%/KDH% + dimensi sumur resapan dari BE (via
+        # target_mitigasi, calculator.py::hitung_target_mitigasi_dampak) WAJIB disuntikkan supaya
+        # narasi LLM konsisten dgn saran final (yg ditimpa verbatim di generator.py).
+        poin = _poin(
+            poin_id="dampak", kategori="Dampak Tata Guna Lahan", tipe_rekomendasi="numerik-mitigasi",
+            status="Tinggi",
+            fakta={
+                "impact_score": 40,
+                "mitigasi": {"perlu_mitigasi": True, "arah": ["turunkan KDB"]},
+                "target_mitigasi": {
+                    "runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.923,
+                    "penyesuaian_lahan": {
+                        "luas_bangunan_maks_m2": 11551.06, "luas_rth_min_m2": 3850.35,
+                        "kdb_maks_persen": 75, "kdh_min_persen": 25,
+                    },
+                    "dimensi_minimum_resapan": {"nilai": 19.01, "satuan": "m³"},
+                },
+            },
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "RINCIAN_MITIGASI_KONKRET" in prompt
+        assert "11551.06 m²" in prompt
+        assert "3850.35 m²" in prompt
+        assert "19.01 m³" in prompt
+        assert "JANGAN mengarang angka lain" in prompt
+
+    def test_rincian_mitigasi_konkret_tak_muncul_tanpa_penyesuaian_lahan(self):
+        prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=True), [])
+        assert "RINCIAN_MITIGASI_KONKRET" not in prompt
+
     def test_alasan_tidak_dinilai_muncul_dgn_limitations(self):
         # APP-2026-2428: status "Tidak Dinilai" + limitations terisi -> WAJIB disuntikkan sbg
         # ALASAN_TIDAK_DINILAI, instruksikan LLM jangan mengarang alasan/solusi teknis lain.
