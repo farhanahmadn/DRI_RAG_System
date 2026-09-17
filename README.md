@@ -292,6 +292,7 @@ concurrency provider embedding/rerank aktif — jalankan manual kapan pun perlu 
 
 | Dokumen | Isi |
 |---|---|
+| [`docs/ARSITEKTUR_RAG.md`](docs/ARSITEKTUR_RAG.md) | **Mulai dari sini** — arsitektur inti: stack, peta modul, alur ingest & runtime, strategi chunking/retrieval, guardrail |
 | [`docs/STATUS.md`](docs/STATUS.md) | Status komponen reasoning, hasil eval gold-set, hardening |
 | [`docs/STATUS_RAG.md`](docs/STATUS_RAG.md) | Status retrieval, keputusan provider Jina, cakupan korpus |
 | [`docs/HANDOFF_RAG_MIGRASI_JINA.md`](docs/HANDOFF_RAG_MIGRASI_JINA.md) | Ringkasan alih-sesi migrasi Jina — status akhir, keterbatasan diketahui |
