@@ -1,0 +1,353 @@
+{
+  "dibuat": "2026-09-20T06:30:43+00:00",
+  "wilayah": "Sleman Tengah",
+  "provider_embedding": "jina",
+  "provider_rerank": "jina",
+  "n_query": 22,
+  "top_n_dinilai": 10,
+  "korpus": {
+    "chunk": 484,
+    "per_level": {
+      "ayat": 356,
+      "pasal": 65,
+      "tabel": 63
+    },
+    "vektor": 440
+  },
+  "konfigurasi": [
+    "dense",
+    "lexical",
+    "rrf",
+    "dense+rerank",
+    "rrf+rerank"
+  ],
+  "agregat": {
+    "dense": {
+      "hit@1": 0.6363636363636364,
+      "recall@1": 0.4393939393939394,
+      "precision@1": 0.6363636363636364,
+      "ndcg@1": 0.6363636363636364,
+      "hit@3": 0.9545454545454546,
+      "recall@3": 0.7045454545454546,
+      "precision@3": 0.4242424242424242,
+      "ndcg@3": 0.6741407545825415,
+      "hit@5": 1.0,
+      "recall@5": 0.7878787878787878,
+      "precision@5": 0.2818181818181818,
+      "ndcg@5": 0.7119799692345636,
+      "hit@10": 1.0,
+      "recall@10": 0.8333333333333333,
+      "precision@10": 0.15000000000000002,
+      "ndcg@10": 0.7318351907634877,
+      "mrr": 0.7818181818181817,
+      "map": 0.6457070707070707,
+      "median_peringkat_pertama": 1.0,
+      "query_tanpa_hasil_relevan": 0
+    },
+    "lexical": {
+      "hit@1": 0.0,
+      "recall@1": 0.0,
+      "precision@1": 0.0,
+      "ndcg@1": 0.0,
+      "hit@3": 0.3181818181818182,
+      "recall@3": 0.16666666666666666,
+      "precision@3": 0.10606060606060605,
+      "ndcg@3": 0.10988973096417204,
+      "hit@5": 0.45454545454545453,
+      "recall@5": 0.32575757575757575,
+      "precision@5": 0.11818181818181818,
+      "ndcg@5": 0.18339997490690035,
+      "hit@10": 0.8181818181818182,
+      "recall@10": 0.6363636363636364,
+      "precision@10": 0.12272727272727274,
+      "ndcg@10": 0.30446726912597954,
+      "mrr": 0.20667388167388168,
+      "map": 0.16927308802308802,
+      "median_peringkat_pertama": 5.0,
+      "query_tanpa_hasil_relevan": 4
+    },
+    "rrf": {
+      "hit@1": 0.6363636363636364,
+      "recall@1": 0.42424242424242425,
+      "precision@1": 0.6363636363636364,
+      "ndcg@1": 0.6363636363636364,
+      "hit@3": 0.7727272727272727,
+      "recall@3": 0.6060606060606061,
+      "precision@3": 0.34848484848484845,
+      "ndcg@3": 0.60167209413399,
+      "hit@5": 0.8181818181818182,
+      "recall@5": 0.6590909090909091,
+      "precision@5": 0.23636363636363636,
+      "ndcg@5": 0.6320485857509758,
+      "hit@10": 0.9545454545454546,
+      "recall@10": 0.8863636363636364,
+      "precision@10": 0.16818181818181818,
+      "ndcg@10": 0.7216729953236812,
+      "mrr": 0.720508658008658,
+      "map": 0.628183621933622,
+      "median_peringkat_pertama": 1,
+      "query_tanpa_hasil_relevan": 1
+    },
+    "dense+rerank": {
+      "hit@1": 0.8181818181818182,
+      "recall@1": 0.5227272727272727,
+      "precision@1": 0.8181818181818182,
+      "ndcg@1": 0.8181818181818182,
+      "hit@3": 1.0,
+      "recall@3": 0.7727272727272727,
+      "precision@3": 0.45454545454545453,
+      "ndcg@3": 0.7660669498778497,
+      "hit@5": 1.0,
+      "recall@5": 0.8333333333333333,
+      "precision@5": 0.30000000000000004,
+      "ndcg@5": 0.7992598404072012,
+      "hit@10": 1.0,
+      "recall@10": 0.8712121212121212,
+      "precision@10": 0.1590909090909091,
+      "ndcg@10": 0.814781084002665,
+      "mrr": 0.9015151515151515,
+      "map": 0.7392676767676768,
+      "median_peringkat_pertama": 1.0,
+      "query_tanpa_hasil_relevan": 0
+    },
+    "rrf+rerank": {
+      "hit@1": 0.8181818181818182,
+      "recall@1": 0.5151515151515151,
+      "precision@1": 0.8181818181818182,
+      "ndcg@1": 0.8181818181818182,
+      "hit@3": 0.9545454545454546,
+      "recall@3": 0.7727272727272727,
+      "precision@3": 0.46969696969696967,
+      "ndcg@3": 0.7632107919861434,
+      "hit@5": 1.0,
+      "recall@5": 0.893939393939394,
+      "precision@5": 0.32727272727272727,
+      "ndcg@5": 0.8210184184231583,
+      "hit@10": 1.0,
+      "recall@10": 0.9242424242424242,
+      "precision@10": 0.17272727272727273,
+      "ndcg@10": 0.8352389858783934,
+      "mrr": 0.8803030303030304,
+      "map": 0.7603174603174604,
+      "median_peringkat_pertama": 1.0,
+      "query_tanpa_hasil_relevan": 0
+    }
+  },
+  "latensi_ms": {
+    "dense": 1310.9565500000094,
+    "lexical": 5.372795454558276,
+    "rrf": 0.08039090911634875,
+    "dense+rerank": 1189.5629454545592,
+    "rrf+rerank": 1561.29928636364
+  },
+  "detail_per_query": [
+    {
+      "query": "Lokasional LP2B",
+      "n_relevan": 3,
+      "dense": 1,
+      "lexical": 2,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "LP2B lahan pertanian pangan berkelanjutan",
+      "n_relevan": 2,
+      "dense": 1,
+      "lexical": 2,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "alih fungsi lahan pertanian",
+      "n_relevan": 2,
+      "dense": 1,
+      "lexical": 3,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "KDB",
+      "n_relevan": 2,
+      "dense": 1,
+      "lexical": 8,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Koefisien Dasar Bangunan",
+      "n_relevan": 1,
+      "dense": 1,
+      "lexical": 5,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "KLB",
+      "n_relevan": 2,
+      "dense": 1,
+      "lexical": 8,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Koefisien Lantai Bangunan",
+      "n_relevan": 1,
+      "dense": 1,
+      "lexical": 5,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "KDH koefisien daerah hijau",
+      "n_relevan": 1,
+      "dense": 1,
+      "lexical": 8,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "intensitas pemanfaatan ruang",
+      "n_relevan": 2,
+      "dense": 3,
+      "lexical": null,
+      "rrf": 8,
+      "dense+rerank": 2,
+      "rrf+rerank": 3
+    },
+    {
+      "query": "ketentuan intensitas bangunan zona C-1",
+      "n_relevan": 2,
+      "dense": 2,
+      "lexical": null,
+      "rrf": 7,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Sempadan Sungai",
+      "n_relevan": 2,
+      "dense": 2,
+      "lexical": 7,
+      "rrf": 3,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Perlindungan Setempat",
+      "n_relevan": 1,
+      "dense": 1,
+      "lexical": 3,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "GSB garis sempadan bangunan",
+      "n_relevan": 1,
+      "dense": 1,
+      "lexical": 9,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Resapan",
+      "n_relevan": 3,
+      "dense": 1,
+      "lexical": 3,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "kawasan resapan air",
+      "n_relevan": 2,
+      "dense": 3,
+      "lexical": 3,
+      "rrf": 2,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Kegiatan",
+      "n_relevan": 3,
+      "dense": 3,
+      "lexical": 7,
+      "rrf": 4,
+      "dense+rerank": 2,
+      "rrf+rerank": 3
+    },
+    {
+      "query": "ketentuan kegiatan dan penggunaan lahan ITBX",
+      "n_relevan": 1,
+      "dense": 5,
+      "lexical": null,
+      "rrf": null,
+      "dense+rerank": 3,
+      "rrf+rerank": 5
+    },
+    {
+      "query": "syarat kegiatan terbatas bersyarat zona perlindungan setempat",
+      "n_relevan": 1,
+      "dense": 1,
+      "lexical": null,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Ketentuan Khusus",
+      "n_relevan": 3,
+      "dense": 2,
+      "lexical": 4,
+      "rrf": 1,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "Banjir",
+      "n_relevan": 3,
+      "dense": 2,
+      "lexical": 6,
+      "rrf": 1,
+      "dense+rerank": 2,
+      "rrf+rerank": 1
+    },
+    {
+      "query": "rawan bencana banjir lahar",
+      "n_relevan": 2,
+      "dense": 1,
+      "lexical": 8,
+      "rrf": 3,
+      "dense+rerank": 1,
+      "rrf+rerank": 2
+    },
+    {
+      "query": "Peraturan Zonasi",
+      "n_relevan": 2,
+      "dense": 1,
+      "lexical": 2,
+      "rrf": 6,
+      "dense+rerank": 1,
+      "rrf+rerank": 1
+    }
+  ],
+  "generasi": {
+    "n_permohonan": 60,
+    "n_poin": 180,
+    "sebab": {
+      "berhasil": 114,
+      "panggilan_llm_gagal": 66
+    },
+    "sitasi": 114,
+    "sitasi_terverifikasi": 114
+  }
+}
