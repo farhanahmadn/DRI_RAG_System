@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # APP-2026-3468: saran deterministik utk poin aman/lolos — reasoning_pendek/panjang & sitasi TETAP
 # dari LLM (poin aman WAJIB tetap dijelaskan KENAPA lolos, bukan reasoning generik tanpa sitasi),
 # hanya bagian "tidak ada tindakan lanjut" ini yang aman ditemplate (tak ada apa pun utk direkomendasikan).
-_SARAN_AMAN = "Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."
+_SARAN_AMAN = "Tidak diperlukan tindakan khusus. Poin ini telah memenuhi ketentuan."
 
 # APP-2026-003: "Tidak Dinilai" (intensitas tanpa data krn gate berhenti di ITBX, atau
 # impact_assessment.dinilai=False) BUKAN "memenuhi ketentuan" — poin ini memang belum pernah
@@ -51,8 +51,8 @@ def _saran_tidak_dinilai(poin: PoinKonteks) -> str:
     limitations = (poin.fakta or {}).get("limitations")
     if limitations:
         return (
-            f"Asesmen dampak tata guna lahan tidak dapat dilakukan: {limitations} Pemohon perlu "
-            "menindaklanjuti catatan tersebut sebelum penilaian dampak dapat diproses."
+            f"Asesmen dampak terhadap lingkungan (hidrologi) tidak dapat dilakukan: {limitations} "
+            "Pemohon perlu menindaklanjuti catatan tersebut sebelum penilaian dampak dapat diproses."
         )
     return _SARAN_TIDAK_DINILAI
 

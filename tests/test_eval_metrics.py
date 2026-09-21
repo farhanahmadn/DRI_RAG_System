@@ -11,6 +11,7 @@ from app.retrieval.base import Chunk
 from app.schemas import (
     KesimpulanOutput,
     L2Assessment,
+    NarasiRekomendasiOutput,
     OutputL3,
     PoinOutput,
     RekomendasiOutput,
@@ -48,6 +49,7 @@ def _output(**overrides) -> OutputL3:
         ringkasan_dampak=RingkasanDampakOutput(impact_category=None, impact_score=None, kalimat="x"),
         poin=[_poin()],
         rekomendasi_sistem="Setuju Bersyarat",
+        narasi_rekomendasi=NarasiRekomendasiOutput(paragraf_gate_intensitas="x", paragraf_dampak="x"),
         kesimpulan=KesimpulanOutput(langkah_berdampak=[], catatan_lokasi=None),
         catatan_global=[],
         low_confidence_keseluruhan=False,

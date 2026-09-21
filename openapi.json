@@ -63,6 +63,55 @@
           }
         }
       }
+    },
+    "/admin/cache/clear": {
+      "post": {
+        "summary": "Admin Cache Clear",
+        "description": "Kosongkan cache retrieval in-memory proses ini — dipanggil scripts/ingest.py / reembed.py\nsetelah korpus berubah (lihat app/api/admin.py utk penjelasan lengkap kenapa perlu HTTP,\nbukan panggilan fungsi biasa dari skrip CLI). Butuh header X-Admin-Token = env ADMIN_TOKEN.",
+        "operationId": "admin_cache_clear_admin_cache_clear_post",
+        "parameters": [
+          {
+            "name": "x-admin-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Admin Cache Clear Admin Cache Clear Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -141,10 +190,6 @@
             "title": "Type"
           },
           "coordinates": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
             "title": "Coordinates"
           }
         },
@@ -283,9 +328,7 @@
           "c_coefficients": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "type": "number"
-                },
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -326,6 +369,52 @@
               }
             ],
             "title": "Limitations"
+          },
+          "luas_usulan_melebihi_persil": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Usulan Melebihi Persil"
+          },
+          "multi_persil": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multi Persil"
+          },
+          "detailed_surface_breakdown": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detailed Surface Breakdown"
+          },
+          "rekomendasi_mitigasi": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rekomendasi Mitigasi"
           }
         },
         "type": "object",
@@ -569,6 +658,9 @@
                 "type": "integer"
               },
               {
+                "type": "string"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -659,6 +751,58 @@
         "title": "L2Envelope",
         "description": "Terima L2Assessment polos ATAU amplop back-end {statusCode, message, data} — bentuk asli\nrespons L2 Spatial Risk Assessment sungguhan (lihat tests/fixtures/l2_sample_*.json). Endpoint\n/reasoning pakai model ini sebagai body, lalu teruskan `.data` (lihat app/api/main.py)."
       },
+      "LangkahKonkretOutput": {
+        "properties": {
+          "parameter": {
+            "type": "string",
+            "title": "Parameter"
+          },
+          "deskripsi": {
+            "type": "string",
+            "title": "Deskripsi"
+          },
+          "nilai_saat_ini": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nilai Saat Ini"
+          },
+          "nilai_target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nilai Target"
+          },
+          "satuan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satuan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter",
+          "deskripsi"
+        ],
+        "title": "LangkahKonkretOutput",
+        "description": "Satu item aksi konkret, dirakit DETERMINISTIK dari app/reasoning/calculator.py — BUKAN\nditulis LLM. Field ADDITIF di RekomendasiOutput (BUKAN pengganti `saran`, yang tetap narasi\nbebas LLM) — dibuat supaya reviewer/FE dapat checklist presisi angka yang tak bergantung pada\nkualitas narasi model manapun yang sedang dipakai (lihat diskusi kualitas saran, 2026-08-17/18).\n\nBEDA dari `RekomendasiOutput.target` (SATU angka representatif, ambil parameter pertama yang\nmelanggar kalau lebih dari satu — lihat calculator.py::pilih_target_utama_intensitas):\n`langkah_konkret` memuat SEMUA parameter yang melanggar sekaligus (mis. KDB & KDH berbarengan),\nbukan cuma satu representatif."
+      },
       "Lokasi": {
         "properties": {
           "koordinat": {
@@ -670,6 +814,28 @@
           "rdtr_zone": {
             "type": "string",
             "title": "Rdtr Zone"
+          },
+          "rdtr_subzone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rdtr Subzone"
+          },
+          "rdtr_subzone_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rdtr Subzone Source"
           },
           "luas_lahan_m2": {
             "type": "number",
@@ -716,6 +882,24 @@
         "type": "object",
         "title": "MetaL2"
       },
+      "NarasiRekomendasiOutput": {
+        "properties": {
+          "paragraf_gate_intensitas": {
+            "type": "string",
+            "title": "Paragraf Gate Intensitas"
+          },
+          "paragraf_dampak": {
+            "type": "string",
+            "title": "Paragraf Dampak"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paragraf_gate_intensitas",
+          "paragraf_dampak"
+        ],
+        "title": "NarasiRekomendasiOutput"
+      },
       "OutputL3": {
         "properties": {
           "ringkasan_gate": {
@@ -734,6 +918,9 @@
           "rekomendasi_sistem": {
             "type": "string",
             "title": "Rekomendasi Sistem"
+          },
+          "narasi_rekomendasi": {
+            "$ref": "#/components/schemas/NarasiRekomendasiOutput"
           },
           "kesimpulan": {
             "$ref": "#/components/schemas/KesimpulanOutput"
@@ -757,6 +944,7 @@
           "ringkasan_dampak",
           "poin",
           "rekomendasi_sistem",
+          "narasi_rekomendasi",
           "kesimpulan",
           "low_confidence_keseluruhan"
         ],
@@ -896,6 +1084,14 @@
               }
             ],
             "title": "Disclaimer"
+          },
+          "langkah_konkret": {
+            "items": {
+              "$ref": "#/components/schemas/LangkahKonkretOutput"
+            },
+            "type": "array",
+            "title": "Langkah Konkret",
+            "default": []
           }
         },
         "type": "object",
@@ -1018,13 +1214,19 @@
             "$ref": "#/components/schemas/ItbxTahap"
           },
           "intensitas": {
-            "$ref": "#/components/schemas/IntensitasTahap"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntensitasTahap"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
-          "itbx",
-          "intensitas"
+          "itbx"
         ],
         "title": "Tahapan"
       },

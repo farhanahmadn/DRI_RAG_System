@@ -19,13 +19,39 @@ def _ke_fraksi(nilai: float, satuan: str) -> float:
     return nilai / 100 if satuan == "persen" else nilai
 
 
+def _bulat2(nilai: float | int | None) -> float | int | None:
+    """Bulatkan angka TAMPILAN (bukan fakta mentah) ke maks 2 desimal — presisi panjang dari BE
+    (mis. usulan 96.09509778650137) tak berarti apa pun bagi reviewer & bikin kalimat/langkah_konkret
+    terlihat 'kotor'. Dipakai HANYA di titik rakit dict target/langkah_konkret (nilai yang dipakai
+    utk DITAMPILKAN, bukan dibandingkan lagi) — guardrail._dekat_dgn_pembulatan sudah toleran
+    membandingkan versi bulat ini dgn fakta presisi penuh, jadi tidak mengganggu cek provenance.
+    int/None/bool diteruskan apa adanya (bulat tak berarti apa pun utknya)."""
+    if nilai is None or isinstance(nilai, bool) or isinstance(nilai, int):
+        return nilai
+    return round(nilai, 2)
+
+
+def _fmt_angka(nilai: float | int | None) -> str:
+    """Tampilkan angka TANPA nol berlebihan di belakang koma — "60.0" -> "60", "51.98" tetap
+    "51.98" (bukan "51.98000..."). Reviewer non-teknis: presisi >2 desimal tak berarti apa pun,
+    tapi "60.00%" juga terlihat janggal utk bilangan bulat — dipakai di titik render kalimat
+    (nilai di sini SUDAH dibulatkan `_bulat2` sebelumnya, ini murni kosmetik tampilan)."""
+    if nilai is None:
+        return "-"
+    if isinstance(nilai, bool):
+        return str(nilai)
+    if isinstance(nilai, int) or float(nilai).is_integer():
+        return str(int(nilai))
+    return f"{nilai:.2f}".rstrip("0").rstrip(".")
+
+
 def hitung_target_kdb(param: ParameterIntensitas, luas_lahan_m2: float | None) -> dict[str, float] | None:
     if param.ambang_maks is None or param.usulan <= param.ambang_maks:
         return None
     selisih = param.usulan - param.ambang_maks
-    hasil = {"target_kdb": param.ambang_maks, "selisih": selisih}
+    hasil = {"target_kdb": _bulat2(param.ambang_maks), "selisih": _bulat2(selisih)}
     if luas_lahan_m2 is not None:
-        hasil["footprint_maks_m2"] = luas_lahan_m2 * _ke_fraksi(param.ambang_maks, param.satuan)
+        hasil["footprint_maks_m2"] = _bulat2(luas_lahan_m2 * _ke_fraksi(param.ambang_maks, param.satuan))
     return hasil
 
 
@@ -33,9 +59,9 @@ def hitung_target_klb(param: ParameterIntensitas, luas_lahan_m2: float | None) -
     if param.ambang_maks is None or param.usulan <= param.ambang_maks:
         return None
     selisih = param.usulan - param.ambang_maks
-    hasil = {"target_klb": param.ambang_maks, "selisih": selisih}
+    hasil = {"target_klb": _bulat2(param.ambang_maks), "selisih": _bulat2(selisih)}
     if luas_lahan_m2 is not None:
-        hasil["luas_lantai_maks_m2"] = luas_lahan_m2 * _ke_fraksi(param.ambang_maks, param.satuan)
+        hasil["luas_lantai_maks_m2"] = _bulat2(luas_lahan_m2 * _ke_fraksi(param.ambang_maks, param.satuan))
     return hasil
 
 
@@ -45,12 +71,12 @@ def hitung_target_kdh(
     if param.ambang_min is None or param.usulan >= param.ambang_min:
         return None
     selisih = param.ambang_min - param.usulan  # positif = kurang
-    hasil = {"target_kdh": param.ambang_min, "selisih": selisih}
+    hasil = {"target_kdh": _bulat2(param.ambang_min), "selisih": _bulat2(selisih)}
     if luas_lahan_m2 is not None:
         rth_dibutuhkan = luas_lahan_m2 * _ke_fraksi(param.ambang_min, param.satuan)
-        hasil["rth_dibutuhkan_m2"] = rth_dibutuhkan
+        hasil["rth_dibutuhkan_m2"] = _bulat2(rth_dibutuhkan)
         if luas_rth_usulan_m2 is not None:
-            hasil["rth_kurang_m2"] = max(rth_dibutuhkan - luas_rth_usulan_m2, 0.0)
+            hasil["rth_kurang_m2"] = _bulat2(max(rth_dibutuhkan - luas_rth_usulan_m2, 0.0))
     return hasil
 
 
@@ -223,8 +249,9 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment) -> dict:
 
 def pilih_target_mitigasi_dampak(target_mitigasi: dict) -> float | None:
     """Satu angka representatif dari `hitung_target_mitigasi_dampak()` utk `RekomendasiOutput.target`
-    — pola sama seperti `pilih_target_utama_intensitas`."""
-    return target_mitigasi.get("runoff_change_index_maks")
+    — pola sama seperti `pilih_target_utama_intensitas`. Dibulatkan (`_bulat2`) — field ini tampil
+    langsung di JSON keluaran (`rekomendasi.target`)."""
+    return _bulat2(target_mitigasi.get("runoff_change_index_maks"))
 
 
 # ---------------------------------------------------------------------------
@@ -245,21 +272,21 @@ def format_target_parameter(info: dict) -> str:
     justru paling actionable buat reviewer (lihat SYSTEM_PROMPT aturan #11, prompts.py).
     """
     if "target_kdb" in info:
-        kalimat = f"KDB harus turun ke maksimal {info['target_kdb']}% (selisih {info['selisih']} poin dari usulan)"
+        kalimat = f"KDB harus turun ke maksimal {_fmt_angka(info['target_kdb'])}% (selisih {_fmt_angka(info['selisih'])} poin dari usulan)"
         if "footprint_maks_m2" in info:
-            kalimat += f" → luas lantai dasar bangunan maksimal {info['footprint_maks_m2']:.1f} m²"
+            kalimat += f" → luas lantai dasar bangunan maksimal {_fmt_angka(info['footprint_maks_m2'])} m²"
         return kalimat
     if "target_klb" in info:
-        kalimat = f"KLB harus turun ke maksimal {info['target_klb']} (selisih {info['selisih']} dari usulan)"
+        kalimat = f"KLB harus turun ke maksimal {_fmt_angka(info['target_klb'])} (selisih {_fmt_angka(info['selisih'])} dari usulan)"
         if "luas_lantai_maks_m2" in info:
-            kalimat += f" → luas total lantai bangunan maksimal {info['luas_lantai_maks_m2']:.1f} m²"
+            kalimat += f" → luas total lantai bangunan maksimal {_fmt_angka(info['luas_lantai_maks_m2'])} m²"
         return kalimat
     if "target_kdh" in info:
-        kalimat = f"KDH harus naik ke minimal {info['target_kdh']}% (kurang {info['selisih']} poin dari usulan)"
+        kalimat = f"KDH harus naik ke minimal {_fmt_angka(info['target_kdh'])}% (kurang {_fmt_angka(info['selisih'])} poin dari usulan)"
         if "rth_dibutuhkan_m2" in info:
-            kalimat += f" → RTH dibutuhkan minimal {info['rth_dibutuhkan_m2']:.1f} m²"
+            kalimat += f" → RTH dibutuhkan minimal {_fmt_angka(info['rth_dibutuhkan_m2'])} m²"
         if info.get("rth_kurang_m2"):
-            kalimat += f" (RTH yang sudah diusulkan pemohon masih kurang {info['rth_kurang_m2']:.1f} m²)"
+            kalimat += f" (RTH yang sudah diusulkan pemohon masih kurang {_fmt_angka(info['rth_kurang_m2'])} m²)"
         return kalimat
     # Jaring pengaman — harusnya tak pernah kena selama fungsi hitung_target_* di atas konsisten
     # dgn 3 bentuk di atas (target_kdb/target_klb/target_kdh), tapi jangan diam-diam sembunyikan
@@ -287,7 +314,7 @@ def bangun_langkah_konkret_intensitas(parameter: dict, target_map: dict) -> list
         langkah.append({
             "parameter": nama.upper(),
             "deskripsi": format_target_parameter(info),
-            "nilai_saat_ini": p.get("usulan"),
+            "nilai_saat_ini": _bulat2(p.get("usulan")),
             "nilai_target": _nilai_target_dari_info(info),
             "satuan": p.get("satuan"),
         })
@@ -320,12 +347,12 @@ def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:
             langkah_rinci.append({
                 "parameter": "Luas Bangunan (Atap)",
                 "deskripsi": (
-                    f"Turunkan luas lantai dasar bangunan ke maksimal {luas_bangunan_maks} m²"
-                    + (f" (KDB maks {kdb_maks}%)" if kdb_maks is not None else "")
+                    f"Turunkan luas lantai dasar bangunan ke maksimal {_fmt_angka(luas_bangunan_maks)} m²"
+                    + (f" (KDB maks {_fmt_angka(kdb_maks)}%)" if kdb_maks is not None else "")
                     + f" agar indeks limpasan turun ke kategori {kategori_target}."
                 ),
-                "nilai_saat_ini": target_mitigasi.get("luas_bangunan_saat_ini_m2"),
-                "nilai_target": luas_bangunan_maks,
+                "nilai_saat_ini": _bulat2(target_mitigasi.get("luas_bangunan_saat_ini_m2")),
+                "nilai_target": _bulat2(luas_bangunan_maks),
                 "satuan": "m²",
             })
         luas_rth_min = penyesuaian.get("luas_rth_min_m2")
@@ -334,12 +361,12 @@ def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:
             langkah_rinci.append({
                 "parameter": "Luas RTH",
                 "deskripsi": (
-                    f"Tingkatkan luas RTH ke minimal {luas_rth_min} m²"
-                    + (f" (KDH min {kdh_min}%)" if kdh_min is not None else "")
+                    f"Tingkatkan luas RTH ke minimal {_fmt_angka(luas_rth_min)} m²"
+                    + (f" (KDH min {_fmt_angka(kdh_min)}%)" if kdh_min is not None else "")
                     + " untuk memperluas daerah peresapan air alami."
                 ),
-                "nilai_saat_ini": target_mitigasi.get("luas_rth_saat_ini_m2"),
-                "nilai_target": luas_rth_min,
+                "nilai_saat_ini": _bulat2(target_mitigasi.get("luas_rth_saat_ini_m2")),
+                "nilai_target": _bulat2(luas_rth_min),
                 "satuan": "m²",
             })
         if dimensi and dimensi.get("nilai") is not None:
@@ -348,25 +375,29 @@ def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:
                 "parameter": "Dimensi Minimum Sumur Resapan",
                 "deskripsi": (
                     f"Alternatif: sediakan sumur atau kolam resapan dengan dimensi minimum "
-                    f"{dimensi['nilai']} {satuan_dimensi} berdasarkan rumus mitigasi hidrologi."
+                    f"{_fmt_angka(dimensi['nilai'])} {satuan_dimensi} berdasarkan rumus mitigasi hidrologi."
                 ),
                 "nilai_saat_ini": 0,
-                "nilai_target": dimensi["nilai"],
+                "nilai_target": _bulat2(dimensi["nilai"]),
                 "satuan": satuan_dimensi or None,
             })
         if langkah_rinci:
             return langkah_rinci
         # penyesuaian/dimensi ADA tapi tak satu pun angkanya valid -> jatuh ke item generik di bawah.
 
-    ambang = target_mitigasi["runoff_change_index_maks"]
+    # "Indeks Limpasan (Runoff)" — BUKAN nama variabel kode "runoff_change_index" apa adanya
+    # (item #5 permintaan user, 2026-09-21): field ini tampil langsung di JSON keluaran sistem
+    # (`RekomendasiOutput.langkah_konkret[].parameter`), nama variabel snake_case membingungkan
+    # reviewer non-teknis yang membaca hasilnya.
+    ambang = _bulat2(target_mitigasi["runoff_change_index_maks"])
     return [{
-        "parameter": "runoff_change_index",
+        "parameter": "Indeks Limpasan (Runoff)",
         "deskripsi": (
-            f"Indikator limpasan air (runoff) perlu ditekan hingga di bawah {ambang} (saat ini "
-            f"{target_mitigasi.get('index_saat_ini')}) supaya kategori dampak turun ke "
+            f"Indikator limpasan air (runoff) perlu ditekan hingga di bawah {_fmt_angka(ambang)} (saat ini "
+            f"{_fmt_angka(target_mitigasi.get('index_saat_ini'))}) supaya kategori dampak turun ke "
             f"{target_mitigasi.get('kategori_target')}."
         ),
-        "nilai_saat_ini": target_mitigasi.get("index_saat_ini"),
+        "nilai_saat_ini": _bulat2(target_mitigasi.get("index_saat_ini")),
         "nilai_target": ambang,
         "satuan": None,
     }]

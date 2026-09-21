@@ -136,7 +136,7 @@ class TestTemplateLowConfidence:
         hasil = template_low_confidence(poin)
         assert hasil.rekomendasi.target == 2.5
         assert len(hasil.rekomendasi.langkah_konkret) == 1
-        assert hasil.rekomendasi.langkah_konkret[0].parameter == "runoff_change_index"
+        assert hasil.rekomendasi.langkah_konkret[0].parameter == "Indeks Limpasan (Runoff)"
 
     def test_itbx_langkah_konkret_selalu_kosong(self):
         # kategorikal (itbx) tak punya target numerik -> langkah_konkret selalu [], bukan error.

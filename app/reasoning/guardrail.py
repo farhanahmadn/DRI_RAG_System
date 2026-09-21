@@ -434,6 +434,11 @@ _LABEL_TEKNIS = {
     "STATUS_INTENSITAS": "status intensitas",
     "KEGIATAN_DIUSULKAN": "kegiatan yang diusulkan",
     "FALLBACK_DATA_KOSONG": "kelengkapan data matriks RDTR",
+    # APP-2026-8025/-5067 (dampak mitigasi BE) — lihat prompts.py::_bangun_fakta_dampak.
+    "ALASAN_TIDAK_DINILAI": "alasan belum dinilai",
+    "PERINGATAN_LUAS_PERSIL": "peringatan luas persil",
+    "TARGET_MITIGASI_KUANTITATIF": "target mitigasi",
+    "RINCIAN_MITIGASI_KONKRET": "rincian mitigasi",
 }
 # WAJIB ada garis bawah: cegah akronim sah ikut tergilas (RDTR, KDB, KLB, KDH, ITBX, LP2B, PBG, RTH).
 _RE_LABEL_TEKNIS = re.compile(
@@ -570,6 +575,47 @@ def _paksa_field_wajib(
 # Masalah teks — hanya jalur non-aman, memicu retry.
 # ---------------------------------------------------------------------------
 
+# Item permintaan user 2026-09-21 (aturan #17, prompts.py): citation_id ("rdtr-sleman-tengah-
+# p53-a3", "anchor-0") adalah ID baris basis data, BUKAN bahasa manusia — reviewer tak paham/tak
+# perlu tahu ID mentah ini. Dicek terhadap SEMUA id yang TERSEDIA (anchor dari poin.dasar_hukum +
+# id chunk hasil retrieval), bukan cuma yang benar-benar disitasi output ini — supaya kebocoran ID
+# yang SEHARUSNYA tak pernah dipilih pun (mis. LLM menyalin id chunk yg sekadar dibaca) tertangkap.
+def _cek_citation_id_bocor(poin_output: PoinOutput, poin: PoinKonteks, chunks: list[Chunk]) -> list[str]:
+    teks = (
+        f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} "
+        f"{poin_output.rekomendasi.saran} {poin_output.rekomendasi.disclaimer or ''}"
+    )
+    kandidat_id = [f"anchor-{i}" for i in range(len(poin.dasar_hukum))] + [c.id for c in chunks]
+    bocor = sorted({cid for cid in kandidat_id if cid and cid in teks})
+    if bocor:
+        return [
+            f"reasoning/saran menyebutkan citation_id mentah {bocor!r} — DILARANG (SYSTEM_PROMPT "
+            "aturan #17). Rujuk sumber pakai bahasa manusia (nama dokumen/nomor pasal), bukan ID "
+            "internal — citation_id hanya boleh muncul di field sitasi."
+        ]
+    return []
+
+
+# Item permintaan user 2026-09-21 (aturan #17, prompts.py): titik koma bukan gaya bahasa umum bagi
+# pembaca non-teknis. Regenerasi (bukan scrub otomatis) — scrub berisiko menyatukan 2 klausa jadi
+# kalimat rusak tanpa pemisah yang jelas (pola sama alasannya dgn kenapa _bersihkan_disclaimer_
+# fallback_palsu di atas TIDAK dipakai utk kasus yang butuh regenerasi semantik, bukan sekadar hapus
+# frasa).
+_RE_TANDA_BACA_DILARANG = re.compile(r";")
+
+
+def _cek_tanda_baca_dilarang(poin_output: PoinOutput) -> list[str]:
+    teks = (
+        f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} "
+        f"{poin_output.rekomendasi.saran} {poin_output.rekomendasi.disclaimer or ''}"
+    )
+    if _RE_TANDA_BACA_DILARANG.search(teks):
+        return [
+            "reasoning/saran memakai tanda titik koma (;) — DILARANG (SYSTEM_PROMPT aturan #17). "
+            "Gunakan tanda baca umum (titik atau koma) sesuai bahasa sehari-hari."
+        ]
+    return []
+
 
 def perbaiki_poin(
     poin_output: PoinOutput,
@@ -643,6 +689,8 @@ def perbaiki_poin(
     masalah.extend(_cek_invers_skor(poin_bersih, poin))
     masalah.extend(_cek_konsistensi_verdict(poin_bersih, poin))
     masalah.extend(_cek_konsistensi_numerik(poin_bersih, poin, chunks))
+    masalah.extend(_cek_citation_id_bocor(poin_bersih, poin, chunks))
+    masalah.extend(_cek_tanda_baca_dilarang(poin_bersih))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 

@@ -237,6 +237,13 @@ class TestRakitRingkasanDampak:
         assert "sedang" in hasil.kalimat.lower()
         assert "invers" in hasil.kalimat.lower()
 
+    def test_kalimat_pakai_label_dampak_terhadap_lingkungan_hidrologi(self):
+        # Item permintaan user 2026-09-21: "Dampak Tata Guna Lahan" (lama) -> label baru.
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        hasil = _rakit_ringkasan_dampak(assessment)
+        assert "Dampak terhadap lingkungan (hidrologi)" in hasil.kalimat
+        assert "tata guna lahan" not in hasil.kalimat.lower()
+
 
 class TestRakitKesimpulan:
     def test_sukses_bersih_dipakai_apa_adanya(self, monkeypatch):
@@ -290,6 +297,95 @@ class TestRakitKesimpulanFallback:
         assert hasil.langkah_berdampak == ["Saran 1.", "Saran 2.", "Saran 3."]
 
 
+def _patch_narasi_llm(monkeypatch, hasil_dict=None, raise_exc=None):
+    def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+        if raise_exc:
+            raise raise_exc
+        return hasil_dict
+
+    monkeypatch.setattr(assemble_module.llm_client, "generate", _stub)
+
+
+class TestRakitNarasiRekomendasi:
+    """Item permintaan user 2026-09-21: narasi 2 paragraf (ITBX+Intensitas / Dampak) — SATU
+    panggilan LLM TAMBAHAN, pola identik `TestRakitKesimpulan` di atas (fallback deterministik
+    kalau LLM gagal/melanggar aturan)."""
+
+    def test_sukses_bersih_dipakai_apa_adanya(self, monkeypatch):
+        _patch_narasi_llm(
+            monkeypatch,
+            hasil_dict={
+                "paragraf_gate_intensitas": "ITBX dan intensitas bangunan memenuhi ketentuan.",
+                "paragraf_dampak": "Dampak terhadap lingkungan tergolong Rendah.",
+            },
+        )
+        poin_list = [_poin_output()]
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Setuju")
+
+        assert hasil.paragraf_gate_intensitas == "ITBX dan intensitas bangunan memenuhi ketentuan."
+        assert hasil.paragraf_dampak == "Dampak terhadap lingkungan tergolong Rendah."
+
+    def test_exception_llm_fallback_deterministik(self, monkeypatch):
+        _patch_narasi_llm(monkeypatch, raise_exc=RuntimeError("gagal panggilan LLM"))
+        poin_list = [
+            _poin_output(poin_id="itbx", rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran ITBX.")),
+            _poin_output(poin_id="intensitas", rekomendasi=RekomendasiOutput(tipe="numerik", saran="Saran intensitas.")),
+            _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Saran dampak.")),
+        ]
+
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Setuju")
+
+        assert hasil.paragraf_gate_intensitas == "Saran ITBX. Saran intensitas."
+        assert hasil.paragraf_dampak == "Saran dampak."
+
+    def test_llm_sebut_angka_fallback_bukan_diloloskan(self, monkeypatch):
+        _patch_narasi_llm(
+            monkeypatch,
+            hasil_dict={
+                "paragraf_gate_intensitas": "KDB harus turun hingga 60 persen.",
+                "paragraf_dampak": "Dampak tergolong Rendah.",
+            },
+        )
+        poin_list = [
+            _poin_output(poin_id="itbx", rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran asli ITBX.")),
+            _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Saran asli dampak.")),
+        ]
+
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Setuju Bersyarat")
+
+        assert hasil.paragraf_gate_intensitas == "Saran asli ITBX."  # fallback, bukan teks LLM ber-angka
+        assert hasil.paragraf_dampak == "Saran asli dampak."
+
+    def test_llm_pakai_titik_koma_fallback_deterministik(self, monkeypatch):
+        _patch_narasi_llm(
+            monkeypatch,
+            hasil_dict={
+                "paragraf_gate_intensitas": "ITBX memenuhi ketentuan; intensitas juga memenuhi.",
+                "paragraf_dampak": "Dampak tergolong Rendah.",
+            },
+        )
+        poin_list = [
+            _poin_output(poin_id="itbx", rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran asli ITBX.")),
+            _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Saran asli dampak.")),
+        ]
+
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Setuju")
+
+        assert ";" not in hasil.paragraf_gate_intensitas
+        assert hasil.paragraf_gate_intensitas == "Saran asli ITBX."
+
+    def test_llm_paragraf_kosong_fallback_deterministik(self, monkeypatch):
+        _patch_narasi_llm(
+            monkeypatch,
+            hasil_dict={"paragraf_gate_intensitas": "", "paragraf_dampak": "Dampak Rendah."},
+        )
+        poin_list = [_poin_output(poin_id="itbx", rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Saran asli."))]
+
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Setuju")
+
+        assert hasil.paragraf_gate_intensitas == "Saran asli."
+
+
 class TestJalankanPrecheckEndToEnd:
     """Mock llm_client.generate (cepat/gratis) + MockRetriever. 3 fixture nyata: lolos,
     lolos_bersyarat, tidak_lolos (fixture tidak_lolos ditambah belakangan — sebelumnya ditunda,
@@ -298,6 +394,11 @@ class TestJalankanPrecheckEndToEnd:
     def _stub_llm_generic(self, prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
         if schema_name == "kesimpulan":
             return {"langkah_berdampak": ["Tindak lanjuti sesuai saran per-poin."], "catatan_lokasi": None}
+        if schema_name == "narasi_rekomendasi":
+            return {
+                "paragraf_gate_intensitas": "Klasifikasi kegiatan dan intensitas bangunan sudah sesuai ketentuan.",
+                "paragraf_dampak": "Dampak terhadap lingkungan tergolong dalam kategori yang dapat diterima.",
+            }
         return {
             "reasoning_pendek": "Ringkasan singkat poin ini.",
             "reasoning_panjang": "Penjelasan lebih lengkap mengenai poin ini berdasarkan data yang tersedia.",
@@ -316,6 +417,8 @@ class TestJalankanPrecheckEndToEnd:
         assert {p.poin_id for p in output.poin} == {"itbx", "intensitas", "dampak"}
         assert output.ringkasan_gate.final_gate_status == "Lolos"
         assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju"
+        assert output.narasi_rekomendasi.paragraf_gate_intensitas.strip() != ""
+        assert output.narasi_rekomendasi.paragraf_dampak.strip() != ""
 
     def test_fixture_lolos_bersyarat_rekomendasi_tak_dihitung_ulang(self, monkeypatch):
         monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm_generic)

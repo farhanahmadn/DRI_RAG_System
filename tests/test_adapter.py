@@ -341,6 +341,15 @@ class TestFixtureAmplop2428:
         assert poin_dampak.fakta["luas_usulan_melebihi_persil"] is None
 
 
+def test_poin_dampak_kategori_label_dampak_terhadap_lingkungan_hidrologi():
+    # Item permintaan user 2026-09-21: "Dampak Tata Guna Lahan" (lama) -> label baru lebih jelas
+    # mencerminkan substansi indikator (dampak hidrologi/limpasan air).
+    assessment = _muat_assessment("l2_sample_lolos.json")
+    hasil = adaptasi(assessment)
+    poin_dampak = next(p for p in hasil.poin if p.poin_id == "dampak")
+    assert poin_dampak.kategori == "Dampak Terhadap Lingkungan (Hidrologi)"
+
+
 class TestDiLuarCakupanWilayah:
     """Pagar cakupan wilayah. Bukti kenapa perlu (logs/precheck.jsonl, 2026-09-07): APP-2026-6191/
     -3335/-3468 di koordinat (-7.78329, 110.47835) berada di luar batas bujur Sleman Tengah menurut

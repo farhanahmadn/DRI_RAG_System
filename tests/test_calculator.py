@@ -341,22 +341,30 @@ class TestPilihTargetMitigasiDampak:
 
 
 class TestFormatTargetParameter:
+    """Sejak 2026-09-21: angka bilangan bulat TANPA nol berlebihan ("60.0"->"60"), angka pecahan
+    dibulatkan maks 2 desimal ("_fmt_angka", dipakai jg oleh langkah_konkret) — item permintaan
+    user: rapikan tampilan angka bagi reviewer non-teknis."""
+
     def test_kdb(self):
         hasil = format_target_parameter({"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0})
-        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan) → luas lantai dasar bangunan maksimal 510.0 m²"
+        assert hasil == "KDB harus turun ke maksimal 60% (selisih 10 poin dari usulan) → luas lantai dasar bangunan maksimal 510 m²"
+
+    def test_kdb_angka_pecahan_dibulatkan_2_desimal(self):
+        hasil = format_target_parameter({"target_kdb": 51.98273913, "selisih": 26.09509778650137})
+        assert hasil == "KDB harus turun ke maksimal 51.98% (selisih 26.1 poin dari usulan)"
 
     def test_kdb_tanpa_footprint_m2(self):
         hasil = format_target_parameter({"target_kdb": 60.0, "selisih": 10.0})
-        assert hasil == "KDB harus turun ke maksimal 60.0% (selisih 10.0 poin dari usulan)"
+        assert hasil == "KDB harus turun ke maksimal 60% (selisih 10 poin dari usulan)"
 
     def test_klb(self):
         hasil = format_target_parameter({"target_klb": 1.8, "selisih": 0.2, "luas_lantai_maks_m2": 900.0})
         assert "KLB harus turun ke maksimal 1.8" in hasil
-        assert "luas total lantai bangunan maksimal 900.0 m²" in hasil
+        assert "luas total lantai bangunan maksimal 900 m²" in hasil
 
     def test_kdh_tanpa_rth_kurang(self):
         hasil = format_target_parameter({"target_kdh": 30.0, "selisih": 5.0, "rth_dibutuhkan_m2": 255.0})
-        assert "KDH harus naik ke minimal 30.0%" in hasil
+        assert "KDH harus naik ke minimal 30%" in hasil
         assert "kurang" not in hasil.split("RTH dibutuhkan")[1]  # tak ada klausa "masih kurang"
 
     def test_bentuk_tak_dikenal_fallback_str(self):
@@ -373,7 +381,7 @@ class TestBangunLangkahKonkretIntensitas:
         assert hasil[0]["nilai_saat_ini"] == 40.0
         assert hasil[0]["nilai_target"] == 10.0
         assert hasil[0]["satuan"] == "persen"
-        assert "luas lantai dasar bangunan maksimal 85.0" in hasil[0]["deskripsi"]
+        assert "luas lantai dasar bangunan maksimal 85" in hasil[0]["deskripsi"]
 
     def test_dua_parameter_melanggar_sekaligus(self):
         # APP-2026-8090 (live nyata): KDB & KDH melanggar BERSAMAAN — RekomendasiOutput.target
@@ -408,7 +416,7 @@ class TestBangunLangkahKonkretDampak:
         target_mitigasi = {"runoff_change_index_maks": 1.5, "index_saat_ini": 2.8, "kategori_target": "Sedang"}
         hasil = bangun_langkah_konkret_dampak(target_mitigasi)
         assert len(hasil) == 1
-        assert hasil[0]["parameter"] == "runoff_change_index"
+        assert hasil[0]["parameter"] == "Indeks Limpasan (Runoff)"
         assert hasil[0]["nilai_saat_ini"] == 2.8
         assert hasil[0]["nilai_target"] == 1.5
         assert "Sedang" in hasil[0]["deskripsi"]
@@ -465,4 +473,4 @@ class TestBangunLangkahKonkretDampak:
         target_mitigasi = {"runoff_change_index_maks": 1.5, "index_saat_ini": 2.8, "kategori_target": "Sedang"}
         hasil = bangun_langkah_konkret_dampak(target_mitigasi)
         assert len(hasil) == 1
-        assert hasil[0]["parameter"] == "runoff_change_index"
+        assert hasil[0]["parameter"] == "Indeks Limpasan (Runoff)"

@@ -8,9 +8,11 @@ from app.reasoning.guardrail import (
     _teks_chunk_disitasi,
     _bersihkan_disclaimer_fallback_palsu,
     _cari_band_untuk_index,
+    _cek_citation_id_bocor,
     _cek_invers_skor,
     _cek_konsistensi_numerik,
     _cek_konsistensi_verdict,
+    _cek_tanda_baca_dilarang,
     _dekat_dgn_pembulatan,
     _gabung_kalimat,
     _kalimat_tingkat_kepercayaan,
@@ -770,12 +772,12 @@ class TestPaksaFieldWajib:
             rekomendasi=RekomendasiOutput(
                 tipe="kategorikal",
                 saran="x",
-                disclaimer="Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual.",
+                disclaimer="Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
             ),
         )
         hasil = _paksa_field_wajib(output, poin, assessment)
 
-        assert "perlu verifikasi manual" in hasil.rekomendasi.disclaimer
+        assert "Perlu verifikasi manual" in hasil.rekomendasi.disclaimer
         assert "Tingkat kepercayaan data: rendah." in hasil.rekomendasi.disclaimer
 
 
@@ -865,7 +867,7 @@ class TestPerbaikiPoin:
         )
         output = _poin_output(
             poin_id="dampak", status="Sedang",
-            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", target=1.5, saran="Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."),
+            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", target=1.5, saran="Tidak diperlukan tindakan khusus. Poin ini telah memenuhi ketentuan."),
         )
         poin_bersih, _ = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
         assert poin_bersih.rekomendasi.target is None
@@ -886,7 +888,7 @@ class TestPerbaikiPoin:
         poin_bersih, _ = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
         assert poin_bersih.rekomendasi.target == 2.5
         assert len(poin_bersih.rekomendasi.langkah_konkret) == 1
-        assert poin_bersih.rekomendasi.langkah_konkret[0].parameter == "runoff_change_index"
+        assert poin_bersih.rekomendasi.langkah_konkret[0].parameter == "Indeks Limpasan (Runoff)"
         assert isinstance(poin_bersih.rekomendasi.langkah_konkret[0], LangkahKonkretOutput)  # bukan dict mentah
 
 
@@ -925,7 +927,7 @@ class TestGeneratePoinDenganGuardrail:
         assert hasil.status == "I"
         assert hasil.reasoning_pendek == "Kegiatan termasuk kategori Diizinkan (I) di zona ini."
         assert len(hasil.sitasi) == 1
-        assert hasil.rekomendasi.saran == "Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."
+        assert hasil.rekomendasi.saran == "Tidak diperlukan tindakan khusus. Poin ini telah memenuhi ketentuan."
         assert hasil.low_confidence is False
 
     def test_llm_bersih_percobaan_pertama_langsung_return(self, monkeypatch):
@@ -1372,3 +1374,70 @@ class TestBersihkanLabelTeknis:
         gabungan = f"{hasil.reasoning_pendek} {hasil.reasoning_panjang} {hasil.rekomendasi.saran} {hasil.rekomendasi.disclaimer}"
         for token in ("STATUS_ITBX", "KATEGORI_DAMPAK", "KEGIATAN_DIUSULKAN", "FALLBACK_DATA_KOSONG"):
             assert token not in gabungan, f"{token} masih bocor ke narasi"
+
+
+class TestCekCitationIdBocor:
+    """Item permintaan user 2026-09-21 (SYSTEM_PROMPT aturan #17): citation_id (ID baris basis
+    data) TIDAK boleh muncul mentah di reasoning/saran/disclaimer — reviewer tak paham/tak perlu
+    tahu ID internal, kalau ingin merujuk sumber harus pakai nama dokumen/nomor pasal."""
+
+    def test_anchor_id_bocor_di_reasoning_terdeteksi(self):
+        from app.schemas import DasarHukum
+
+        poin = _poin(dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="x")])
+        output = _poin_output(reasoning_panjang="Sesuai anchor-0, kegiatan ini diizinkan.")
+        masalah = _cek_citation_id_bocor(output, poin, [])
+        assert any("anchor-0" in m for m in masalah)
+
+    def test_chunk_id_bocor_di_saran_terdeteksi(self):
+        chunk = Chunk(id="rdtr-sleman-tengah-p53-a3", level="ayat", teks="x", dokumen="RDTR Sleman", pasal="53")
+        output = _poin_output(
+            rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Lihat rdtr-sleman-tengah-p53-a3 untuk detail."),
+        )
+        masalah = _cek_citation_id_bocor(output, _poin(), [chunk])
+        assert any("rdtr-sleman-tengah-p53-a3" in m for m in masalah)
+
+    def test_chunk_id_bocor_di_disclaimer_terdeteksi(self):
+        chunk = Chunk(id="rdtr-sleman-tengah-p53-a3", level="ayat", teks="x", dokumen="RDTR Sleman", pasal="53")
+        output = _poin_output(
+            rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="x", disclaimer="Rujukan: rdtr-sleman-tengah-p53-a3."),
+        )
+        masalah = _cek_citation_id_bocor(output, _poin(), [chunk])
+        assert any("rdtr-sleman-tengah-p53-a3" in m for m in masalah)
+
+    def test_id_yang_tak_pernah_disodorkan_tidak_dicek(self):
+        # ID yang bahkan tak ada di daftar kandidat (anchor/chunk) tidak relevan dicek di sini —
+        # kalau muncul di narasi berarti dikarang sepenuhnya, ditangkap cek lain (konsistensi angka).
+        output = _poin_output(reasoning_panjang="Sesuai rdtr-entah-mana-p99, kegiatan diizinkan.")
+        assert _cek_citation_id_bocor(output, _poin(), []) == []
+
+    def test_menyebut_nama_dokumen_pasal_bukan_id_tidak_terdeteksi(self):
+        chunk = Chunk(id="rdtr-sleman-tengah-p53-a3", level="ayat", teks="x", dokumen="RDTR Sleman", pasal="53")
+        output = _poin_output(reasoning_panjang="Sesuai Pasal 53 RDTR Sleman Tengah, kegiatan ini diizinkan.")
+        assert _cek_citation_id_bocor(output, _poin(), [chunk]) == []
+
+
+class TestCekTandaBacaDilarang:
+    """Item permintaan user 2026-09-21 (SYSTEM_PROMPT aturan #17): titik koma bukan gaya bahasa
+    umum bagi pembaca non-teknis — DILARANG di reasoning/saran/disclaimer manapun."""
+
+    def test_titik_koma_di_reasoning_panjang_terdeteksi(self):
+        output = _poin_output(reasoning_panjang="Kegiatan ini diizinkan; tidak ada catatan tambahan.")
+        assert _cek_tanda_baca_dilarang(output) != []
+
+    def test_titik_koma_di_saran_terdeteksi(self):
+        output = _poin_output(rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Lengkapi dokumen X; ajukan izin Y."))
+        assert _cek_tanda_baca_dilarang(output) != []
+
+    def test_titik_koma_di_disclaimer_terdeteksi(self):
+        output = _poin_output(
+            rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="x", disclaimer="Data belum lengkap; perlu verifikasi."),
+        )
+        assert _cek_tanda_baca_dilarang(output) != []
+
+    def test_tanpa_titik_koma_tidak_terdeteksi(self):
+        output = _poin_output(
+            reasoning_panjang="Kegiatan ini diizinkan. Tidak ada catatan tambahan.",
+            rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Lengkapi dokumen X, lalu ajukan izin Y."),
+        )
+        assert _cek_tanda_baca_dilarang(output) == []

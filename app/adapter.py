@@ -156,7 +156,13 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
     kategori_dampak = normalisasi_kategori_dampak(impact.impact_category)
     return PoinKonteks(
         poin_id="dampak",
-        kategori="Dampak Tata Guna Lahan",
+        # Item permintaan user 2026-09-21: "Dampak Tata Guna Lahan" (lama) -> label ini lebih
+        # jelas mencerminkan substansi indikator (dampak HIDROLOGI/limpasan air akibat perubahan
+        # tata guna lahan, bukan tata guna lahan itu sendiri). HANYA label tampilan di output —
+        # TIDAK menyentuh `_QUERY_FALLBACK_PER_POIN["dampak"]`/`_EXPANSION` (generator.py/
+        # retriever.py, string internal "dampak tata guna lahan" lowercase TERPISAH, dipakai
+        # query RAG, sengaja TIDAK diubah supaya retrieval tak ikut berubah perilaku).
+        kategori="Dampak Terhadap Lingkungan (Hidrologi)",
         tipe_rekomendasi="numerik-mitigasi",
         status=kategori_dampak if impact.dinilai else "Tidak Dinilai",
         fakta={

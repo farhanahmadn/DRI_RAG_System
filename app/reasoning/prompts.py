@@ -27,6 +27,12 @@ ATURAN WAJIB (jangan dilanggar):
 10a. BAHASA UNTUK PETUGAS, BUKAN BAHASA SISTEM — DILARANG menyalin nama field/label teknis dari prompt ini ke dalam narasi (mis. "KATEGORI_DAMPAK", "STATUS_ITBX", "FALLBACK_DATA_KOSONG", "ambang_maks"), dan DILARANG menjelaskan mekanisme internal sistem (mis. "karena status tidak I", "karena fallback data tidak kosong", "berdasarkan data yang dihitung oleh sistem"). Tulis substansinya dalam Bahasa Indonesia biasa yang dipahami petugas tata ruang — sebut kategori/status dengan kata-katanya sendiri ("dampak tergolong Rendah", "kegiatan termasuk kategori Bersyarat"), bukan nama variabelnya.
 10. POIN AMAN/LOLOS TETAP WAJIB DIJELASKAN — kalau fakta di atas menunjukkan poin ini lolos/memenuhi (mis. STATUS_ITBX "I", STATUS_INTENSITAS "MEMENUHI_SYARAT", atau KATEGORI_DAMPAK "Rendah"/"Sedang"), JANGAN menulis reasoning generik seperti "tidak ada catatan berisiko" atau "tidak ada tindakan lebih lanjut" tanpa alasan. WAJIB jelaskan KONKRET mengapa poin ini lolos — sebut fakta relevan (mis. kategori kegiatan di zona ini, angka usulan dibanding ambang, kategori dampak) dan sitasi pasal yang tersedia — sama persis seperti menjelaskan poin yang tidak lolos.
 11. SARAN HARUS KONKRET & DAPAT DITINDAKLANJUTI, bukan pernyataan terbuka/umum. "saran" adalah bahan reviewer memutuskan syarat ACC — JANGAN menulis kalimat umum seperti "menyesuaikan desain agar memenuhi ketentuan" TANPA menyebutkan APA yang disesuaikan dan (kalau ada FAKTA angka target/ambang di atas) angka targetnya persis. Kalau ada LEBIH DARI SATU langkah/opsi konkret yang tersedia di fakta (mis. beberapa "Arah Mitigasi", beberapa syarat di "Keterangan Ketentuan"), tulis "saran" sebagai daftar bernomor ("1. ...\\n2. ...") satu opsi per baris — JANGAN digabung jadi satu kalimat panjang. Kalau ada FAKTA "TARGET_MITIGASI_KUANTITATIF" atau target numerik lain, WAJIB sebutkan angkanya persis di salah satu baris saran (bukan cuma di reasoning). KHUSUS poin intensitas: kalau baris "[TARGET PATUH: ...]" menyebut angka FISIK dalam meter persegi (mis. "luas lantai dasar bangunan maksimal 510.0 m²", "RTH dibutuhkan minimal 255.0 m²", "masih kurang 45.0 m²") — angka m² itu WAJIB dikutip persis di saran, BUKAN cuma angka persentase ambang (mis. "KDB maksimal 60%") tanpa terjemahan fisiknya. Angka persentase saja tidak actionable bagi pemohon; angka m² menjawab langsung "berapa luas yang boleh dibangun/berapa RTH yang masih harus ditambahkan".
+12. FORMAT PENEKANAN — di "reasoning_panjang", tandai BOLD (markdown, diapit tanda bintang ganda **seperti ini**) tiga hal: (a) status/verdict poin ini (mis. **Bersyarat**, **Melampaui Batas**, **Tinggi**), (b) alasan utama/inti kenapa status itu berlaku (satu frasa singkat, bukan seluruh kalimat), dan (c) kalimat rekomendasi/tindak-lanjut TERAKHIR di paragraf itu. JANGAN bold seluruh paragraf atau lebih dari beberapa frasa pendek — bold dipakai supaya reviewer bisa memindai cepat, bukan dekorasi.
+13. BAHASA KUALITATIF, SEIMBANGKAN ANGKA DENGAN KALIMAT — JANGAN menyalin gaya notasi mentah dari fakta "REASON" back-end apa adanya (mis. "KDB (96.095) Max (70)" atau "KDH (19.591212) Min (30)") ke reasoning/saran. Tulis ulang jadi kalimat kualitatif yang menggabungkan angka (SUDAH dibulatkan wajar, dengan satuannya, lihat aturan #14) dengan penjelasan hubungannya — CONTOH BENAR: "KDH sebesar 19,6% berada di bawah ketentuan minimal 30%", BUKAN "KDH (19.591212) Min (30)". Angka tetap WAJIB akurat (aturan #8), hanya CARA PENULISANNYA yang harus kalimat manusia, bukan notasi tabel/kode.
+14. SETIAP ANGKA WAJIB PAKAI SIMBOL/SATUANNYA — kalau fakta menyebut ambang/usulan persen (mis. "ambang_min=30%"), sebutkan simbol "%" itu setiap kali angkanya disebut ulang di reasoning/saran (mis. "30%", BUKAN cuma "30"). Berlaku sama untuk m² (luas), m³ (dimensi/kapasitas), dan satuan lain yang tercantum di fakta — JANGAN pernah menyebut angka telanjang tanpa satuannya kalau fakta sumbernya punya satuan.
+15. BAHASA MANUSIA, BUKAN NAMA VARIABEL KODE — nama field di prompt ini (huruf besar/snake_case, mis. "KATEGORI_DAMPAK", "STATUS_ITBX", "STATUS_INTENSITAS", "ambang_maks", "kbli_diusulkan") adalah label INTERNAL, BUKAN istilah yang boleh disalin ke reasoning/saran (lihat juga aturan #10a). Tulis ulang jadi frasa Bahasa Indonesia biasa — CONTOH: "KATEGORI_DAMPAK" -> "Kategori Dampak"/"kategori dampak", "STATUS_ITBX" -> "status ITBX"/"klasifikasi kegiatan", "ambang_maks" -> "ambang maksimal", "kbli_diusulkan" -> "KBLI yang diusulkan". PENGECUALIAN: singkatan resmi regulasi (ITBX, KDB, KLB, KDH, RTH, KKOP, dst.) BUKAN nama variabel kode — itu istilah baku tata ruang, TETAP dipakai, dan SELALU ditulis kapital semua (aturan #16), jangan disamakan dgn label snake_case yang harus ditulis ulang.
+16. SINGKATAN SELALU KAPITAL PENUH — ITBX, KDB, KLB, KDH, RTH, KKOP, dan singkatan regulasi sejenis SELALU ditulis dengan huruf kapital semua di reasoning/saran manapun (mis. "KDB", BUKAN "Kdb"/"kdb"), tidak peduli bagaimana kemunculannya di fakta.
+17. JANGAN SEBUT ID INTERNAL, DAN JANGAN PAKAI TANDA TITIK KOMA — `citation_id` (mis. "rdtr-sleman-tengah-p53-a3", "anchor-0") adalah ID baris basis data, BUKAN bahasa manusia — JANGAN PERNAH menuliskannya di reasoning_pendek/reasoning_panjang/saran; kalau ingin merujuk sumber tertentu, sebut nama dokumen dan/atau nomor pasalnya (mis. "Pasal 53 RDTR Sleman Tengah"), citation_id hanya untuk field "sitasi" terpisah. Selain itu, JANGAN PERNAH memakai tanda titik koma (;) di reasoning/saran manapun — pisahkan kalimat dengan titik, atau gunakan koma untuk merangkai anak kalimat, sesuai gaya bahasa sehari-hari yang mudah dibaca pembaca non-teknis.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -203,10 +209,15 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
 
     target_map = fakta.get("target") or {}
     for nama, param in (fakta.get("parameter") or {}).items():
+        # Satuan disertakan di SETIAP angka (usulan DAN ambang) — sebelumnya cuma "usulan" yang
+        # dapat satuan, "ambang_maks"/"ambang_min" tampil telanjang (mis. "ambang_maks=70" tanpa
+        # "%"), memicu LLM ikut menyalin tanpa satuan ke narasi (item permintaan user 2026-09-21:
+        # "19 -> 19%"). "rasio" (KLB) sengaja TIDAK dapat sufiks — bukan persentase.
+        satuan_sufiks = "%" if param["satuan"] == "persen" else ""
         baris = (
-            f"- {nama}: usulan={_angka_prompt(param['usulan'])} {param['satuan']}, "
-            f"ambang_maks={_angka_prompt(param['ambang_maks'])}, "
-            f"ambang_min={_angka_prompt(param['ambang_min'])}, "
+            f"- {nama}: usulan={_angka_prompt(param['usulan'])}{satuan_sufiks}, "
+            f"ambang_maks={_angka_prompt(param['ambang_maks'])}{satuan_sufiks if param['ambang_maks'] is not None else ''}, "
+            f"ambang_min={_angka_prompt(param['ambang_min'])}{satuan_sufiks if param['ambang_min'] is not None else ''}, "
             f"memenuhi={param['memenuhi']}"
         )
         if nama in target_map:
@@ -284,11 +295,11 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     if ambang is not None:
         lines.append(
             f"\nTARGET_MITIGASI_KUANTITATIF: indikator limpasan air (runoff) perlu ditekan hingga "
-            f"DI BAWAH {ambang} (saat ini {target_mitigasi['index_saat_ini']}) supaya kategori dampak "
-            f"turun dari {poin.status} ke {target_mitigasi['kategori_target']}. Angka ini BUKAN skor "
-            "invers (beda dari Aturan #2) — arah SELALU 'turunkan sampai di bawah angka ini', jangan "
-            "ditafsirkan arah lain. WAJIB sebutkan angka target ini secara eksplisit & konkret di "
-            "reasoning_pendek dan saran (kutip apa adanya, JANGAN dihitung ulang)."
+            f"DI BAWAH {_angka_prompt(ambang)} (saat ini {_angka_prompt(target_mitigasi['index_saat_ini'])}) "
+            f"supaya kategori dampak turun dari {poin.status} ke {target_mitigasi['kategori_target']}. "
+            "Angka ini BUKAN skor invers (beda dari Aturan #2) — arah SELALU 'turunkan sampai di bawah "
+            "angka ini', jangan ditafsirkan arah lain. WAJIB sebutkan angka target ini secara eksplisit "
+            "& konkret di reasoning_pendek dan saran (kutip apa adanya, JANGAN dihitung ulang)."
         )
 
     # APP-2026-8025/-5067: BE kini (kadang) kirim rincian penyesuaian lahan KONKRET (bukan cuma
@@ -301,18 +312,21 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     if penyesuaian:
         detail = []
         if penyesuaian.get("luas_bangunan_maks_m2") is not None:
-            detail.append(f"luas bangunan maksimal {penyesuaian['luas_bangunan_maks_m2']} m²")
+            detail.append(f"luas bangunan maksimal {_angka_prompt(penyesuaian['luas_bangunan_maks_m2'])} m²")
         if penyesuaian.get("luas_rth_min_m2") is not None:
-            detail.append(f"RTH minimal {penyesuaian['luas_rth_min_m2']} m²")
+            detail.append(f"RTH minimal {_angka_prompt(penyesuaian['luas_rth_min_m2'])} m²")
         dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
         if dimensi.get("nilai") is not None:
             detail.append(
-                f"ATAU sumur/kolam resapan dimensi minimum {dimensi['nilai']} {dimensi.get('satuan') or ''}"
+                f"ATAU sumur/kolam resapan dimensi minimum {_angka_prompt(dimensi['nilai'])} "
+                f"{dimensi.get('satuan') or ''}"
             )
         if detail:
+            # ", " BUKAN "; " — item permintaan user 2026-09-21: DILARANG tanda titik koma di
+            # template maupun luaran LLM (SYSTEM_PROMPT aturan #10 baru).
             lines.append(
                 "\nRINCIAN_MITIGASI_KONKRET (SUDAH dihitung penuh oleh back-end, FINAL): "
-                + "; ".join(detail) + ". Rekomendasi resmi poin ini SUDAH ditetapkan persis angka "
+                + ", ".join(detail) + ". Rekomendasi resmi poin ini SUDAH ditetapkan persis angka "
                 "ini — jelaskan di reasoning_pendek/panjang KENAPA mitigasi ini diperlukan (kategori "
                 f"{poin.status}), sebutkan angka-angka di atas APA ADANYA, JANGAN mengarang angka "
                 "lain atau menghitung ulang."
@@ -448,6 +462,59 @@ def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str
         "Rangkum ringkasan per-poin di atas menjadi langkah_berdampak (daftar kalimat "
         "langkah/pertimbangan untuk reviewer dalam mengambil keputusan, pemohon disebut sebagai "
         "orang ketiga) dan catatan_lokasi (satu kalimat atau null)."
+    )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Narasi rekomendasi 2 paragraf — SATU panggilan TAMBAHAN per precheck, lihat assemble.py.
+# Item permintaan user 2026-09-21: prosa naratif ringkas berbeda dari langkah_berdampak
+# (checklist per-butir) — paragraf 1 gerbang hukum (ITBX+Intensitas), paragraf 2 dampak hidrologi.
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT_NARASI_REKOMENDASI = """Anda menulis narasi rekomendasi akhir pre-check izin bangunan Kabupaten Sleman untuk reviewer Pemda, dalam 2 paragraf.
+
+ATURAN WAJIB (jangan dilanggar):
+1. Ringkasan per-poin di bawah SUDAH FINAL (status, saran) — tugas Anda HANYA menulis ulang jadi 2 paragraf prosa mengalir, BUKAN daftar butir. JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
+2. "paragraf_gate_intensitas" merangkum HANYA poin itbx dan intensitas (klasifikasi kegiatan dan intensitas bangunan KDB/KLB/KDH) — sebutkan status keduanya dan inti saran/tindak lanjutnya kalau ada.
+3. "paragraf_dampak" merangkum HANYA poin dampak (Dampak Terhadap Lingkungan/Hidrologi) — sebutkan status/kategorinya dan inti saran/tindak lanjutnya kalau ada.
+4. Kalau saran suatu poin berbunyi "tidak diperlukan tindakan khusus" ATAU "tidak dievaluasi" (atau senada), JANGAN tulis kewajiban/tindakan apa pun untuk poin itu — sebut singkat bahwa poin itu sudah memenuhi ketentuan atau belum dinilai, TANPA menyiratkan ada yang harus dilakukan.
+5. JANGAN menyebutkan angka apa pun (skor, target, persentase, dsb) di kedua paragraf — ini narasi kualitatif ringkas, angka lengkap sudah ada di bagian lain hasil pre-check.
+6. JANGAN menyalin citation_id, nama field/label teknis (mis. "KATEGORI_DAMPAK", "rekomendasi_sistem"), atau tanda titik koma (;) — tulis dalam Bahasa Indonesia biasa, kalimat dipisah titik/koma.
+7. Singkatan resmi (ITBX, KDB, KLB, KDH, RTH) SELALU ditulis kapital semua.
+8. Tulisan ini bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat ke pemohon — sebut pemohon sebagai orang ketiga, JANGAN memakai "Anda". Tiap paragraf ringkas (2-4 kalimat), jelas, dan profesional.
+
+Balas HANYA dalam format JSON sesuai skema yang diberikan."""
+
+
+def build_narasi_rekomendasi_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> str:
+    """Susun prompt narasi 2 paragraf — HANYA dari ringkasan per-poin yang sudah lolos guardrail
+    (pola sama dgn build_kesimpulan_prompt: reasoning_pendek SENGAJA tak disertakan, cuma
+    status+saran, supaya narasi konsisten dgn saran final bukan mengikuti nada reasoning bebas)."""
+    by_id = {p.poin_id: p for p in poin_list}
+    lines: list[str] = []
+    lines.append("## Ringkasan Per-Poin (SUDAH FINAL — jangan dihitung ulang)")
+    lines.append(f"rekomendasi_sistem keseluruhan: {rekomendasi_sistem}")
+    lines.append("")
+    lines.append("### Untuk paragraf_gate_intensitas (ITBX + Intensitas SAJA):")
+    for poin_id in ("itbx", "intensitas"):
+        poin = by_id.get(poin_id)
+        if poin:
+            lines.append(f"- [{poin.poin_id}] status={poin.status}")
+            lines.append(f"  saran: {poin.rekomendasi.saran}")
+    lines.append("")
+    lines.append("### Untuk paragraf_dampak (Dampak Terhadap Lingkungan/Hidrologi SAJA):")
+    poin_dampak = by_id.get("dampak")
+    if poin_dampak:
+        lines.append(f"- [{poin_dampak.poin_id}] status={poin_dampak.status}")
+        lines.append(f"  saran: {poin_dampak.rekomendasi.saran}")
+
+    lines.append("")
+    lines.append(
+        "## Tugas\n"
+        "Tulis paragraf_gate_intensitas (rangkuman ITBX+Intensitas) dan paragraf_dampak (rangkuman "
+        "Dampak Terhadap Lingkungan/Hidrologi), masing-masing satu paragraf prosa ringkas."
     )
 
     return "\n".join(lines)

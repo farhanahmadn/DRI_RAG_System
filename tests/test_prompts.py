@@ -76,6 +76,21 @@ def test_system_prompt_tidak_lagi_suruh_llm_echo_data_confidence():
     assert "DATA_CONFIDENCE" not in SYSTEM_PROMPT
 
 
+def test_system_prompt_aturan_baru_2026_09_21():
+    # Item permintaan user: bold penting (#12), bahasa kualitatif bukan notasi REASON mentah (#13),
+    # simbol/satuan wajib (#14), bahasa manusia bukan nama variabel kode dgn contoh eksplisit (#15),
+    # singkatan selalu kapital (#16), larangan citation_id mentah & titik koma (#17).
+    assert "**seperti ini**" in SYSTEM_PROMPT
+    assert "BOLD" in SYSTEM_PROMPT
+    assert 'KDB (96.095) Max (70)' in SYSTEM_PROMPT  # contoh notasi mentah yang dilarang
+    assert "KDH sebesar 19,6% berada di bawah ketentuan minimal 30%" in SYSTEM_PROMPT
+    assert "WAJIB PAKAI SIMBOL/SATUANNYA" in SYSTEM_PROMPT
+    assert '"KATEGORI_DAMPAK" -> "Kategori Dampak"' in SYSTEM_PROMPT
+    assert "SINGKATAN SELALU KAPITAL PENUH" in SYSTEM_PROMPT
+    assert "JANGAN PERNAH menuliskannya di reasoning_pendek/reasoning_panjang/saran" in SYSTEM_PROMPT
+    assert "tanda titik koma (;)" in SYSTEM_PROMPT
+
+
 class TestFaktaItbx:
     def test_status_x_tidak_diberi_label_dilarang(self):
         poin = _poin(status="X", fakta={"lolos": False, "reason": "Tidak ditemukan di matriks RDTR"})
@@ -221,11 +236,34 @@ class TestFaktaIntensitas:
         assert "usulan=70" in prompt
         assert "memenuhi=False" in prompt
 
+    def test_ambang_dapat_sufiks_satuan_persen(self):
+        # Item permintaan user 2026-09-21: sebelumnya HANYA "usulan" dapat sufiks satuan
+        # ("usulan=70%"), "ambang_maks"/"ambang_min" tampil telanjang ("ambang_maks=60", tanpa "%")
+        # — memicu LLM ikut menyalin angka ambang tanpa satuan ke narasi.
+        prompt = build_user_prompt(self._poin_intensitas(), [])
+        assert "usulan=70%" in prompt
+        assert "ambang_maks=60%" in prompt
+
+    def test_ambang_rasio_klb_tidak_dapat_sufiks_persen(self):
+        poin = _poin(
+            poin_id="intensitas", tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS",
+            fakta={"parameter": {"klb": {"usulan": 2.2, "ambang_maks": 1.8, "ambang_min": None, "memenuhi": False, "satuan": "rasio"}}},
+        )
+        prompt = build_user_prompt(poin, [])
+        assert "usulan=2.2," in prompt  # BUKAN "2.2%" — rasio, bukan persentase
+        assert "ambang_maks=1.8," in prompt
+
+    def test_ambang_null_tidak_dapat_sufiks_satuan(self):
+        # ambang_min=None utk KDB (cuma punya ambang_maks) -> "ambang_min=None", BUKAN "None%".
+        prompt = build_user_prompt(self._poin_intensitas(), [])
+        assert "ambang_min=None," in prompt
+        assert "None%" not in prompt
+
     def test_target_muncul_saat_ada(self):
         target = {"kdb": {"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0}}
         prompt = build_user_prompt(self._poin_intensitas(target=target), [])
         assert "TARGET PATUH" in prompt
-        assert "60.0" in prompt
+        assert "60" in prompt
 
     def test_target_tak_muncul_saat_kosong(self):
         prompt = build_user_prompt(self._poin_intensitas(target={}), [])
@@ -233,12 +271,13 @@ class TestFaktaIntensitas:
 
     def test_target_kdb_kalimat_berlabel_bukan_dict_mentah(self):
         # Sebelumnya: "[TARGET PATUH: {'target_kdb': 60.0, 'selisih': 10.0, ...}]" (repr dict
-        # Python mentah) — sekarang kalimat siap-kutip termasuk angka fisik m².
+        # Python mentah) — sekarang kalimat siap-kutip termasuk angka fisik m² (2026-09-21: angka
+        # bilangan bulat TANPA nol berlebihan, "60.0" -> "60" — lihat calculator.py::_fmt_angka).
         target = {"kdb": {"target_kdb": 60.0, "selisih": 10.0, "footprint_maks_m2": 510.0}}
         prompt = build_user_prompt(self._poin_intensitas(target=target), [])
         assert "{'target_kdb'" not in prompt  # bukan lagi repr dict mentah
-        assert "KDB harus turun ke maksimal 60.0%" in prompt
-        assert "luas lantai dasar bangunan maksimal 510.0 m²" in prompt
+        assert "KDB harus turun ke maksimal 60%" in prompt
+        assert "luas lantai dasar bangunan maksimal 510 m²" in prompt
 
     def test_target_kdh_sebut_rth_kurang_m2(self):
         poin = _poin(
@@ -254,9 +293,9 @@ class TestFaktaIntensitas:
             },
         )
         prompt = build_user_prompt(poin, [])
-        assert "KDH harus naik ke minimal 30.0%" in prompt
-        assert "RTH dibutuhkan minimal 255.0 m²" in prompt
-        assert "masih kurang 45.0 m²" in prompt
+        assert "KDH harus naik ke minimal 30%" in prompt
+        assert "RTH dibutuhkan minimal 255 m²" in prompt
+        assert "masih kurang 45 m²" in prompt
 
 
 # TestFormatTargetParameter dipindah ke tests/test_calculator.py — format_target_parameter() kini
@@ -335,6 +374,10 @@ class TestFaktaDampak:
         assert "3850.35 m²" in prompt
         assert "19.01 m³" in prompt
         assert "JANGAN mengarang angka lain" in prompt
+        # Item permintaan user 2026-09-21: dilarang titik koma di template — baris RINCIAN_
+        # MITIGASI_KONKRET SEBELUMNYA memisah item pakai "; " (literal titik koma).
+        rincian = prompt[prompt.index("RINCIAN_MITIGASI_KONKRET"):]
+        assert ";" not in rincian.split("Rekomendasi resmi")[0]
 
     def test_rincian_mitigasi_konkret_tak_muncul_tanpa_penyesuaian_lahan(self):
         prompt = build_user_prompt(self._poin_dampak(perlu_mitigasi=True), [])
@@ -469,7 +512,7 @@ class TestBuildKesimpulanPrompt:
         # SENGAJA dihapus dari prompt ini supaya LLM tak punya sumber utk kontradiksi itu.
         poin = _poin_output(
             reasoning_pendek="Pemohon harus memastikan bahwa kegiatan tidak merusak fungsi kawasan resapan air.",
-            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Tidak diperlukan tindakan khusus; poin ini telah memenuhi ketentuan."),
+            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Tidak diperlukan tindakan khusus. Poin ini telah memenuhi ketentuan."),
         )
         prompt = build_kesimpulan_prompt([poin], "Setuju Bersyarat")
         assert "harus memastikan" not in prompt

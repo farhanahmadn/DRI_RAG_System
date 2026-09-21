@@ -388,7 +388,7 @@ def test_generate_poin_intensitas_langkah_konkret_semua_parameter_melanggar(monk
     kdb_item = next(l for l in hasil.rekomendasi.langkah_konkret if l.parameter == "KDB")
     assert kdb_item.nilai_saat_ini == 40
     assert kdb_item.nilai_target == 10.0
-    assert "85.0" in kdb_item.deskripsi
+    assert "85" in kdb_item.deskripsi
 
 
 def test_generate_poin_dampak_langkah_konkret_dari_target_mitigasi(monkeypatch):
@@ -412,7 +412,7 @@ def test_generate_poin_dampak_langkah_konkret_dari_target_mitigasi(monkeypatch):
     hasil = generate_poin(poin, MockRetriever())
 
     assert len(hasil.rekomendasi.langkah_konkret) == 1
-    assert hasil.rekomendasi.langkah_konkret[0].parameter == "runoff_change_index"
+    assert hasil.rekomendasi.langkah_konkret[0].parameter == "Indeks Limpasan (Runoff)"
     assert hasil.rekomendasi.langkah_konkret[0].nilai_target == 2.5
 
 

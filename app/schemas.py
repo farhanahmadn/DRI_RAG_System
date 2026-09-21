@@ -308,11 +308,23 @@ class KesimpulanOutput(BaseModel):
     catatan_lokasi: str | None = None
 
 
+# Item permintaan user 2026-09-21: narasi 2 paragraf ringkas berdasar rekomendasi_sistem per-poin —
+# paragraf 1 merangkum ITBX+Intensitas (gerbang hukum), paragraf 2 merangkum Dampak Terhadap
+# Lingkungan (Hidrologi) — TERPISAH dari `kesimpulan.langkah_berdampak` (daftar poin per-butir utk
+# checklist reviewer). Ini prosa naratif ringkas, hasil SATU panggilan LLM sintesis TAMBAHAN (lihat
+# app/reasoning/assemble.py::_rakit_narasi_rekomendasi, app/reasoning/prompts.py::
+# build_narasi_rekomendasi_prompt) — bukan dihitung ulang dari fakta mentah/angka.
+class NarasiRekomendasiOutput(BaseModel):
+    paragraf_gate_intensitas: str
+    paragraf_dampak: str
+
+
 class OutputL3(BaseModel):
     ringkasan_gate: RingkasanGateOutput
     ringkasan_dampak: RingkasanDampakOutput
     poin: list[PoinOutput]
     rekomendasi_sistem: str
+    narasi_rekomendasi: NarasiRekomendasiOutput
     kesimpulan: KesimpulanOutput
     catatan_global: list[str] = []
     low_confidence_keseluruhan: bool

@@ -20,12 +20,18 @@ from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
 from app.reasoning.guardrail import DiagnosaPoin, caveat_fallback_itbx, generate_poin_terdiagnosis
-from app.reasoning.prompts import SYSTEM_PROMPT_KESIMPULAN, build_kesimpulan_prompt
+from app.reasoning.prompts import (
+    SYSTEM_PROMPT_KESIMPULAN,
+    SYSTEM_PROMPT_NARASI_REKOMENDASI,
+    build_kesimpulan_prompt,
+    build_narasi_rekomendasi_prompt,
+)
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
 from app.schemas import (
     KesimpulanOutput,
     L2Assessment,
+    NarasiRekomendasiOutput,
     OutputL3,
     PoinKonteks,
     PoinOutput,
@@ -47,6 +53,16 @@ _LLM_RESPONSE_SCHEMA_KESIMPULAN = {
 # Sama pola dgn app.reasoning.guardrail._cek_konsistensi_numerik (cek #6) — angka di narasi
 # kesimpulan dilarang sama seperti di reasoning per-poin (SYSTEM_PROMPT_KESIMPULAN aturan #3).
 _RE_ANGKA_MENCURIGAKAN = re.compile(r"\b\d+[.,]\d+\b|\b\d{2,}\b")
+
+_LLM_RESPONSE_SCHEMA_NARASI_REKOMENDASI = {
+    "type": "object",
+    "properties": {
+        "paragraf_gate_intensitas": {"type": "string"},
+        "paragraf_dampak": {"type": "string"},
+    },
+    "required": ["paragraf_gate_intensitas", "paragraf_dampak"],
+    "additionalProperties": False,
+}
 
 _LABEL_TAHAP = {"itbx": "klasifikasi kegiatan (ITBX)", "intensitas": "intensitas bangunan (KDB/KLB/KDH)"}
 
@@ -136,11 +152,11 @@ def _rakit_ringkasan_dampak(assessment: L2Assessment) -> RingkasanDampakOutput:
         return RingkasanDampakOutput(
             impact_category=None,
             impact_score=None,
-            kalimat="Dampak tata guna lahan belum dinilai untuk permohonan ini.",
+            kalimat="Dampak terhadap lingkungan (hidrologi) belum dinilai untuk permohonan ini.",
         )
 
     kategori = normalisasi_kategori_dampak(impact.impact_category)
-    kalimat = f"Dampak tata guna lahan tergolong {kategori}"
+    kalimat = f"Dampak terhadap lingkungan (hidrologi) tergolong {kategori}"
     if impact.impact_score is not None:
         kalimat += " (skor dampak bersifat invers: semakin tinggi skor, semakin rendah dampaknya)."
     else:
@@ -176,6 +192,57 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> K
     except Exception:
         logger.exception("Sintesis kesimpulan via LLM gagal/melanggar aturan — fallback deterministik.")
         return _rakit_kesimpulan_fallback(poin_list)
+
+
+def _rakit_narasi_rekomendasi_fallback(poin_list: list[PoinOutput]) -> NarasiRekomendasiOutput:
+    """Dipakai kalau panggilan LLM narasi gagal/melanggar aturan — deterministik, gabungan saran
+    per-poin verbatim (sudah lolos guardrail) per kelompok paragraf, pola sama dgn
+    `_rakit_kesimpulan_fallback`."""
+    by_id = {p.poin_id: p for p in poin_list}
+    saran_gate = [
+        by_id[pid].rekomendasi.saran for pid in ("itbx", "intensitas")
+        if pid in by_id and by_id[pid].rekomendasi.saran.strip()
+    ]
+    poin_dampak = by_id.get("dampak")
+    saran_dampak = poin_dampak.rekomendasi.saran if poin_dampak and poin_dampak.rekomendasi.saran.strip() else ""
+    return NarasiRekomendasiOutput(
+        paragraf_gate_intensitas=" ".join(saran_gate) or "Tidak ada catatan tambahan untuk ITBX dan intensitas bangunan.",
+        paragraf_dampak=saran_dampak or "Tidak ada catatan tambahan untuk dampak terhadap lingkungan (hidrologi).",
+    )
+
+
+def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> NarasiRekomendasiOutput:
+    """SATU panggilan LLM TAMBAHAN (item permintaan user 2026-09-21) — narasi 2 paragraf ringkas
+    berdasar rekomendasi_sistem per-poin (paragraf 1: ITBX+Intensitas, paragraf 2: Dampak Terhadap
+    Lingkungan/Hidrologi). Gagal/melanggar aturan angka -> fallback deterministik dari saran per-poin
+    (pola identik `_rakit_kesimpulan` di atas — jaga konsistensi 2 panggilan sintesis ini)."""
+    try:
+        prompt = build_narasi_rekomendasi_prompt(poin_list, rekomendasi_sistem)
+        hasil = llm_client.generate(
+            prompt,
+            _LLM_RESPONSE_SCHEMA_NARASI_REKOMENDASI,
+            schema_name="narasi_rekomendasi",
+            system=SYSTEM_PROMPT_NARASI_REKOMENDASI,
+        )
+        paragraf_gate = hasil.get("paragraf_gate_intensitas") or ""
+        paragraf_dampak = hasil.get("paragraf_dampak") or ""
+        gabungan = f"{paragraf_gate} {paragraf_dampak}"
+        if _RE_ANGKA_MENCURIGAKAN.search(gabungan):
+            raise ValueError(
+                "Narasi rekomendasi LLM menyebutkan angka — dilarang "
+                "(SYSTEM_PROMPT_NARASI_REKOMENDASI aturan #5)."
+            )
+        if ";" in gabungan:
+            raise ValueError(
+                "Narasi rekomendasi LLM memakai tanda titik koma — dilarang "
+                "(SYSTEM_PROMPT_NARASI_REKOMENDASI aturan #6)."
+            )
+        if not paragraf_gate.strip() or not paragraf_dampak.strip():
+            raise ValueError("Narasi rekomendasi LLM mengembalikan paragraf kosong.")
+        return NarasiRekomendasiOutput(paragraf_gate_intensitas=paragraf_gate, paragraf_dampak=paragraf_dampak)
+    except Exception:
+        logger.exception("Sintesis narasi rekomendasi via LLM gagal/melanggar aturan — fallback deterministik.")
+        return _rakit_narasi_rekomendasi_fallback(poin_list)
 
 
 CAVEAT_DI_LUAR_CAKUPAN = (
@@ -241,6 +308,7 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
         ringkasan_dampak=_rakit_ringkasan_dampak(assessment),
         poin=poin_list,
         rekomendasi_sistem=hasil_adaptasi.rekomendasi_sistem,
+        narasi_rekomendasi=_rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem),
         kesimpulan=_rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem),
         catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list, di_luar_wilayah),
         # Di luar cakupan = seluruh dasar hukum patut diragukan -> tandai low_confidence walau

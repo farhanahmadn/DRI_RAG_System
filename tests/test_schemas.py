@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from app.schemas import (
     KesimpulanOutput,
     L2Assessment,
+    NarasiRekomendasiOutput,
     OutputL3,
     ParameterIntensitas,
     PoinOutput,
@@ -227,6 +228,10 @@ def test_output_l3_roundtrip():
             )
         ],
         rekomendasi_sistem="Setuju Bersyarat",
+        narasi_rekomendasi=NarasiRekomendasiOutput(
+            paragraf_gate_intensitas="Intensitas melampaui ambang, perlu penyesuaian.",
+            paragraf_dampak="Dampak terhadap lingkungan hidrologi tergolong Sedang.",
+        ),
         kesimpulan=KesimpulanOutput(langkah_berdampak=["Revisi desain agar KDB memenuhi ambang."]),
         catatan_global=[],
         low_confidence_keseluruhan=False,

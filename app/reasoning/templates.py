@@ -107,9 +107,11 @@ def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
         reasoning_panjang = (
             f"Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin "
             f"'{poin.kategori}' ({poin.poin_id}) setelah beberapa kali percobaan. Status ({poin.status}) "
-            "tetap berdasarkan data asli dari back-end; mohon dilakukan peninjauan manual oleh petugas."
+            "tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas."
         )
-    disclaimer = "Penjelasan otomatis tidak tersedia untuk poin ini; perlu verifikasi manual."
+    # "." BUKAN ";" — item permintaan user 2026-09-21: DILARANG tanda titik koma di template
+    # maupun luaran LLM manapun (SYSTEM_PROMPT aturan #17 baru).
+    disclaimer = "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual."
 
     return PoinOutput(
         poin_id=poin.poin_id,

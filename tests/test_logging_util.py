@@ -5,6 +5,7 @@ from app.logging_util import log_precheck
 from app.schemas import (
     KesimpulanOutput,
     L2Assessment,
+    NarasiRekomendasiOutput,
     OutputL3,
     PoinOutput,
     RekomendasiOutput,
@@ -36,6 +37,7 @@ def _response() -> OutputL3:
             )
         ],
         rekomendasi_sistem="Setuju",
+        narasi_rekomendasi=NarasiRekomendasiOutput(paragraf_gate_intensitas="x", paragraf_dampak="x"),
         kesimpulan=KesimpulanOutput(langkah_berdampak=["a"], catatan_lokasi="catatan"),
         catatan_global=[],
         low_confidence_keseluruhan=False,

@@ -11,6 +11,7 @@ from app.api.main import app
 from app.api.rate_limit import _LIMIT, reset_rate_limiter
 from app.schemas import (
     KesimpulanOutput,
+    NarasiRekomendasiOutput,
     OutputL3,
     PoinOutput,
     RekomendasiOutput,
@@ -61,6 +62,7 @@ def _output_kanonik() -> OutputL3:
             )
         ],
         rekomendasi_sistem="Setuju",
+        narasi_rekomendasi=NarasiRekomendasiOutput(paragraf_gate_intensitas="x", paragraf_dampak="x"),
         kesimpulan=KesimpulanOutput(langkah_berdampak=["a"], catatan_lokasi="catatan"),
         catatan_global=[],
         low_confidence_keseluruhan=False,
