@@ -20,11 +20,9 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      # Cukup extra [dev] (pytest): seluruh impor berat (psycopg, torch, transformers) LAZY di
-      # dalam fungsi, dan suite offline dipaksa RETRIEVER=mock oleh tests/conftest.py — diverifikasi
-      # dgn memeriksa sys.modules setelah suite selesai, satu-satunya modul berat yang termuat
-      # adalah httpx (transitif dari openai). Jangan tambahkan [rag]/[rag-serverless] di sini:
-      # menarik torch ~2-3GB tanpa dipakai sama sekali.
+      # Cukup extra [dev] (pytest, httpx): seluruh impor berat (psycopg, torch, transformers) LAZY di
+      # dalam fungsi, dan suite offline dipaksa RETRIEVER=mock oleh tests/conftest.py. Jangan
+      # tambahkan [rag] di sini: menarik torch ~2-3GB tanpa dipakai sama sekali.
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
