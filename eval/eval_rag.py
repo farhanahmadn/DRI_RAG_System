@@ -44,6 +44,7 @@ import math
 import os
 import statistics
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -51,7 +52,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from app.reasoning.generator import _pilih_chunks_referensi  # noqa: E402
 from app.retrieval import db, fusion, rerank  # noqa: E402
+from app.schemas import PoinKonteks  # noqa: E402
+from eval.statistik import bootstrap_ci, wilcoxon_berpasangan  # noqa: E402
 from app.retrieval.base import RetrievalFilters  # noqa: E402
 from app.retrieval.embeddings import encode_dense_one  # noqa: E402
 from app.retrieval.retriever import _expand  # noqa: E402
@@ -61,6 +65,14 @@ _LOG_PRECHECK = Path(__file__).parent.parent / "logs" / "precheck.jsonl"
 _K_LIST = (1, 3, 5, 10)
 _TOP_N = 10          # panjang daftar hasil yang dinilai
 _KANDIDAT = 30       # sejajar dgn candidate_k/rerank_pool retriever produksi
+
+# TITIK OPERASI: app/reasoning/generator.py mengirim `top_k_dukungan=3` chunk ke LLM. Metrik pada
+# kedalaman LAIN berguna untuk memahami perilaku, tapi hanya k=3 yang mewakili apa yang benar-benar
+# diterima sistem — laporan menyorotnya secara terpisah supaya tak terbaca dari kedalaman yang salah.
+_K_OPERASI = 3
+# Metrik yang dipakai untuk klaim & uji signifikansi. Sengaja dibatasi: menguji SEMUA metrik x SEMUA
+# pasangan konfigurasi menaikkan peluang temuan palsu tanpa menambah informasi.
+_METRIK_KLAIM = (f"ndcg@{_K_OPERASI}", f"recall@{_K_OPERASI}", f"hit@{_K_OPERASI}", "mrr", "map")
 
 
 # ---------------------------------------------------------------------------
@@ -145,12 +157,32 @@ def _urutan_rerank(conn, query: str, fused: list[str]) -> list[str]:
     return [kandidat[i].id for i, _ in skor]
 
 
-def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0) -> dict:
+def _muat_topik(path: Path) -> list[dict]:
+    """Terima DUA skema: eval set lama (query/relevan) dan eval set titik operasi (ber-`jalur`,
+    `filter`, `sumber_label`). Yang lama dinormalkan ke bentuk baru supaya sisa kode satu jalur."""
+    topik = []
+    for garis in path.read_text(encoding="utf-8").splitlines():
+        if not garis.strip():
+            continue
+        row = json.loads(garis)
+        row.setdefault("id", row["query"])
+        row.setdefault("jalur", "search")
+        row.setdefault("filter", {})
+        row.setdefault("sumber_label", "seeded")
+        row.setdefault("bobot_traffic", 0)
+        topik.append(row)
+    return topik
+
+
+def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
+                      eval_set: Path | None = None) -> dict:
     import psycopg
 
-    baris = [json.loads(l) for l in _EVAL_SET.read_text(encoding="utf-8").splitlines() if l.strip()]
+    berkas_eval = eval_set or _EVAL_SET
+    semua_topik = _muat_topik(berkas_eval)
+    baris = [x for x in semua_topik if x["jalur"] == "search"]
+    topik_ref = [x for x in semua_topik if x["jalur"] == "reference"]
     wilayah = os.getenv("RETRIEVER_WILAYAH", "Sleman Tengah").strip('"')
-    filters = RetrievalFilters(dokumen=wilayah)
     conn = psycopg.connect(os.getenv("DATABASE_URL"))
 
     konfigurasi = ["dense", "lexical", "rrf"] + (["dense+rerank", "rrf+rerank"] if pakai_rerank else [])
@@ -160,6 +192,9 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0) -> dict:
 
     for i, row in enumerate(baris, 1):
         query, relevan = row["query"], set(row["relevan"])
+        # Filter per-topik: inilah sumbu yang benar-benar bervariasi di produksi (zona/sub-zona),
+        # bukan teks querinya. Wilayah selalu disematkan, persis seperti _apply_default_wilayah.
+        filters = RetrievalFilters(dokumen=wilayah, **(row.get("filter") or {}))
         urutan: dict[str, list[str]] = {}
 
         t0 = time.perf_counter()
@@ -183,16 +218,32 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0) -> dict:
             urutan["rrf+rerank"] = _urutan_rerank(conn, query, urutan["rrf"])
             latensi["rrf+rerank"].append(time.perf_counter() - t0)
 
-        baris_detail = {"query": query, "n_relevan": len(relevan)}
+        baris_detail = {"query": row["id"], "n_relevan": len(relevan),
+                        "sumber_label": row["sumber_label"]}
         for kfg in konfigurasi:
             m = _metrik_satu_query(urutan[kfg][:_TOP_N], relevan)
             per_query[kfg].append(m)
             baris_detail[kfg] = m["peringkat_pertama"]
         detail.append(baris_detail)
-        print(f"  [{i}/{len(baris)}] {query[:46]:48s} " +
+        print(f"  [{i}/{len(baris)}] {row['id'][:46]:48s} " +
               "  ".join(f"{k}={baris_detail[k] or '-'}" for k in konfigurasi), flush=True)
         if jeda_s and i < len(baris):
             time.sleep(jeda_s)
+
+    produksi = "rrf+rerank" if "rrf+rerank" in konfigurasi else konfigurasi[-1]
+
+    # Jalur rujukan dievaluasi terpisah: konfigurasinya beda (bukan dense/lexical/rrf) dan
+    # inilah satu-satunya jalur yang dipakai poin itbx di produksi.
+    hasil_anchor = None
+    if topik_ref:
+        from app.retrieval.retriever import RetrieverAsli
+
+        print(f"\n[eval] jalur rujukan (anchor): {len(topik_ref)} topik")
+        hasil_anchor = evaluasi_anchor(RetrieverAsli(default_wilayah=wilayah), topik_ref)
+        for k in hasil_anchor["konfigurasi"]:
+            a = hasil_anchor["agregat"][k]
+            print(f"  {k:20s} nDCG@{_K_OPERASI}={a[f'ndcg@{_K_OPERASI}']:.3f}  "
+                  f"Recall@{_K_OPERASI}={a[f'recall@{_K_OPERASI}']:.0%}")
 
     # --- konteks korpus ---
     with conn.cursor() as cur:
@@ -215,10 +266,146 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0) -> dict:
         "top_n_dinilai": _TOP_N,
         "korpus": {"chunk": n_chunk, "per_level": per_level, "vektor": n_vektor},
         "konfigurasi": konfigurasi,
+        "produksi": produksi,
         "agregat": {k: _agregat(per_query[k]) for k in konfigurasi},
+        "statistik": _statistik(per_query, konfigurasi, produksi),
         "latensi_ms": {k: statistics.fmean(latensi[k]) * 1000 for k in konfigurasi},
         "detail_per_query": detail,
+        # Skor mentah per-topik utk metrik klaim — supaya pihak lain bisa menghitung ulang CI/uji
+        # sendiri tanpa menjalankan ulang retrieval (dan memverifikasi statistik kita).
+        "skor_per_query": {k: [{m: q[m] for m in _METRIK_KLAIM} for q in per_query[k]]
+                           for k in konfigurasi},
+        "metadata": _metadata_reproduksi(),
+        "berkas_eval": berkas_eval.name,
+        "sumber_label": dict(Counter(x["sumber_label"] for x in semua_topik)),
+        "anchor": hasil_anchor,
         "generasi": _ringkas_diagnostik_log(),
+    }
+
+
+# --- Jalur rujukan (anchor) — menangani 100% poin itbx di produksi ---------------------------
+_KFG_ANCHOR = ("anchor-urutan-db", "anchor-sadar-zona")
+_LABEL_ANCHOR = {
+    "anchor-urutan-db": "Anchor menurut urutan DB (sebelum perbaikan)",
+    "anchor-sadar-zona": "Anchor sadar-zona (produksi)",
+}
+
+
+def _poin_tiruan(zona: str | None, subzona: str | None) -> PoinKonteks:
+    """PoinKonteks minimal — hanya zona yang dibaca `_pilih_chunks_referensi`."""
+    return PoinKonteks(
+        poin_id="itbx", kategori="Klasifikasi Kegiatan (ITBX)", tipe_rekomendasi="kategorikal",
+        status="I", fakta={"lolos": True, "reason": "x"}, zona=zona, zona_subzone=subzona,
+    )
+
+
+def evaluasi_anchor(rt, topik: list[dict]) -> dict:
+    """Ablasi pemilihan sitasi sadar-zona pada jalur `get_by_reference`.
+
+    Jalur ini menangani SELURUH poin itbx di produksi (349/349 payload BE membawa `dasar_hukum`),
+    tapi tak pernah dievaluasi sebelumnya. Dua konfigurasi dibandingkan atas topik yang sama:
+    urutan DB apa adanya (perilaku sebelum commit `d1a194c`) vs pemilihan sadar-zona (produksi).
+    Bedanya bukan akademis — di payload nyata APP-2026-2428, urutan DB menyodorkan Lampiran V.B
+    Cagar Alam untuk pemohon Zona Pertanian.
+    """
+    per_query: dict[str, list[dict]] = {k: [] for k in _KFG_ANCHOR}
+    latensi: dict[str, list[float]] = {k: [] for k in _KFG_ANCHOR}
+    detail: list[dict] = []
+
+    for row in topik:
+        relevan = set(row["relevan"])
+        filt = row.get("filter") or {}
+        poin = _poin_tiruan(
+            zona=filt.get("zona_induk") or _zona_induk_dari_prefix(filt.get("zona_prefix")),
+            subzona=filt.get("zona"),
+        )
+        t0 = time.perf_counter()
+        kandidat = rt.get_by_reference([row["query"]])
+        biaya_ambil = time.perf_counter() - t0
+
+        urutan = {
+            # Perilaku lama: potong apa adanya menurut urutan yang dikembalikan DB.
+            "anchor-urutan-db": [c.id for c in kandidat[:_TOP_N]],
+            "anchor-sadar-zona": [c.id for c in _pilih_chunks_referensi(kandidat, poin, _TOP_N)],
+        }
+        baris = {"query": row.get("id", row["query"]), "n_relevan": len(relevan)}
+        for kfg in _KFG_ANCHOR:
+            m = _metrik_satu_query(urutan[kfg], relevan)
+            per_query[kfg].append(m)
+            latensi[kfg].append(biaya_ambil)
+            baris[kfg] = m["peringkat_pertama"]
+        detail.append(baris)
+
+    return {
+        "konfigurasi": list(_KFG_ANCHOR),
+        "produksi": "anchor-sadar-zona",
+        "n_query": len(topik),
+        "agregat": {k: _agregat(per_query[k]) for k in _KFG_ANCHOR},
+        "statistik": _statistik(per_query, list(_KFG_ANCHOR), "anchor-sadar-zona"),
+        "latensi_ms": {k: statistics.fmean(latensi[k]) * 1000 for k in _KFG_ANCHOR},
+        "detail_per_query": detail,
+        "skor_per_query": {k: [{m: q[m] for m in _METRIK_KLAIM} for q in per_query[k]]
+                           for k in _KFG_ANCHOR},
+    }
+
+
+def _zona_induk_dari_prefix(prefix: str | None) -> str | None:
+    """Balik dari kode keluarga ('R') ke nama zona induk ('Zona Perumahan') — `_pilih_chunks_referensi`
+    menerima NAMA zona induk, bukan kodenya."""
+    if not prefix:
+        return None
+    from app.reasoning.generator import _ZONA_KODE_PREFIX
+
+    return next((nama.title() for nama, kode in _ZONA_KODE_PREFIX.items() if kode == prefix), None)
+
+
+def _statistik(per_query: dict[str, list[dict]], konfigurasi: list[str], produksi: str) -> dict:
+    """Selang kepercayaan tiap konfigurasi + uji berpasangan TERHADAP konfigurasi produksi.
+
+    Pembanding sengaja satu (produksi), bukan semua-lawan-semua: pertanyaan yang relevan adalah
+    "apakah ada yang berbeda nyata dari yang kita jalankan sekarang", dan membatasi jumlah uji
+    menekan peluang temuan palsu.
+    """
+    ci: dict[str, dict[str, dict]] = {}
+    for kfg in konfigurasi:
+        ci[kfg] = {}
+        for metrik in _METRIK_KLAIM:
+            s = bootstrap_ci([q[metrik] for q in per_query[kfg]])
+            ci[kfg][metrik] = {"rata": s.rata, "bawah": s.bawah, "atas": s.atas, "n": s.n}
+
+    uji: dict[str, dict[str, dict]] = {}
+    for kfg in konfigurasi:
+        if kfg == produksi:
+            continue
+        uji[kfg] = {}
+        for metrik in _METRIK_KLAIM:
+            u = wilcoxon_berpasangan([q[metrik] for q in per_query[kfg]],
+                                     [q[metrik] for q in per_query[produksi]])
+            uji[kfg][metrik] = {"p": u.p, "n_beda": u.n_beda, "efek": u.efek,
+                                "selisih_rata": u.selisih_rata, "signifikan": u.signifikan}
+    return {"ci": ci, "uji_vs_produksi": uji, "pembanding": produksi}
+
+
+def _metadata_reproduksi() -> dict:
+    """Segala yang dibutuhkan pihak lain untuk memproduksi ulang angka ini."""
+    import subprocess
+
+    def _git(*arg: str) -> str | None:
+        try:
+            return subprocess.run(["git", *arg], capture_output=True, text=True,
+                                  timeout=10, cwd=Path(__file__).parent.parent).stdout.strip() or None
+        except Exception:
+            return None
+
+    return {
+        "commit": _git("rev-parse", "--short", "HEAD"),
+        "commit_kotor": bool(_git("status", "--porcelain")),
+        "model_embedding": os.getenv("JINA_EMBEDDING_MODEL") or os.getenv("EMBEDDING_MODEL"),
+        "model_rerank": os.getenv("JINA_RERANK_MODEL") or os.getenv("RERANKER_MODEL"),
+        "model_llm": os.getenv("LLM_MODEL"),
+        "kandidat_k": _KANDIDAT,
+        "top_n_dinilai": _TOP_N,
+        "k_operasi": _K_OPERASI,
     }
 
 
@@ -383,6 +570,27 @@ def _donat(judul: str, data: dict[str, int], palet: dict[str, str]) -> str:
     return "".join(p)
 
 
+def _fmt_ci(e: dict, persen: bool = False) -> str:
+    """'0.821 [0.74-0.89]' — angka telanjang tanpa selang tidak boleh muncul di laporan ini."""
+    if persen:
+        return (f'{e["rata"]:.0%} <span class="ci">[{e["bawah"]:.0%}–{e["atas"]:.0%}]</span>')
+    return (f'{e["rata"]:.3f} <span class="ci">[{e["bawah"]:.3f}–{e["atas"]:.3f}]</span>')
+
+
+def _fmt_uji(e: dict | None) -> str:
+    """Verdict perbandingan terhadap konfigurasi produksi, bukan sekadar selisih angka."""
+    if e is None:
+        return '<span class="net">— (pembanding)</span>'
+    if e["n_beda"] == 0:
+        return '<span class="net">identik</span>'
+    if not e["signifikan"]:
+        return f'<span class="net">setara</span> <span class="ci">(p={e["p"]:.2f})</span>'
+    arah = "lebih baik" if e["selisih_rata"] > 0 else "lebih buruk"
+    warna = "baik" if e["selisih_rata"] > 0 else "buruk"
+    return (f'<span class="{warna}">{arah} {e["selisih_rata"]:+.3f}</span> '
+            f'<span class="ci">(p={e["p"]:.3f})</span>')
+
+
 def bangun_html(r: dict) -> str:
     kfg = r["konfigurasi"]
     agg = r["agregat"]
@@ -405,6 +613,28 @@ def bangun_html(r: dict) -> str:
             f"<td>{a['query_tanpa_hasil_relevan']}</td>"
             f"<td>{r['latensi_ms'][k]:,.0f} ms</td></tr>")
 
+    stat = r.get("statistik") or {}
+    ci_all, uji_all = stat.get("ci", {}), stat.get("uji_vs_produksi", {})
+    baris_operasi = ""
+    for k in kfg:
+        c = ci_all.get(k, {})
+        sorot = ' class="sorot"' if k == produksi else ""
+        if not c:      # hasil lama tanpa statistik — jangan mengarang selang
+            a = agg[k]
+            baris_operasi += (
+                f'<tr{sorot}><td><b>{_esc(_LABEL.get(k,k))}</b></td>'
+                f'<td>{a[f"ndcg@{_K_OPERASI}"]:.3f}</td><td>{a[f"recall@{_K_OPERASI}"]:.0%}</td>'
+                f'<td>{a[f"hit@{_K_OPERASI}"]:.0%}</td><td>{a["mrr"]:.3f}</td>'
+                f'<td class="net">(tanpa statistik)</td></tr>')
+            continue
+        baris_operasi += (
+            f'<tr{sorot}><td><b>{_esc(_LABEL.get(k,k))}</b></td>'
+            f'<td>{_fmt_ci(c[f"ndcg@{_K_OPERASI}"])}</td>'
+            f'<td>{_fmt_ci(c[f"recall@{_K_OPERASI}"], persen=True)}</td>'
+            f'<td>{_fmt_ci(c[f"hit@{_K_OPERASI}"], persen=True)}</td>'
+            f'<td>{_fmt_ci(c["mrr"])}</td>'
+            f'<td>{_fmt_uji(uji_all.get(k, {}).get(f"ndcg@{_K_OPERASI}"))}</td></tr>')
+
     gen = r.get("generasi") or {}
     blok_gen = ""
     if gen.get("n_poin"):
@@ -414,7 +644,7 @@ def bangun_html(r: dict) -> str:
                       if gen.get("sitasi") else "tidak ada sitasi tercatat")
         n_gagal = gen["sebab"].get("panggilan_llm_gagal", 0)
         blok_gen = f"""
-  <h2>4. Sisi generasi — data operasional historis</h2>
+  <h2>5. Sisi generasi — data operasional historis</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Baca dengan hati-hati — ini BUKAN tingkat kegagalan produksi.</b> Rekap ini diambil dari kunci
   <code>diagnostik</code> yang sudah terkumpul di <code>logs/precheck.jsonl</code>
@@ -433,6 +663,17 @@ def bangun_html(r: dict) -> str:
 
     korpus = r["korpus"]
     lvl = ", ".join(f"{v} {k}" for k, v in sorted(korpus["per_level"].items()))
+
+    md = r.get("metadata") or {}
+    if md:
+        kotor = ' <b>(working tree kotor — ada perubahan belum ter-commit)</b>' if md.get("commit_kotor") else ""
+        meta_txt = _esc(
+            f'commit {md.get("commit") or "?"}{"" if not kotor else ""} · '
+            f'embedding {md.get("model_embedding")} · rerank {md.get("model_rerank")} · '
+            f'LLM {md.get("model_llm")} · kandidat={md.get("kandidat_k")} · '
+            f'dinilai sampai peringkat {md.get("top_n_dinilai")}') + kotor
+    else:
+        meta_txt = "(metadata tidak tercatat — hasil dari versi harness lama)"
 
     return f"""<!doctype html>
 <html lang="id"><head><meta charset="utf-8">
@@ -468,6 +709,11 @@ def bangun_html(r: dict) -> str:
   .lg  {{ font:12px system-ui; fill:#334155; }}
   .ctr {{ font:600 22px system-ui; fill:#0f172a; }}
   .grid {{ stroke:#e2e8f0; stroke-width:1; }}
+  .ci   {{ color:#64748b; font-size:11.5px; white-space:nowrap; }}
+  .net  {{ color:#64748b; }}
+  .baik {{ color:#047857; font-weight:600; }}
+  .buruk{{ color:#b91c1c; font-weight:600; }}
+  .meta {{ color:#64748b; font-size:12.5px; border-top:1px solid var(--grs); padding-top:12px; margin-top:26px; }}
 </style></head><body><main>
 
   <h1>Evaluasi Retrieval RAG</h1>
@@ -480,7 +726,23 @@ def bangun_html(r: dict) -> str:
     <span class="pil">vektor: {korpus['vektor']}</span>
   </p>
 
-  <h2>1. Ringkasan metrik &amp; ablasi per lapis</h2>
+  <h2>1. Titik operasi sistem (k={_K_OPERASI})</h2>
+  <div class="peringatan" style="margin-bottom:14px">
+  <b>Ini tabel yang menentukan.</b> Sistem mengirim <b>{_K_OPERASI} chunk</b> ke LLM
+  (<code>generator.top_k_dukungan</code>), jadi hanya kedalaman ini yang mewakili apa yang
+  benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 2 &amp; 3) berguna untuk memahami
+  perilaku, tapi <b>tidak boleh dipakai sebagai klaim kinerja</b>.
+  Tiap angka disertai selang kepercayaan 95% (bootstrap atas topik, n={r['n_query']}); kolom
+  terakhir menguji apakah selisih terhadap jalur produksi nyata (Wilcoxon signed-rank berpasangan).
+  <b>Selisih yang dinyatakan "setara" tidak boleh diklaim sebagai keunggulan.</b>
+  </div>
+  <div class="kartu"><table>
+    <thead><tr><th>Konfigurasi</th><th>nDCG@{_K_OPERASI}</th><th>Recall@{_K_OPERASI}</th>
+      <th>Hit@{_K_OPERASI}</th><th>MRR</th><th>vs produksi (nDCG@{_K_OPERASI})</th></tr></thead>
+    <tbody>{baris_operasi}</tbody>
+  </table></div>
+
+  <h2>2. Ringkasan metrik &amp; ablasi per lapis</h2>
   <p class="cat">Pipeline produksi adalah dense + lexical → RRF → rerank. Tiap lapis dinilai
   sendiri supaya kontribusinya terlihat, bukan diasumsikan. Baris hijau = jalur produksi.</p>
   <div class="kartu"><table>
@@ -490,11 +752,11 @@ def bangun_html(r: dict) -> str:
     <tbody>{baris_tabel}</tbody>
   </table></div>
 
-  <h2>2. Hit-Rate menurut kedalaman</h2>
+  <h2>3. Hit-Rate menurut kedalaman</h2>
   <p class="cat">Seberapa sering minimal satu chunk relevan masuk peringkat-k teratas.</p>
   <div class="kartu">{_bar_berkelompok("Hit-Rate@k", [f"@{n}" for n in _K_LIST], hit)}</div>
 
-  <h2>3. Mutu peringkat</h2>
+  <h2>4. Mutu peringkat</h2>
   <p class="cat">Hit-Rate hanya menanyakan "ketemu atau tidak". Metrik di bawah menanyakan
   "ketemu di posisi berapa" dan "berapa banyak yang ketemu" — di sinilah reranker seharusnya
   membayar dirinya sendiri.</p>
@@ -505,7 +767,7 @@ def bangun_html(r: dict) -> str:
       [_WARNA.get(k, "#64748b") for k in kfg], " ms")}</div>
 {blok_gen}
 
-  <h2>{'5' if blok_gen else '4'}. Batas pembacaan</h2>
+  <h2>{'6' if blok_gen else '5'}. Batas pembacaan</h2>
   <div class="peringatan">
   <ul>
     <li><b>Ground truth diseed developer, belum divalidasi ahli tata ruang.</b> Angka di sini
@@ -521,9 +783,13 @@ def bangun_html(r: dict) -> str:
   </ul>
   </div>
 
-  <p class="cat" style="margin-top:26px">Dihasilkan oleh <code>python -m eval.eval_rag</code>.
-  Data mentah berdampingan sebagai <code>.json</code>. Nilai konfigurasi ada di
-  <code>.env.example</code>; arsitektur sistem di <code>docs/ARSITEKTUR_RAG.md</code>.</p>
+  <div class="meta">
+    <b>Reproduksibilitas.</b> {meta_txt}<br>
+    Dihasilkan oleh <code>python -m eval.eval_rag</code>; data mentah berdampingan sebagai
+    <code>.json</code> (termasuk skor per-topik, supaya selang &amp; uji di atas bisa dihitung ulang
+    secara independen). Nilai konfigurasi di <code>.env.example</code>; arsitektur di
+    <code>docs/ARSITEKTUR_RAG.md</code>.
+  </div>
 </main></body></html>"""
 
 
@@ -534,6 +800,9 @@ def main() -> None:
                     help="lewati konfigurasi ber-rerank (hemat kuota API provider)")
     ap.add_argument("--jeda", type=float, default=0.0,
                     help="jeda detik antar-query, utk menghindari rate limit provider")
+    ap.add_argument("--eval-set", type=Path, default=None,
+                    help="eval set yang dipakai (default tests/eval_set.jsonl; "
+                         "pakai tests/eval_set_operasi.jsonl utk titik operasi produksi)")
     ap.add_argument("--dari-json", type=Path, default=None,
                     help="bangun ulang HTML dari hasil JSON yang sudah ada, TANPA memanggil "
                          "DB/API lagi — untuk mengubah tampilan laporan tanpa membakar kuota")
@@ -544,7 +813,8 @@ def main() -> None:
         hasil = json.loads(args.dari_json.read_text(encoding="utf-8"))
     else:
         print(f"[eval] {_EVAL_SET.name} -> {args.out.name}")
-        hasil = jalankan_evaluasi(pakai_rerank=not args.tanpa_rerank, jeda_s=args.jeda)
+        hasil = jalankan_evaluasi(pakai_rerank=not args.tanpa_rerank, jeda_s=args.jeda,
+                                  eval_set=args.eval_set)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(bangun_html(hasil), encoding="utf-8")
