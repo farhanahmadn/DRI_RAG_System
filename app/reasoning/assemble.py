@@ -21,6 +21,7 @@ from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
 from app.reasoning.guardrail import DiagnosaPoin, caveat_fallback_itbx, generate_poin_terdiagnosis
 from app.reasoning.prompts import (
+    CAVEAT_SUBZONA_TAK_TERKONFIRMASI,
     SYSTEM_PROMPT_KESIMPULAN,
     SYSTEM_PROMPT_NARASI_REKOMENDASI,
     build_kesimpulan_prompt,
@@ -252,11 +253,24 @@ CAVEAT_DI_LUAR_CAKUPAN = (
 )
 
 
+def _intensitas_dinilai(poin: PoinOutput) -> bool:
+    """Poin intensitas yang benar-benar menilai ambang KDB/KLB/KDH.
+
+    Kalau back-end tak mengirim penilaian intensitas, adapter TETAP merakit poinnya dengan
+    status "Tidak Dinilai" dan `fakta={"dinilai": False}` — tanpa parameter, tanpa ambang,
+    tanpa tabel Lampiran VI yang dikutip. Caveat sub-zona di situ memperingatkan soal angka
+    yang tidak ada, jadi ia disaring di sini (ditemukan lewat fixture
+    l2_sample_itbx_x_tanpa_intensitas.json).
+    """
+    return poin.poin_id == "intensitas" and poin.status != "Tidak Dinilai"
+
+
 def _rakit_catatan_global(
     assessment: L2Assessment,
     itbx_fallback: bool,
     poin_list: list[PoinOutput],
     di_luar_wilayah: bool = False,
+    subzona_tak_pasti: bool = False,
 ) -> list[str]:
     """Blueprint §5.4: meta.caveats WAJIB muncul di output, tidak disembunyikan — plus caveat
     fallback ITBX (§5.2) kalau berlaku. Terpisah dari disclaimer per-poin (guardrail._paksa_field_wajib)
@@ -274,6 +288,14 @@ def _rakit_catatan_global(
 
     if di_luar_wilayah:
         catatan.append(CAVEAT_DI_LUAR_CAKUPAN)
+
+    # Hanya kalau ada poin intensitas: tanpa poin itu, tak ada ambang KDB/KLB/KDH yang dikutip
+    # dan caveat ini cuma jadi derau. Lapis ini DETERMINISTIK — prompt juga membawa caveat yang
+    # sama (generator.caveat_subzona) supaya narasinya tak mengklaim lebih dari yang diketahui,
+    # tapi narasi bergantung LLM; yang ini tidak, jadi pembaca tetap melihatnya walau narasi
+    # jatuh ke template low_confidence.
+    if subzona_tak_pasti and any(_intensitas_dinilai(p) for p in poin_list):
+        catatan.append(CAVEAT_SUBZONA_TAK_TERKONFIRMASI)
 
     poin_low_confidence = [p.poin_id for p in poin_list if p.low_confidence]
     if poin_low_confidence:
@@ -294,6 +316,10 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     # Retrieval dikunci ke satu wilayah lewat RETRIEVER_WILAYAH, jadi kalau lokasinya di luar
     # wilayah itu, SELURUH sitasi di output ini berpotensi tak berlaku — bukan cuma satu poin.
     di_luar_wilayah = di_luar_cakupan(assessment.lokasi)
+    # Idem: sub-zona presisi adalah properti LOKASI, bukan properti poin. Kalau back-end tak
+    # mengonfirmasinya, seluruh sitasi intensitas di output ini berasal dari tabel tingkat
+    # keluarga zona (lihat generator._QUERY_INTENSITAS_TAJAM).
+    subzona_tak_pasti = not (assessment.lokasi.rdtr_subzone or "").strip()
 
     futures = [
         _executor.submit(_generate_poin_defensif, poin, retriever, assessment)
@@ -310,7 +336,8 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
         rekomendasi_sistem=hasil_adaptasi.rekomendasi_sistem,
         narasi_rekomendasi=_rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem),
         kesimpulan=_rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem),
-        catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list, di_luar_wilayah),
+        catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list,
+                                             di_luar_wilayah, subzona_tak_pasti),
         # Di luar cakupan = seluruh dasar hukum patut diragukan -> tandai low_confidence walau
         # ketiga poin sendiri lolos guardrail dgn mulus.
         low_confidence_keseluruhan=any(p.low_confidence for p in poin_list) or di_luar_wilayah,

@@ -342,6 +342,14 @@ _BANGUN_FAKTA = {
 }
 
 
+CAVEAT_SUBZONA_TAK_TERKONFIRMASI = (
+    "Sub-zona presisi lokasi permohonan tidak dikonfirmasi oleh back-end, sehingga ketentuan "
+    "intensitas yang dikutip diambil dari tabel tingkat keluarga zona. Ambang KDB/KLB/KDH "
+    "antar sub-zona dalam satu keluarga dapat berbeda, jadi angka ambang pada sitasi wajib "
+    "diverifikasi terhadap sub-zona yang sebenarnya sebelum dipakai sebagai dasar keputusan."
+)
+
+
 def build_user_prompt(
     poin: PoinKonteks,
     chunks: list[Chunk],
@@ -349,12 +357,20 @@ def build_user_prompt(
     catatan_perbaikan: str | None = None,
     *,
     konteks_induk: dict[str, str] | None = None,
+    catatan_tambahan: list[str] | None = None,
 ) -> str:
     """Susun prompt user, deterministik dari poin (fakta adapter) + chunk yang diretrieve.
 
     `konteks_induk` ({chunk_id: teks pasal induk}, dari generator.ambil_konteks_induk) melengkapi
     small-to-big: chunk ayat sering merujuk ayat lain ("sebagaimana dimaksud pada ayat (1)") yang
-    tak ikut terkirim. Ditempel sbg konteks baca, BUKAN kandidat sitasi baru."""
+    tak ikut terkirim. Ditempel sbg konteks baca, BUKAN kandidat sitasi baru.
+
+    `catatan_tambahan` masuk ke blok "Catatan (WAJIB disebutkan)" yang sama dengan
+    `meta.caveats` — dipakai untuk batas yang diketahui KODE, bukan dikirim back-end (mis.
+    sub-zona tak terkonfirmasi, lihat CAVEAT_SUBZONA_TAK_TERKONFIRMASI). Caveat di sini TIDAK
+    menggantikan catatan_global deterministik di assemble.py: yang ini membuat narasinya tidak
+    mengklaim lebih dari yang diketahui, yang itu menjamin pembaca tetap melihatnya walau LLM
+    gagal atau narasinya jatuh ke template."""
     lines: list[str] = []
 
     lines.append("## Poin (SUDAH FINAL — jangan diubah/dihitung ulang)")
@@ -370,10 +386,12 @@ def build_user_prompt(
     # data_confidence_keseluruhan SENGAJA TIDAK disuntikkan ke prompt (Fix #4) — label kepercayaan
     # adalah FAKTA, dirakit deterministik di guardrail.py::_paksa_field_wajib, bukan bahasa yang
     # diserahkan ke LLM utk echo/parafrase (sumber kebocoran token mentah "DATA_CONFIDENCE: X").
-    if meta and meta.caveats:
+    semua_caveat = list(meta.caveats) if meta and meta.caveats else []
+    semua_caveat += list(catatan_tambahan or [])
+    if semua_caveat:
         lines.append("")
         lines.append("## Catatan (WAJIB disebutkan dalam reasoning)")
-        for caveat in meta.caveats:
+        for caveat in semua_caveat:
             lines.append(f"CAVEAT: {caveat}")
 
     lines.append("")

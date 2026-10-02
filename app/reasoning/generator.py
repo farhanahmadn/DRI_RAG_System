@@ -15,7 +15,11 @@ from app.reasoning.calculator import (
     pilih_target_mitigasi_dampak,
     pilih_target_utama_intensitas,
 )
-from app.reasoning.prompts import SYSTEM_PROMPT, build_user_prompt
+from app.reasoning.prompts import (
+    CAVEAT_SUBZONA_TAK_TERKONFIRMASI,
+    SYSTEM_PROMPT,
+    build_user_prompt,
+)
 from app.retrieval.base import Chunk, RetrievalFilters, Retriever
 from app.schemas import MetaL2, PoinKonteks, PoinOutput, RekomendasiOutput, SitasiOutput
 
@@ -118,14 +122,24 @@ _QUERY_FALLBACK_PER_POIN = {
 
 # APP-2026-8090 (live, verifikasi manual thd DB): query "kdb" polos kalah oleh pasal definisional
 # umum (Pasal 1/44/61 — skor lebih tinggi drpd tabel ambang Lampiran VI spesifik-zona, walau
-# filter zona SUDAH benar) — tabel ambang cuma naik ke rank #1 dgn query lebih spesifik ini. TAPI
-# query ini HANYA aman dipakai kalau `zona_subzone` presisi tersedia (filter EXACT, lihat di
-# bawah) — tanpa sub-zona presisi (cuma filter KELUARGA zona_prefix), query setajam ini pernah
-# terbukti bikin beberapa sub-zona (mis. R-2/R-3/R-4) skor berdekatan & TAK BISA dibedakan —
-# berisiko percaya diri mengutip tabel sub-zona yang SALAH. Query generik `_QUERY_FALLBACK_PER_POIN`
-# di atas tetap dipakai kalau sub-zona tak diketahui (aman tapi kurang presisi, lebih baik drpd
-# presisi tapi bisa salah).
-_QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA = "ambang KDB KLB KDH maksimal minimal"
+# filter zona SUDAH benar) — tabel ambang cuma naik ke rank #1 dgn query lebih spesifik ini.
+#
+# Dulu query ini DIBATASI hanya untuk kasus `zona_subzone` presisi, karena dgn filter KELUARGA
+# saja beberapa sub-zona (mis. R-2/R-3/R-4) skornya berdekatan & tak bisa dibedakan — dinilai
+# "lebih baik aman tapi kurang presisi". Pengukuran (eval/laporan_rag.html bagian 6, 21 keluarga
+# zona, filter & label IDENTIK, hanya teks query berbeda) menunjukkan ongkos "aman" itu jauh
+# lebih besar dari dugaan: dgn "kdb" polos, nDCG@3 0.157 & Recall@3 30.2%, dan tabel ambang yang
+# benar TIDAK PERNAH sampai peringkat 1 (0/21). Artinya pada cabang ini (74.3% request di
+# logs/precheck.jsonl) sistem sebagian besar bukan "aman", melainkan menjawab TANPA tabel ambang
+# sama sekali. Dgn query tajam: nDCG@3 0.856, Recall@3 90.5%, peringkat 1 pada 16/21 (p=5.3e-05).
+#
+# Kekhawatiran aslinya TIDAK terbantah oleh angka itu — label eval menganggap seluruh tabel satu
+# keluarga sah, jadi ia tak bisa memutuskan apakah sub-zona yang DIKUTIP tepat. Karena itu
+# pembukaan gating ini WAJIB berpasangan dgn CAVEAT_SUBZONA_TAK_TERKONFIRMASI (dipasang di dua
+# tempat: prompt, supaya narasi tak mengklaim lebih dari yang diketahui; dan catatan_global di
+# assemble.py, supaya pembaca tetap melihatnya walau LLM gagal). Jangan hapus salah satunya
+# tanpa menutup kembali gating di bawah.
+_QUERY_INTENSITAS_TAJAM = "ambang KDB KLB KDH maksimal minimal"
 
 # Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
 # Pasal 17 (Zona Lindung) & Pasal 23 (Zona Budi Daya), "RDTR Kawasan Sleman Tengah 2023-2043.md"
@@ -244,6 +258,11 @@ def ambil_chunks_pendukung(
     chunks = _pilih_chunks_referensi(chunks, poin, top_k_dukungan)
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
+        if poin.poin_id == "intensitas":
+            # Query tajam dipakai apa pun tingkat filternya — lihat pengukuran di
+            # _QUERY_INTENSITAS_TAJAM. Ketidakpastian sub-zona ditangani lewat caveat, bukan
+            # dgn melemahkan query sampai tabel ambangnya tidak ketemu sama sekali.
+            query_fallback = _QUERY_INTENSITAS_TAJAM
         # APP-2026-8090: filter EXACT ke sub-zona presisi (mis. "P-1") kalau BE mengirim &
         # yakin (poin.zona_subzone) — jauh lebih presisi drpd filter KELUARGA (zona_prefix, cuma
         # bisa saring "P" tanpa beda P-1/P-2). Fallback ke zona_prefix (APP-2026-6191, cegah
@@ -251,10 +270,6 @@ def ambil_chunks_pendukung(
         # PERNAH menebak sub-zona sendiri di sini.
         if poin.zona_subzone:
             filters = RetrievalFilters(zona=poin.zona_subzone)
-            if poin.poin_id == "intensitas":
-                # Query lebih tajam AMAN di sini krn filter zona sudah EXACT (bukan cuma
-                # keluarga) — lihat _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA di atas.
-                query_fallback = _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA
         else:
             filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
         chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan)
@@ -284,6 +299,24 @@ def _butuh_konteks_induk(teks: str) -> bool:
     """
     rendah = teks.lower()
     return any(penanda in rendah for penanda in _PENANDA_RUJUKAN_SILANG)
+
+
+def caveat_subzona(poin: PoinKonteks) -> list[str]:
+    """Caveat sub-zona untuk poin intensitas yang disitasi dari tabel tingkat KELUARGA zona.
+
+    Hanya untuk `intensitas`: poin inilah yang ambangnya (KDB/KLB/KDH) berbeda antar sub-zona
+    dalam satu keluarga. ITBX memakai Lampiran V.B yang juga per-sub-zona, tapi jalurnya
+    `get_by_reference` dgn anchor dari back-end, bukan query tajam yang baru dibuka di sini —
+    menambahkan caveat ke sana akan memperingatkan hal yang tidak berubah.
+    """
+    if poin.poin_id != "intensitas" or poin.zona_subzone:
+        return []
+    if poin.status == "Tidak Dinilai":
+        # BE tak mengirim penilaian intensitas -> tak ada ambang yang dikutip sama sekali.
+        # Lihat assemble._intensitas_dinilai; syaratnya harus sama di kedua lapis, kalau
+        # tidak narasi memperingatkan hal yang tak disebut catatan_global (atau sebaliknya).
+        return []
+    return [CAVEAT_SUBZONA_TAK_TERKONFIRMASI]
 
 
 def ambil_konteks_induk(chunks: list[Chunk], retriever: Retriever) -> dict[str, str]:
@@ -360,7 +393,8 @@ def generate_poin(
     anchor_by_id = {f"anchor-{i}": d for i, d in enumerate(poin.dasar_hukum)}
     konteks_induk = ambil_konteks_induk(chunks, retriever)
 
-    prompt = build_user_prompt(poin, chunks, meta, catatan_perbaikan, konteks_induk=konteks_induk)
+    prompt = build_user_prompt(poin, chunks, meta, catatan_perbaikan, konteks_induk=konteks_induk,
+                               catatan_tambahan=caveat_subzona(poin))
 
     llm_out = llm_client.generate(
         prompt,

@@ -104,9 +104,11 @@
 
   <h2>6. Ablasi string query — cabang tanpa sub-zona presisi</h2>
   <p class="cat">Saat back-end tidak mengirim sub-zona presisi, sistem hanya bisa menyaring per
-  <b>keluarga</b> zona, dan pada cabang itu ia menerbitkan query
-  <code>kdb</code>. Tabel ini membandingkannya dengan query tajam
-  <code>ambang KDB KLB KDH maksimal minimal</code> yang kini hanya dipakai saat sub-zona diketahui.
+  <b>keluarga</b> zona. Dulu pada cabang itu ia menerbitkan query pendek
+  <code>kdb</code>, dengan alasan bahwa query tajam tanpa filter exact
+  berisiko mengutip tabel sub-zona yang salah. <b>Ablasi inilah yang membuka gating itu:</b>
+  produksi kini menerbitkan <code>ambang KDB KLB KDH maksimal minimal</code> pada kedua cabang,
+  berpasangan dengan caveat sub-zona tak terkonfirmasi di narasi dan catatan global.
   <b>Filter dan label kedua lengan identik</b> — satu-satunya yang berbeda adalah teks query,
   atas 21 keluarga zona yang sama. Keduanya dinilai di run yang sama, jadi selisihnya tidak
   bisa dijelaskan oleh perbedaan indeks atau versi kode.</p>

@@ -5,6 +5,7 @@ from pathlib import Path
 from app.adapter import adaptasi
 from app.reasoning import assemble as assemble_module
 from app.reasoning.guardrail import DiagnosaPoin
+from app.reasoning.prompts import CAVEAT_SUBZONA_TAK_TERKONFIRMASI
 from app.reasoning.assemble import (
     CAVEAT_DI_LUAR_CAKUPAN,
     _rakit_catatan_global,
@@ -693,3 +694,100 @@ class TestPagarCakupanWilayah:
 
         assert CAVEAT_DI_LUAR_CAKUPAN in catatan
         assert any("intensitas" in c for c in catatan)
+
+
+class TestCaveatSubzonaTakTerkonfirmasi:
+    """Lapis DETERMINISTIK dari pasangan wajib pembukaan gating query tajam.
+
+    Prompt juga membawa caveat yang sama (generator.caveat_subzona) supaya narasinya tak mengklaim
+    lebih dari yang diketahui, tapi narasi bergantung pada LLM yang bisa gagal atau jatuh ke template
+    low_confidence. Kelas ini menjaga lapis yang TIDAK bergantung LLM: pembaca tetap melihat batasnya.
+    """
+
+    def test_muncul_saat_subzona_kosong_dan_ada_poin_intensitas(self):
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(update={"meta": None})
+        poin_list = [_poin_output(poin_id="intensitas")]
+
+        catatan = _rakit_catatan_global(assessment, False, poin_list, False, True)
+
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI in catatan
+
+    def test_tidak_muncul_saat_subzona_terkonfirmasi(self):
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(update={"meta": None})
+        poin_list = [_poin_output(poin_id="intensitas")]
+
+        catatan = _rakit_catatan_global(assessment, False, poin_list, False, False)
+
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI not in catatan
+
+    def test_tidak_muncul_tanpa_poin_intensitas(self):
+        """Tanpa poin intensitas tak ada ambang KDB/KLB/KDH yang dikutip — caveat cuma derau."""
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(update={"meta": None})
+        poin_list = [_poin_output(poin_id="itbx"), _poin_output(poin_id="dampak")]
+
+        catatan = _rakit_catatan_global(assessment, False, poin_list, False, True)
+
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI not in catatan
+
+    def test_menyatu_dgn_catatan_lain_bukan_menimpa(self):
+        assessment = _muat_assessment("l2_sample_lolos.json")
+        assessment = assessment.model_copy(update={"meta": None})
+        poin_list = [_poin_output(poin_id="intensitas", low_confidence=True)]
+
+        catatan = _rakit_catatan_global(assessment, False, poin_list, False, True)
+
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI in catatan
+        assert any("peninjauan manual" in c for c in catatan)
+
+    def test_kalimat_menyebut_sebabnya_dan_apa_yang_harus_dilakukan(self):
+        """Caveat yang cuma bilang "tidak pasti" membuat pembaca menebak. Sebutkan asal angkanya
+        (tabel tingkat keluarga) dan tindakan yang diminta (verifikasi sub-zona sebenarnya)."""
+        assert "keluarga zona" in CAVEAT_SUBZONA_TAK_TERKONFIRMASI
+        assert "diverifikasi" in CAVEAT_SUBZONA_TAK_TERKONFIRMASI
+        assert "KDB/KLB/KDH" in CAVEAT_SUBZONA_TAK_TERKONFIRMASI
+
+    # --- kabel dari jalankan_precheck: flag dihitung di sana, bukan di _rakit_catatan_global ---
+    def _stub_llm(self, prompt, json_schema, *, schema_name="response", system=None,
+                  temperature=0.0, max_tokens=1024):
+        if schema_name == "kesimpulan":
+            return {"langkah_berdampak": ["Tindak lanjuti sesuai saran per-poin."], "catatan_lokasi": None}
+        if schema_name == "narasi_rekomendasi":
+            return {"paragraf_gate_intensitas": "Intensitas bangunan sesuai ketentuan.",
+                    "paragraf_dampak": "Dampak lingkungan dapat diterima."}
+        return {"reasoning_pendek": "Ringkasan singkat.",
+                "reasoning_panjang": "Penjelasan lebih lengkap mengenai poin ini.",
+                "sitasi": [], "saran": "Ikuti prosedur yang berlaku.", "disclaimer": None}
+
+    def test_e2e_caveat_muncul_saat_be_tak_kirim_subzona(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm)
+        _patch_log(monkeypatch)
+
+        output = jalankan_precheck(_muat_assessment("l2_sample_lolos.json"), MockRetriever())
+
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI in output.catatan_global
+
+    def test_e2e_caveat_absen_saat_be_mengirim_subzona(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm)
+        _patch_log(monkeypatch)
+
+        # Fixture ini membawa rdtr_subzone="R-3" -> filter exact, tak ada yang perlu disangkal.
+        output = jalankan_precheck(_muat_assessment("l2_sample_amplop_5067.json"), MockRetriever())
+
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI not in output.catatan_global
+
+    def test_e2e_caveat_absen_saat_intensitas_tidak_dinilai(self, monkeypatch):
+        monkeypatch.setattr(assemble_module.llm_client, "generate", self._stub_llm)
+        _patch_log(monkeypatch)
+
+        # rdtr_subzone kosong, dan BE tak mengirim penilaian intensitas. Adapter TETAP merakit
+        # poin intensitas (status "Tidak Dinilai") — jadi menyaring per poin_id saja tidak cukup;
+        # yang menentukan adalah ada-tidaknya ambang yang dikutip.
+        output = jalankan_precheck(
+            _muat_assessment("l2_sample_itbx_x_tanpa_intensitas.json"), MockRetriever())
+
+        poin_intensitas = next(p for p in output.poin if p.poin_id == "intensitas")
+        assert poin_intensitas.status == "Tidak Dinilai"
+        assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI not in output.catatan_global

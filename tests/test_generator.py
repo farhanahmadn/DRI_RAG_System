@@ -238,18 +238,30 @@ class TestAmbilChunksPendukungZonaFilter:
         assert retriever.query_diterima == "ambang KDB KLB KDH maksimal minimal"
         assert retriever.filters_diterima.zona == "P-1"
 
-    def test_intensitas_tanpa_subzone_tetap_query_generik(self):
-        # Tanpa sub-zona presisi (cuma zona_prefix keluarga), query TETAP generik "kdb" — query
-        # tajam TANPA filter exact terbukti bikin sub-zona (mis. R-2/R-3/R-4) skor berdekatan &
-        # berisiko kutip tabel sub-zona yang salah.
+    def test_intensitas_tanpa_subzone_tetap_pakai_query_tajam(self):
+        """Dulu cabang ini sengaja memakai query generik "kdb" demi "aman": tanpa filter exact,
+        sub-zona satu keluarga (R-2/R-3/R-4) skornya berdekatan dan tabel yang salah bisa terkutip.
+
+        Pengukuran membalik penilaian itu. Atas 21 keluarga zona dengan filter & label IDENTIK,
+        "kdb" memberi nDCG@3 0.157 / Recall@3 30.2% dan tabel ambang yang benar TIDAK PERNAH sampai
+        peringkat 1 (0/21) — jadi cabang ini (74.3% request nyata) bukan "aman", melainkan menjawab
+        tanpa tabel ambang sama sekali. Query tajam: 0.856 / 90.5%, peringkat 1 pada 16/21.
+
+        Ketidakpastian sub-zona tetap nyata dan TIDAK dibantah angka itu — ia ditangani lewat
+        caveat (lihat test_caveat_subzona_*), bukan dengan melemahkan query.
+        """
         retriever = self._RetrieverPerekamFilter()
         poin = PoinKonteks(
             poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)", tipe_rekomendasi="numerik",
             status="MELAMPAUI_BATAS", fakta={}, dasar_hukum=[], zona="Zona Perumahan", zona_subzone=None,
         )
         ambil_chunks_pendukung(poin, retriever)
-        assert retriever.query_diterima == "kdb"
+        assert retriever.query_diterima == "ambang KDB KLB KDH maksimal minimal"
+        # Filter TETAP tingkat keluarga — membuka query tidak boleh ikut melonggarkan filter,
+        # karena itulah satu-satunya pagar yang mencegah sitasi lintas keluarga zona (APP-2026-6191).
         assert retriever.filters_diterima.zona_prefix == "R"
+        assert retriever.filters_diterima.zona is None
+
 
     def test_dampak_dgn_subzone_query_tak_berubah(self):
         # Query lebih tajam HANYA berlaku utk poin_id="intensitas" — dampak/itbx tetap pakai
@@ -1065,3 +1077,66 @@ def test_ayat_mandiri_tidak_menarik_induk():
 
     assert ambil_konteks_induk([mandiri], rt) == {}
     assert rt.dipanggil == [], "get_parent tak perlu dipanggil utk chunk yang sudah mandiri"
+
+
+class TestCaveatSubzona:
+    """Pasangan wajib dari pembukaan gating query tajam di `ambil_chunks_pendukung`."""
+
+    def _poin(self, poin_id="intensitas", subzona=None):
+        return PoinKonteks(
+            poin_id=poin_id, kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS", fakta={}, dasar_hukum=[],
+            zona="Zona Perumahan", zona_subzone=subzona,
+        )
+
+    def test_caveat_subzona_muncul_saat_subzona_kosong(self):
+        from app.reasoning.generator import caveat_subzona
+        from app.reasoning.prompts import CAVEAT_SUBZONA_TAK_TERKONFIRMASI
+
+        assert caveat_subzona(self._poin()) == [CAVEAT_SUBZONA_TAK_TERKONFIRMASI]
+
+    def test_caveat_subzona_hilang_saat_subzona_presisi_ada(self):
+        from app.reasoning.generator import caveat_subzona
+
+        assert caveat_subzona(self._poin(subzona="R-2")) == [],             "filter exact -> tabelnya memang milik sub-zona pemohon, tak ada yang perlu disangkal"
+
+    def test_caveat_subzona_absen_saat_intensitas_tidak_dinilai(self):
+        """BE tak mengirim penilaian intensitas -> adapter tetap merakit poinnya dgn status
+        "Tidak Dinilai" dan tanpa parameter apa pun. Tak ada ambang yang dikutip, jadi caveat di situ
+        memperingatkan angka yang tidak ada. Syaratnya harus sama dgn assemble._intensitas_dinilai."""
+        from app.reasoning.generator import caveat_subzona
+
+        poin = PoinKonteks(
+            poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik", status="Tidak Dinilai", fakta={"dinilai": False},
+            dasar_hukum=[], zona="Zona Perumahan", zona_subzone=None,
+        )
+
+        assert caveat_subzona(poin) == []
+
+    def test_caveat_subzona_tidak_dipasang_di_poin_lain(self):
+        from app.reasoning.generator import caveat_subzona
+
+        for pid in ("itbx", "dampak"):
+            assert caveat_subzona(self._poin(poin_id=pid)) == [],                 f"{pid} tak mengutip ambang KDB/KLB/KDH; caveat di sana cuma derau"
+
+    def test_caveat_masuk_blok_wajib_disebut_di_prompt(self):
+        from app.reasoning.generator import caveat_subzona
+        from app.reasoning.prompts import build_user_prompt
+
+        poin = self._poin()
+        prompt = build_user_prompt(poin, [], None, catatan_tambahan=caveat_subzona(poin))
+
+        assert "Catatan (WAJIB disebutkan dalam reasoning)" in prompt
+        assert "tidak dikonfirmasi oleh back-end" in prompt
+
+    def test_caveat_tambahan_tidak_menghapus_caveat_backend(self):
+        """meta.caveats dari BE dan catatan kode harus SAMA-SAMA masuk, bukan saling menimpa."""
+        from app.reasoning.prompts import build_user_prompt
+        from app.schemas import MetaL2
+
+        meta = MetaL2(caveats=["Caveat asli dari back-end."])
+        prompt = build_user_prompt(self._poin(), [], meta, catatan_tambahan=["Catatan dari kode."])
+
+        assert "Caveat asli dari back-end." in prompt
+        assert "Catatan dari kode." in prompt

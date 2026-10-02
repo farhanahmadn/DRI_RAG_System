@@ -50,7 +50,7 @@ _LOG_PRECHECK = _AKAR / "logs" / "precheck.jsonl"
 # String query PERSIS seperti yang diterbitkan app/reasoning/generator.py. Diimpor, bukan disalin,
 # supaya eval set ikut basi kalau produksi mengganti querinya (ketimbang diam-diam menguji yang lama).
 from app.reasoning.generator import (  # noqa: E402
-    _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+    _QUERY_INTENSITAS_TAJAM,
     _QUERY_FALLBACK_PER_POIN,
 )
 
@@ -141,8 +141,8 @@ def bangun(conn, wilayah: str) -> list[dict]:
                 f"Lampiran VI zona {zona} = sumber otoritatif ambang KDB/KLB/KDH sub-zona itu.", w))
             topik.append(_topik(
                 f"intensitas-ambang-{zona}", "search", "intensitas",
-                _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA, {"zona": zona}, lamp["vi"], "aturan",
-                "Query tajam yang dipakai produksi saat sub-zona presisi diketahui.", w))
+                _QUERY_INTENSITAS_TAJAM, {"zona": zona}, lamp["vi"], "aturan",
+                "Query tajam produksi, filter exact sub-zona.", w))
         if lamp["vb"]:
             topik.append(_topik(
                 f"itbx-kegiatan-{zona}", "search", "itbx",
@@ -168,7 +168,9 @@ def bangun(conn, wilayah: str) -> list[dict]:
             topik.append(_topik(
                 f"intensitas-kdb-keluarga-{k}", "search", "intensitas",
                 _QUERY_FALLBACK_PER_POIN["intensitas"], {"zona_prefix": k}, lamp["vi"], "aturan",
-                f"Sub-zona tak diketahui: seluruh Lampiran VI keluarga {k} sah.", w))
+                "Sub-zona tak diketahui, query pendek. Sejak gating query dibuka ini jadi "
+                "KONTRAFAKTUAL (produksi memakai query tajam) — dipertahankan sebagai pembanding "
+                f"& penjaga regresi. Seluruh Lampiran VI keluarga {k} sah.", w))
         if lamp["vb"]:
             topik.append(_topik(
                 f"itbx-kegiatan-keluarga-{k}", "search", "itbx",
@@ -203,8 +205,8 @@ def bangun(conn, wilayah: str) -> list[dict]:
 
     # ---- D. KONTRAFAKTUAL: filter keluarga + query TAJAM ----
     # Produksi tidak pernah menerbitkan kombinasi ini: query tajam dipakai HANYA saat sub-zona
-    # presisi diketahui (generator.py, _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA), dengan alasan
-    # eksplisit bahwa tanpa filter exact sistem bisa percaya diri menyitasi sub-zona yang salah.
+    # presisi diketahui. Gating itu kini DIBUKA di produksi justru karena hasil ablasi ini —
+    # topiknya tetap dipertahankan sebagai pembanding historis & penjaga regresi.
     # Topik ini mengisolasi efek STRING QUERY: filternya identik dengan topik "-kdb-keluarga-"
     # di bagian B, hanya teks querinya berbeda, sehingga perbandingannya berpasangan sempurna.
     # Ditaruh PALING AKHIR agar urutan topik sebelumnya tidak bergeser — checkpoint evaluasi
@@ -212,10 +214,10 @@ def bangun(conn, wilayah: str) -> list[dict]:
     for t in [x for x in topik if x["id"].startswith("intensitas-kdb-keluarga-")]:
         topik.append(_topik(
             t["id"].replace("intensitas-kdb-keluarga-", "intensitas-tajam-keluarga-"),
-            "search", "intensitas", _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+            "search", "intensitas", _QUERY_INTENSITAS_TAJAM,
             dict(t["filter"]), t["relevan"], "aturan",
-            "Kontrafaktual: filter keluarga + query tajam. Pasangan dari "
-            f'{t["id"]} — hanya string query yang berbeda.', t["bobot_traffic"]))
+            "Filter keluarga + query tajam = perilaku PRODUKSI sejak gating dibuka. "
+            f'Pasangan dari {t["id"]} — hanya string query yang berbeda.', t["bobot_traffic"]))
 
     return topik
 

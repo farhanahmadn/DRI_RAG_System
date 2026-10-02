@@ -53,7 +53,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.reasoning.generator import (  # noqa: E402
-    _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+    _QUERY_INTENSITAS_TAJAM,
     _QUERY_FALLBACK_PER_POIN,
     _pilih_chunks_referensi,
 )
@@ -572,7 +572,7 @@ def ablasi_string_query(detail: list[dict], per_query: dict[str, list[dict]],
                            "selisih_rata": u.selisih_rata, "signifikan": u.signifikan}
         hasil[kfg] = {"lengan": lengan, "uji": uji}
     return {"n_keluarga": len(keluarga), "keluarga": keluarga, "per_konfigurasi": hasil,
-            "query_tajam": _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+            "query_tajam": _QUERY_INTENSITAS_TAJAM,
             "query_kdb": _QUERY_FALLBACK_PER_POIN["intensitas"]}
 
 
@@ -891,9 +891,11 @@ def bangun_html(r: dict) -> str:
         blok_abq = f"""
   <h2>{_nomor_abq}. Ablasi string query — cabang tanpa sub-zona presisi</h2>
   <p class="cat">Saat back-end tidak mengirim sub-zona presisi, sistem hanya bisa menyaring per
-  <b>keluarga</b> zona, dan pada cabang itu ia menerbitkan query
-  <code>{_esc(abq["query_kdb"])}</code>. Tabel ini membandingkannya dengan query tajam
-  <code>{_esc(abq["query_tajam"])}</code> yang kini hanya dipakai saat sub-zona diketahui.
+  <b>keluarga</b> zona. Dulu pada cabang itu ia menerbitkan query pendek
+  <code>{_esc(abq["query_kdb"])}</code>, dengan alasan bahwa query tajam tanpa filter exact
+  berisiko mengutip tabel sub-zona yang salah. <b>Ablasi inilah yang membuka gating itu:</b>
+  produksi kini menerbitkan <code>{_esc(abq["query_tajam"])}</code> pada kedua cabang,
+  berpasangan dengan caveat sub-zona tak terkonfirmasi di narasi dan catatan global.
   <b>Filter dan label kedua lengan identik</b> — satu-satunya yang berbeda adalah teks query,
   atas {nk} keluarga zona yang sama. Keduanya dinilai di run yang sama, jadi selisihnya tidak
   bisa dijelaskan oleh perbedaan indeks atau versi kode.</p>
