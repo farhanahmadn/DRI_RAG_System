@@ -201,6 +201,22 @@ def bangun(conn, wilayah: str) -> list[dict]:
                 t["poin"] == "dampak" for t in topik) else [],
             "seeded", "Query dampak yang PERSIS diterbitkan produksi.", 0))
 
+    # ---- D. KONTRAFAKTUAL: filter keluarga + query TAJAM ----
+    # Produksi tidak pernah menerbitkan kombinasi ini: query tajam dipakai HANYA saat sub-zona
+    # presisi diketahui (generator.py, _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA), dengan alasan
+    # eksplisit bahwa tanpa filter exact sistem bisa percaya diri menyitasi sub-zona yang salah.
+    # Topik ini mengisolasi efek STRING QUERY: filternya identik dengan topik "-kdb-keluarga-"
+    # di bagian B, hanya teks querinya berbeda, sehingga perbandingannya berpasangan sempurna.
+    # Ditaruh PALING AKHIR agar urutan topik sebelumnya tidak bergeser — checkpoint evaluasi
+    # yang sudah berjalan tetap sah dan tidak perlu dibayar ulang.
+    for t in [x for x in topik if x["id"].startswith("intensitas-kdb-keluarga-")]:
+        topik.append(_topik(
+            t["id"].replace("intensitas-kdb-keluarga-", "intensitas-tajam-keluarga-"),
+            "search", "intensitas", _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+            dict(t["filter"]), t["relevan"], "aturan",
+            "Kontrafaktual: filter keluarga + query tajam. Pasangan dari "
+            f'{t["id"]} — hanya string query yang berbeda.', t["bobot_traffic"]))
+
     return topik
 
 

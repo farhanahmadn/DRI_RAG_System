@@ -220,3 +220,5 @@ __marimo__/
 logs/
 data/raw/
 CLAUDE.md
+# checkpoint mentah evaluasi RAG — hasil akhirnya (laporan_rag.json/html) yang di-commit
+eval/_checkpoint_*.json

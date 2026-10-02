@@ -52,7 +52,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.reasoning.generator import _pilih_chunks_referensi  # noqa: E402
+from app.reasoning.generator import (  # noqa: E402
+    _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+    _QUERY_FALLBACK_PER_POIN,
+    _pilih_chunks_referensi,
+)
 from app.retrieval import db, fusion, rerank  # noqa: E402
 from app.schemas import PoinKonteks  # noqa: E402
 from eval.statistik import bootstrap_ci, wilcoxon_berpasangan  # noqa: E402
@@ -73,11 +77,91 @@ _K_OPERASI = 3
 # Metrik yang dipakai untuk klaim & uji signifikansi. Sengaja dibatasi: menguji SEMUA metrik x SEMUA
 # pasangan konfigurasi menaikkan peluang temuan palsu tanpa menambah informasi.
 _METRIK_KLAIM = (f"ndcg@{_K_OPERASI}", f"recall@{_K_OPERASI}", f"hit@{_K_OPERASI}", "mrr", "map")
+# MRR dan MAP adalah nama AGREGAT: per-query yang ada hanyalah reciprocal rank (`rr`) dan average
+# precision (`ap`) — rata-ratanyalah yang disebut MRR/MAP. Statistik bekerja atas skor per-topik,
+# jadi namanya harus diterjemahkan dulu; menyamakannya begitu saja menghasilkan KeyError.
+_KUNCI_PER_QUERY = {"mrr": "rr", "map": "ap"}
+
+
+def _nilai_klaim(per_query_satu: dict, metrik: str) -> float:
+    """Ambil skor satu topik untuk metrik klaim, menerjemahkan nama agregat ke kunci per-query."""
+    return per_query_satu[_KUNCI_PER_QUERY.get(metrik, metrik)]
 
 
 # ---------------------------------------------------------------------------
 # Metrik — relevansi biner, sesuai bentuk ground truth (`relevan`: daftar id chunk)
 # ---------------------------------------------------------------------------
+# Backoff antar-percobaan SATU topik. Retry di dalam _provider_http hanya menutup gangguan
+# beberapa detik; yang membunuh run adalah gangguan jaringan semenit-dua.
+_JEDA_PULIH_S = (30.0, 60.0, 120.0)
+
+
+def _coba_ulang(fn, nama: str):
+    """Jalankan `fn`, ulangi dgn backoff bila provider/jaringan gagal.
+
+    Alasannya empiris, bukan defensif-berjaga-jaga: run 140 topik mati di topik ke-80 karena satu
+    kegagalan DNS sesaat (`getaddrinfo failed`) — ~25 menit panggilan API berbayar hangus karena
+    gangguan beberapa detik.
+    """
+    for percobaan, jeda in enumerate((*_JEDA_PULIH_S, None), 1):
+        try:
+            return fn()
+        except Exception as exc:
+            if jeda is None:
+                raise
+            print(f"    ! {nama}: percobaan {percobaan} gagal ({type(exc).__name__}: {exc}); "
+                  f"ulangi dalam {jeda:.0f}s", flush=True)
+            time.sleep(jeda)
+
+
+def _muat_checkpoint(nama: str, konfigurasi: list[str], id_topik: list[str]) -> dict | None:
+    """Muat checkpoint hanya bila ia benar-benar milik run yang sama.
+
+    Syaratnya ketat dengan sengaja: konfigurasi identik dan id topik yang sudah selesai harus
+    sama persis dengan awalan eval set sekarang. Checkpoint dari eval set lain yang dipaksa
+    masuk akan menghasilkan tabel yang campur aduk tanpa jejak apa pun — lebih baik menolak dan
+    mulai dari awal daripada melaporkan angka yang tidak bisa ditelusuri.
+    """
+    berkas = Path(__file__).parent / nama
+    if not berkas.exists():
+        print(f"[eval] --lanjutkan diminta tapi {nama} tidak ada; mulai dari awal")
+        return None
+    try:
+        cp = json.loads(berkas.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"[eval] checkpoint tak terbaca ({exc}); mulai dari awal")
+        return None
+
+    selesai = [d["query"] for d in cp.get("detail_per_query", [])]
+    if cp.get("konfigurasi") != konfigurasi:
+        print("[eval] konfigurasi checkpoint beda; mulai dari awal")
+        return None
+    if id_topik[:len(selesai)] != selesai:
+        print("[eval] urutan topik checkpoint tak cocok dgn eval set; mulai dari awal")
+        return None
+    if not all(len(cp.get("latensi", {}).get(k, [])) == len(selesai) for k in konfigurasi):
+        print("[eval] latensi checkpoint tak sejajar dgn skor; mulai dari awal")
+        return None
+    print(f"[eval] lanjut dari checkpoint: {len(selesai)} topik sudah dinilai, dilewati")
+    return cp
+
+
+def _simpan_checkpoint(nama: str, muatan: dict) -> None:
+    """Tulis skor mentah per-topik SEBELUM tahap statistik/HTML.
+
+    Tahap retrieval membakar kuota API nyata — ~200 topik x 5 konfigurasi berjalan puluhan menit.
+    Pernah terjadi: tahap statistik gagal setelah seluruh pemanggilan API selesai, dan semua skor
+    hangus. Checkpoint ini memuat cukup data untuk menghitung ulang seluruh statistik tanpa
+    menyentuh DB/API lagi. Kegagalan menulisnya sendiri tidak boleh menggagalkan evaluasi.
+    """
+    try:
+        berkas = Path(__file__).parent / nama
+        berkas.write_text(json.dumps(muatan, ensure_ascii=False), encoding="utf-8")
+        print(f"[eval] checkpoint skor mentah -> {berkas.name}")
+    except Exception as exc:
+        print(f"[eval] checkpoint gagal (dilanjutkan): {exc}")
+
+
 def _metrik_satu_query(urutan: list[str], relevan: set[str]) -> dict:
     """Hitung seluruh metrik untuk SATU query dari daftar id terurut (peringkat 1 = indeks 0)."""
     hasil: dict = {}
@@ -128,9 +212,23 @@ def _agregat(per_query: list[dict]) -> dict:
 # ---------------------------------------------------------------------------
 # Konfigurasi retrieval yang diuji (ablasi lapis demi lapis)
 # ---------------------------------------------------------------------------
+# Memo embedding per teks query. Eval set 161 topik hanya memakai 9 string query unik — yang
+# bervariasi di produksi adalah FILTER zona, bukan teks querinya. Tanpa memo, harness membayar
+# 161 panggilan embedding untuk 9 teks: 94% terbuang, dan itulah yang menghabiskan saldo provider
+# di tengah run sebelumnya. Aman karena embedding adalah fungsi dari teksnya saja; filter bekerja
+# di sisi SQL, sesudah vektornya ada.
+_memo_embedding: dict[str, list[float]] = {}
+
+
+def _embedding_query(teks: str) -> list[float]:
+    if teks not in _memo_embedding:
+        _memo_embedding[teks] = encode_dense_one(teks)
+    return _memo_embedding[teks]
+
+
 def _urutan_dense(conn, query: str, filters: RetrievalFilters) -> list[str]:
     """Hanya pencarian vektor. Query DIPERLUAS — persis seperti jalur produksi."""
-    qvec = encode_dense_one(_expand(query))
+    qvec = _embedding_query(_expand(query))
     provider = os.getenv("EMBEDDING_PROVIDER", "local").strip().lower()
     if provider == "local":
         hasil = db.dense_search(conn, qvec, filters, _KANDIDAT)
@@ -175,7 +273,7 @@ def _muat_topik(path: Path) -> list[dict]:
 
 
 def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
-                      eval_set: Path | None = None) -> dict:
+                      eval_set: Path | None = None, lanjutkan: bool = False) -> dict:
     import psycopg
 
     berkas_eval = eval_set or _EVAL_SET
@@ -190,33 +288,58 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
     latensi: dict[str, list[float]] = {k: [] for k in konfigurasi}
     detail: list[dict] = []
 
+    dilewati = 0
+    if lanjutkan:
+        cp = _muat_checkpoint("_checkpoint_search.json", konfigurasi, [x["id"] for x in baris])
+        if cp:
+            per_query = {k: list(cp["per_query"][k]) for k in konfigurasi}
+            latensi = {k: list(cp["latensi"][k]) for k in konfigurasi}
+            detail = list(cp["detail_per_query"])
+            dilewati = len(detail)
+
     for i, row in enumerate(baris, 1):
+        if i <= dilewati:
+            continue
         query, relevan = row["query"], set(row["relevan"])
         # Filter per-topik: inilah sumbu yang benar-benar bervariasi di produksi (zona/sub-zona),
         # bukan teks querinya. Wilayah selalu disematkan, persis seperti _apply_default_wilayah.
         filters = RetrievalFilters(dokumen=wilayah, **(row.get("filter") or {}))
-        urutan: dict[str, list[str]] = {}
 
-        t0 = time.perf_counter()
-        urutan["dense"] = _urutan_dense(conn, query, filters)
-        latensi["dense"].append(time.perf_counter() - t0)
+        def _seluruh_jalur(query=query, filters=filters):
+            """Semua jalur utk SATU topik, sebagai satuan yang bisa diulang utuh.
 
-        t0 = time.perf_counter()
-        urutan["lexical"] = _urutan_lexical(conn, query, filters)
-        latensi["lexical"].append(time.perf_counter() - t0)
-
-        t0 = time.perf_counter()
-        urutan["rrf"] = _urutan_rrf(urutan["dense"], urutan["lexical"])
-        latensi["rrf"].append(time.perf_counter() - t0)
-
-        if pakai_rerank:
-            t0 = time.perf_counter()
-            urutan["dense+rerank"] = _urutan_rerank(conn, query, urutan["dense"])
-            latensi["dense+rerank"].append(time.perf_counter() - t0)
+            Latensi dikumpulkan lokal dan baru disalin setelah seluruh jalur berhasil: kalau topik
+            diulang, waktu percobaan yang gagal tidak boleh masuk rata-rata, dan panjang daftar
+            latensi harus tetap sejajar dgn daftar skor.
+            """
+            u: dict[str, list[str]] = {}
+            lat: dict[str, float] = {}
 
             t0 = time.perf_counter()
-            urutan["rrf+rerank"] = _urutan_rerank(conn, query, urutan["rrf"])
-            latensi["rrf+rerank"].append(time.perf_counter() - t0)
+            u["dense"] = _urutan_dense(conn, query, filters)
+            lat["dense"] = time.perf_counter() - t0
+
+            t0 = time.perf_counter()
+            u["lexical"] = _urutan_lexical(conn, query, filters)
+            lat["lexical"] = time.perf_counter() - t0
+
+            t0 = time.perf_counter()
+            u["rrf"] = _urutan_rrf(u["dense"], u["lexical"])
+            lat["rrf"] = time.perf_counter() - t0
+
+            if pakai_rerank:
+                t0 = time.perf_counter()
+                u["dense+rerank"] = _urutan_rerank(conn, query, u["dense"])
+                lat["dense+rerank"] = time.perf_counter() - t0
+
+                t0 = time.perf_counter()
+                u["rrf+rerank"] = _urutan_rerank(conn, query, u["rrf"])
+                lat["rrf+rerank"] = time.perf_counter() - t0
+            return u, lat
+
+        urutan, lat_topik = _coba_ulang(_seluruh_jalur, row["id"])
+        for kfg, nilai in lat_topik.items():
+            latensi[kfg].append(nilai)
 
         baris_detail = {"query": row["id"], "n_relevan": len(relevan),
                         "sumber_label": row["sumber_label"]}
@@ -227,8 +350,21 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
         detail.append(baris_detail)
         print(f"  [{i}/{len(baris)}] {row['id'][:46]:48s} " +
               "  ".join(f"{k}={baris_detail[k] or '-'}" for k in konfigurasi), flush=True)
+        # Berkala, bukan hanya di akhir: gangguan jaringan yang lebih panjang daripada backoff
+        # masih bisa membunuh run, dan skor yang sudah dibayar tidak boleh ikut mati.
+        if i % 20 == 0:
+            _simpan_checkpoint("_checkpoint_search.json",
+                               {"tahap": "search", "wilayah": wilayah, "konfigurasi": konfigurasi,
+                                "per_query": per_query, "latensi": latensi,
+                                "detail_per_query": detail})
         if jeda_s and i < len(baris):
             time.sleep(jeda_s)
+
+    _simpan_checkpoint("_checkpoint_search.json",
+                       {"tahap": "search", "wilayah": wilayah, "konfigurasi": konfigurasi,
+                        "per_query": per_query, "latensi": latensi,
+                        "detail_per_query": detail})
+    print(f"[eval] embedding: {len(_memo_embedding)} teks query unik utk {len(baris)} topik")
 
     produksi = "rrf+rerank" if "rrf+rerank" in konfigurasi else konfigurasi[-1]
 
@@ -273,12 +409,13 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
         "detail_per_query": detail,
         # Skor mentah per-topik utk metrik klaim — supaya pihak lain bisa menghitung ulang CI/uji
         # sendiri tanpa menjalankan ulang retrieval (dan memverifikasi statistik kita).
-        "skor_per_query": {k: [{m: q[m] for m in _METRIK_KLAIM} for q in per_query[k]]
+        "skor_per_query": {k: [{m: _nilai_klaim(q, m) for m in _METRIK_KLAIM} for q in per_query[k]]
                            for k in konfigurasi},
         "metadata": _metadata_reproduksi(),
         "berkas_eval": berkas_eval.name,
         "sumber_label": dict(Counter(x["sumber_label"] for x in semua_topik)),
         "anchor": hasil_anchor,
+        "ablasi_query": ablasi_string_query(detail, per_query, konfigurasi),
         "generasi": _ringkas_diagnostik_log(),
     }
 
@@ -336,6 +473,10 @@ def evaluasi_anchor(rt, topik: list[dict]) -> dict:
             baris[kfg] = m["peringkat_pertama"]
         detail.append(baris)
 
+    _simpan_checkpoint("_checkpoint_anchor.json",
+                       {"tahap": "anchor", "konfigurasi": list(_KFG_ANCHOR),
+                        "per_query": per_query, "detail_per_query": detail})
+
     return {
         "konfigurasi": list(_KFG_ANCHOR),
         "produksi": "anchor-sadar-zona",
@@ -344,7 +485,7 @@ def evaluasi_anchor(rt, topik: list[dict]) -> dict:
         "statistik": _statistik(per_query, list(_KFG_ANCHOR), "anchor-sadar-zona"),
         "latensi_ms": {k: statistics.fmean(latensi[k]) * 1000 for k in _KFG_ANCHOR},
         "detail_per_query": detail,
-        "skor_per_query": {k: [{m: q[m] for m in _METRIK_KLAIM} for q in per_query[k]]
+        "skor_per_query": {k: [{m: _nilai_klaim(q, m) for m in _METRIK_KLAIM} for q in per_query[k]]
                            for k in _KFG_ANCHOR},
     }
 
@@ -370,7 +511,7 @@ def _statistik(per_query: dict[str, list[dict]], konfigurasi: list[str], produks
     for kfg in konfigurasi:
         ci[kfg] = {}
         for metrik in _METRIK_KLAIM:
-            s = bootstrap_ci([q[metrik] for q in per_query[kfg]])
+            s = bootstrap_ci([_nilai_klaim(q, metrik) for q in per_query[kfg]])
             ci[kfg][metrik] = {"rata": s.rata, "bawah": s.bawah, "atas": s.atas, "n": s.n}
 
     uji: dict[str, dict[str, dict]] = {}
@@ -379,11 +520,60 @@ def _statistik(per_query: dict[str, list[dict]], konfigurasi: list[str], produks
             continue
         uji[kfg] = {}
         for metrik in _METRIK_KLAIM:
-            u = wilcoxon_berpasangan([q[metrik] for q in per_query[kfg]],
-                                     [q[metrik] for q in per_query[produksi]])
+            u = wilcoxon_berpasangan([_nilai_klaim(q, metrik) for q in per_query[kfg]],
+                                     [_nilai_klaim(q, metrik) for q in per_query[produksi]])
             uji[kfg][metrik] = {"p": u.p, "n_beda": u.n_beda, "efek": u.efek,
                                 "selisih_rata": u.selisih_rata, "signifikan": u.signifikan}
     return {"ci": ci, "uji_vs_produksi": uji, "pembanding": produksi}
+
+
+_PRA_TAJAM = "intensitas-tajam-keluarga-"
+_PRA_KDB = "intensitas-kdb-keluarga-"
+
+
+def ablasi_string_query(detail: list[dict], per_query: dict[str, list[dict]],
+                        konfigurasi: list[str]) -> dict | None:
+    """Ablasi STRING QUERY pada cabang tanpa sub-zona presisi (mayoritas traffic).
+
+    Dihitung sebagai TURUNAN dari skor per-topik yang sudah dinilai di run yang sama — bukan
+    retrieval ulang — sehingga tidak ada panggilan API tambahan dan tidak ada celah di mana kedua
+    lengan bisa dinilai dengan indeks atau versi kode yang berbeda.
+
+    Pasangannya sempurna: `intensitas-tajam-keluarga-<K>` dan `intensitas-kdb-keluarga-<K>`
+    memakai filter yang IDENTIK dan label yang IDENTIK; satu-satunya yang berbeda adalah teks
+    query. Karena itu selisihnya tidak bisa dijelaskan oleh apa pun selain string query.
+    """
+    tajam = {d["query"][len(_PRA_TAJAM):]: i for i, d in enumerate(detail)
+             if d["query"].startswith(_PRA_TAJAM)}
+    kdb = {d["query"][len(_PRA_KDB):]: i for i, d in enumerate(detail)
+           if d["query"].startswith(_PRA_KDB)}
+    keluarga = sorted(set(tajam) & set(kdb))
+    if not keluarga:
+        return None       # eval set tanpa topik kontrafaktual — jangan karang bagiannya
+
+    hasil: dict[str, dict] = {}
+    for kfg in konfigurasi:
+        lengan: dict[str, dict] = {}
+        for nama, peta in (("tajam", tajam), ("kdb", kdb)):
+            lengan[nama] = {}
+            for metrik in _METRIK_KLAIM:
+                c = bootstrap_ci([_nilai_klaim(per_query[kfg][peta[k]], metrik)
+                                  for k in keluarga])
+                lengan[nama][metrik] = {"rata": c.rata, "bawah": c.bawah, "atas": c.atas,
+                                        "n": c.n}
+            lengan[nama]["peringkat1"] = sum(
+                1 for k in keluarga if detail[peta[k]].get(kfg) == 1)
+        uji: dict[str, dict] = {}
+        for metrik in _METRIK_KLAIM:
+            u = wilcoxon_berpasangan(
+                [_nilai_klaim(per_query[kfg][tajam[k]], metrik) for k in keluarga],
+                [_nilai_klaim(per_query[kfg][kdb[k]], metrik) for k in keluarga])
+            uji[metrik] = {"p": u.p, "n_beda": u.n_beda, "efek": u.efek,
+                           "selisih_rata": u.selisih_rata, "signifikan": u.signifikan}
+        hasil[kfg] = {"lengan": lengan, "uji": uji}
+    return {"n_keluarga": len(keluarga), "keluarga": keluarga, "per_konfigurasi": hasil,
+            "query_tajam": _QUERY_FALLBACK_INTENSITAS_DGN_SUBZONA,
+            "query_kdb": _QUERY_FALLBACK_PER_POIN["intensitas"]}
 
 
 def _metadata_reproduksi() -> dict:
@@ -635,6 +825,95 @@ def bangun_html(r: dict) -> str:
             f'<td>{_fmt_ci(c["mrr"])}</td>'
             f'<td>{_fmt_uji(uji_all.get(k, {}).get(f"ndcg@{_K_OPERASI}"))}</td></tr>')
 
+    # Bagian 1-4 selalu ada; sisanya bergantung isi hasil. Nomornya diturunkan dari data,
+    # bukan ditanam, supaya laporan dari eval set tanpa jalur rujukan tidak melompati nomor.
+    _ada_anchor = bool((r.get("anchor") or {}).get("n_query"))
+    _ada_abq = bool((r.get("ablasi_query") or {}).get("n_keluarga"))
+    _ada_gen = bool((r.get("generasi") or {}).get("n_poin"))
+    _nomor_anchor = 5
+    _nomor_abq = _nomor_anchor + (1 if _ada_anchor else 0)
+    _nomor_gen = _nomor_abq + (1 if _ada_abq else 0)
+    _nomor_batas = _nomor_gen + (1 if _ada_gen else 0)
+
+    # --- Ablasi jalur rujukan (anchor) ---------------------------------------------------
+    anc = r.get("anchor") or {}
+    blok_anchor = ""
+    if anc.get("n_query"):
+        baris_anc = ""
+        for k in anc["konfigurasi"]:
+            a, c = anc["agregat"][k], anc["statistik"]["ci"][k]
+            sorot = ' class="sorot"' if k == anc["produksi"] else ""
+            uji = anc["statistik"]["uji_vs_produksi"].get(k, {}).get(f"ndcg@{_K_OPERASI}")
+            baris_anc += (
+                f'<tr{sorot}><td><b>{_esc(_LABEL_ANCHOR.get(k, k))}</b></td>'
+                f'<td>{_fmt_ci(c[f"ndcg@{_K_OPERASI}"])}</td>'
+                f'<td>{_fmt_ci(c[f"recall@{_K_OPERASI}"], persen=True)}</td>'
+                f'<td>{a[f"hit@{_K_OPERASI}"]:.0%}</td><td>{a["mrr"]:.3f}</td>'
+                f'<td>{a["query_tanpa_hasil_relevan"]}/{anc["n_query"]}</td>'
+                f'<td>{_fmt_uji(uji)}</td></tr>')
+        blok_anchor = f"""
+  <h2>{_nomor_anchor}. Ablasi jalur rujukan — pemilihan sitasi sadar-zona</h2>
+  <p class="cat">Jalur <code>get_by_reference</code> menangani <b>seluruh poin ITBX di
+  produksi</b> (setiap payload back-end membawa <code>dasar_hukum</code>), jadi inilah jalur yang
+  paling sering dipakai sistem — dan jalur yang sebelumnya tidak pernah dievaluasi. Kedua
+  konfigurasi dinilai atas <b>{anc["n_query"]} topik yang sama</b>: memotong daftar kandidat
+  menurut urutan yang dikembalikan DB, versus memilih menurut kecocokan zona pemohon.</p>
+  <table>
+    <thead><tr><th>Konfigurasi</th><th>nDCG@{_K_OPERASI}</th><th>Recall@{_K_OPERASI}</th>
+      <th>Hit@{_K_OPERASI}</th><th>MRR</th><th>Topik tanpa hasil relevan</th>
+      <th>vs produksi (nDCG@{_K_OPERASI})</th></tr></thead>
+    <tbody>{baris_anc}</tbody>
+  </table>
+  <p class="cat">Latensi jalur ini <b>{anc["latensi_ms"][anc["produksi"]]:,.0f} ms</b> — murni SQL,
+  tanpa panggilan embedding maupun rerank.</p>"""
+
+    # --- Ablasi string query -------------------------------------------------------------
+    abq = r.get("ablasi_query") or {}
+    blok_abq = ""
+    if abq.get("n_keluarga"):
+        nk = abq["n_keluarga"]
+        baris_abq = ""
+        for k in kfg:
+            d = abq["per_konfigurasi"].get(k)
+            if not d:
+                continue
+            sorot = ' class="sorot"' if k == produksi else ""
+            t, b = d["lengan"]["tajam"], d["lengan"]["kdb"]
+            u = d["uji"][f"ndcg@{_K_OPERASI}"]
+            baris_abq += (
+                f'<tr{sorot}><td><b>{_esc(_LABEL.get(k, k))}</b></td>'
+                f'<td>{_fmt_ci(t[f"ndcg@{_K_OPERASI}"])}</td>'
+                f'<td>{_fmt_ci(b[f"ndcg@{_K_OPERASI}"])}</td>'
+                f'<td>{t[f"recall@{_K_OPERASI}"]["rata"]:.0%} &rarr; '
+                f'{b[f"recall@{_K_OPERASI}"]["rata"]:.0%}</td>'
+                f'<td>{t["peringkat1"]}/{nk} vs {b["peringkat1"]}/{nk}</td>'
+                f'<td>{_fmt_uji(u)}</td></tr>')
+        blok_abq = f"""
+  <h2>{_nomor_abq}. Ablasi string query — cabang tanpa sub-zona presisi</h2>
+  <p class="cat">Saat back-end tidak mengirim sub-zona presisi, sistem hanya bisa menyaring per
+  <b>keluarga</b> zona, dan pada cabang itu ia menerbitkan query
+  <code>{_esc(abq["query_kdb"])}</code>. Tabel ini membandingkannya dengan query tajam
+  <code>{_esc(abq["query_tajam"])}</code> yang kini hanya dipakai saat sub-zona diketahui.
+  <b>Filter dan label kedua lengan identik</b> — satu-satunya yang berbeda adalah teks query,
+  atas {nk} keluarga zona yang sama. Keduanya dinilai di run yang sama, jadi selisihnya tidak
+  bisa dijelaskan oleh perbedaan indeks atau versi kode.</p>
+  <table>
+    <thead><tr><th>Konfigurasi</th><th>nDCG@{_K_OPERASI} (tajam)</th>
+      <th>nDCG@{_K_OPERASI} (&ldquo;{_esc(abq["query_kdb"])}&rdquo;)</th>
+      <th>Recall@{_K_OPERASI} tajam &rarr; pendek</th>
+      <th>Peringkat 1 (tajam vs pendek)</th>
+      <th>Uji berpasangan</th></tr></thead>
+    <tbody>{baris_abq}</tbody>
+  </table>
+  <div class="peringatan">
+  <b>Batas pembacaan yang tidak boleh dilewat.</b> Dengan filter keluarga, tiga chunk teratas
+  bisa berisi tabel <b>sub-zona berbeda dengan ambang KDB yang berbeda</b>. Label di sini
+  menganggap seluruh tabel satu keluarga sah — karena itu memang batas informasi yang tersedia
+  sistem — sehingga ablasi ini <b>tidak bisa memutuskan</b> apakah narasi lalu menyajikan angka
+  sub-zona yang salah sebagai milik pemohon. Risiko itu ada di lapis generasi, bukan retrieval,
+  dan harus ditangani di sana (mis. narasi menyatakan sub-zona belum terkonfirmasi).
+  </div>"""
+
     gen = r.get("generasi") or {}
     blok_gen = ""
     if gen.get("n_poin"):
@@ -644,7 +923,7 @@ def bangun_html(r: dict) -> str:
                       if gen.get("sitasi") else "tidak ada sitasi tercatat")
         n_gagal = gen["sebab"].get("panggilan_llm_gagal", 0)
         blok_gen = f"""
-  <h2>5. Sisi generasi — data operasional historis</h2>
+  <h2>{_nomor_gen}. Sisi generasi — data operasional historis</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Baca dengan hati-hati — ini BUKAN tingkat kegagalan produksi.</b> Rekap ini diambil dari kunci
   <code>diagnostik</code> yang sudah terkumpul di <code>logs/precheck.jsonl</code>
@@ -765,9 +1044,11 @@ def bangun_html(r: dict) -> str:
   <div class="kartu">{_bar_horizontal("Latensi rata-rata per query",
       [_LABEL.get(k, k) for k in kfg], [r["latensi_ms"][k] for k in kfg],
       [_WARNA.get(k, "#64748b") for k in kfg], " ms")}</div>
+{blok_anchor}
+{blok_abq}
 {blok_gen}
 
-  <h2>{'6' if blok_gen else '5'}. Batas pembacaan</h2>
+  <h2>{_nomor_batas}. Batas pembacaan</h2>
   <div class="peringatan">
   <ul>
     <li><b>Ground truth diseed developer, belum divalidasi ahli tata ruang.</b> Angka di sini
@@ -803,6 +1084,9 @@ def main() -> None:
     ap.add_argument("--eval-set", type=Path, default=None,
                     help="eval set yang dipakai (default tests/eval_set.jsonl; "
                          "pakai tests/eval_set_operasi.jsonl utk titik operasi produksi)")
+    ap.add_argument("--lanjutkan", action="store_true",
+                    help="lanjutkan run yang tumbang dari eval/_checkpoint_search.json, "
+                         "tanpa membayar ulang panggilan API topik yang sudah dinilai")
     ap.add_argument("--dari-json", type=Path, default=None,
                     help="bangun ulang HTML dari hasil JSON yang sudah ada, TANPA memanggil "
                          "DB/API lagi — untuk mengubah tampilan laporan tanpa membakar kuota")
@@ -812,9 +1096,9 @@ def main() -> None:
         print(f"[eval] bangun ulang dari {args.dari_json.name} (tanpa panggilan DB/API)")
         hasil = json.loads(args.dari_json.read_text(encoding="utf-8"))
     else:
-        print(f"[eval] {_EVAL_SET.name} -> {args.out.name}")
+        print(f"[eval] {(args.eval_set or _EVAL_SET).name} -> {args.out.name}")
         hasil = jalankan_evaluasi(pakai_rerank=not args.tanpa_rerank, jeda_s=args.jeda,
-                                  eval_set=args.eval_set)
+                                  eval_set=args.eval_set, lanjutkan=args.lanjutkan)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(bangun_html(hasil), encoding="utf-8")

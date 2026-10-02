@@ -104,3 +104,39 @@ class TestWilcoxonBerpasangan:
             assert "panjang" in str(exc)
         else:
             raise AssertionError("harus menolak pasangan yang panjangnya beda")
+
+
+class TestStatistikAtasMetrikNyata:
+    """Jembatan yang sebelumnya tidak diuji.
+
+    `TestBootstrapCI`/`TestWilcoxonBerpasangan` di atas menguji eval/statistik.py atas list angka
+    sintetis — dan tetap hijau meski pemanggilnya salah mengambil kunci. Akibatnya nyata: evaluasi
+    192 topik selesai memanggil seluruh API lalu mati dengan `KeyError: 'mrr'`, karena per-topik yang
+    ada hanyalah `rr`/`ap`. Tes ini memakai dict yang benar-benar dihasilkan `_metrik_satu_query`.
+    """
+
+    def test_statistik_jalan_atas_keluaran_metrik_satu_query(self):
+        from eval.eval_rag import _METRIK_KLAIM, _metrik_satu_query, _statistik
+
+        relevan = {"chunk-a"}
+        bagus = [_metrik_satu_query(["chunk-a", "chunk-x", "chunk-y"], relevan) for _ in range(6)]
+        jelek = [_metrik_satu_query(["chunk-x", "chunk-y", "chunk-a"], relevan) for _ in range(6)]
+
+        hasil = _statistik({"bagus": bagus, "jelek": jelek}, ["bagus", "jelek"], "bagus")
+
+        for metrik in _METRIK_KLAIM:
+            assert metrik in hasil["ci"]["bagus"], f"{metrik} harus punya CI"
+            assert hasil["ci"]["bagus"][metrik]["n"] == 6
+        assert hasil["ci"]["bagus"]["mrr"]["rata"] == 1.0, "relevan di peringkat 1 -> RR=1"
+        assert hasil["ci"]["jelek"]["mrr"]["rata"] == pytest.approx(1 / 3)
+        assert hasil["uji_vs_produksi"]["jelek"]["mrr"]["selisih_rata"] < 0
+
+    def test_skor_klaim_memakai_kunci_per_query_yang_benar(self):
+        from eval.eval_rag import _METRIK_KLAIM, _metrik_satu_query, _nilai_klaim
+
+        q = _metrik_satu_query(["chunk-x", "chunk-a"], {"chunk-a"})
+
+        assert _nilai_klaim(q, "mrr") == q["rr"] == 0.5
+        assert _nilai_klaim(q, "map") == q["ap"]
+        for metrik in _METRIK_KLAIM:
+            assert isinstance(_nilai_klaim(q, metrik), float)
