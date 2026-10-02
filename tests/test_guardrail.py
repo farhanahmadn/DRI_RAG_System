@@ -15,7 +15,6 @@ from app.reasoning.guardrail import (
     _cek_tanda_baca_dilarang,
     _dekat_dgn_pembulatan,
     _gabung_kalimat,
-    _kalimat_tingkat_kepercayaan,
     _paksa_field_wajib,
     caveat_fallback_itbx,
     generate_poin_dengan_guardrail,
@@ -690,7 +689,11 @@ class TestPaksaFieldWajib:
             assert "diloloskan" not in caveat.lower()
             assert "perlu verifikasi manual" in caveat.lower()
 
-    def test_meta_caveat_dan_data_confidence_disuntik(self):
+    def test_meta_caveat_disuntik_tanpa_label_kepercayaan(self):
+        # Item permintaan user (2026-10-02): kalimat "Tingkat kepercayaan data: ..." SENGAJA
+        # DIHAPUS dari output — label generik begini bikin sistem terkesan ragu pada datanya
+        # sendiri di mata reviewer, padahal tak pernah mengubah apa pun secara struktural.
+        # meta.caveats (free-text spesifik dari BE) TETAP tampil — itu catatan substantif.
         assessment = _muat_assessment("l2_sample_lolos.json")
         assessment = assessment.model_copy(
             update={"meta": MetaL2(data_confidence_keseluruhan="Medium", caveats=["Data ITBX sebagian estimasi"])}
@@ -699,21 +702,10 @@ class TestPaksaFieldWajib:
         output = _poin_output()
         hasil = _paksa_field_wajib(output, poin, assessment)
 
-        assert "Tingkat kepercayaan data: sedang." in hasil.rekomendasi.disclaimer
         assert "Data ITBX sebagian estimasi" in hasil.rekomendasi.disclaimer
         assert "DATA_CONFIDENCE" not in hasil.rekomendasi.disclaimer
+        assert "Tingkat kepercayaan" not in hasil.rekomendasi.disclaimer
         assert "Medium" not in hasil.rekomendasi.disclaimer
-
-    def test_meta_data_confidence_bahasa_indonesia_tetap_disuntik(self):
-        # APP-2026-INNER-01 (2026-09-26): data_confidence_keseluruhan dari fixture nyata dlm
-        # Bahasa Indonesia ("Tinggi") — integrasi penuh via _paksa_field_wajib, bukan cuma unit
-        # test _kalimat_tingkat_kepercayaan di TestKalimatTingkatKepercayaan.
-        assessment = _muat_assessment("l2_sample_amplop_inner01.json")
-        poin = _poin()
-        output = _poin_output()
-        hasil = _paksa_field_wajib(output, poin, assessment)
-
-        assert "Tingkat kepercayaan data: tinggi." in hasil.rekomendasi.disclaimer
 
     def test_luas_usulan_melebihi_persil_true_tambah_peringatan_disclaimer(self):
         # APP-2026-2428, Cek #3b: peringatan WAJIB dirakit deterministik di guardrail, jaring
@@ -761,20 +753,9 @@ class TestPaksaFieldWajib:
         hasil = _paksa_field_wajib(output, poin, self._assessment_tanpa_meta())
         assert hasil.rekomendasi.disclaimer is None
 
-    def test_data_confidence_konsisten_utk_ketiga_poin(self):
-        assessment = _muat_assessment("l2_sample_lolos.json")
-        assessment = assessment.model_copy(update={"meta": MetaL2(data_confidence_keseluruhan="High")})
-
-        for poin_id in ("itbx", "intensitas", "dampak"):
-            poin = _poin(poin_id=poin_id, kategori="x")
-            output = _poin_output(poin_id=poin_id, kategori="x")
-            hasil = _paksa_field_wajib(output, poin, assessment)
-            assert "Tingkat kepercayaan data: tinggi." in hasil.rekomendasi.disclaimer
-            assert "DATA_CONFIDENCE" not in hasil.rekomendasi.disclaimer
-
     def test_poin_low_confidence_tetap_sertakan_catatan_peninjauan_manual(self):
-        # Fix #4: kalimat kepercayaan (baru) HARUS berdampingan dengan catatan peninjauan manual
-        # yang sudah ada dari template_low_confidence — bukan menimpanya.
+        # Catatan peninjauan manual dari template_low_confidence TETAP utuh, tidak ditimpa apa pun
+        # — kalimat kepercayaan data (lama) sudah dihapus total, tes ini disempitkan maknanya.
         assessment = _muat_assessment("l2_sample_lolos.json")
         assessment = assessment.model_copy(update={"meta": MetaL2(data_confidence_keseluruhan="Low")})
         poin = _poin()
@@ -789,38 +770,10 @@ class TestPaksaFieldWajib:
         hasil = _paksa_field_wajib(output, poin, assessment)
 
         assert "Perlu verifikasi manual" in hasil.rekomendasi.disclaimer
-        assert "Tingkat kepercayaan data: rendah." in hasil.rekomendasi.disclaimer
+        assert "Tingkat kepercayaan" not in hasil.rekomendasi.disclaimer
 
 
-class TestKalimatTingkatKepercayaan:
-    def test_high_jadi_tinggi(self):
-        assert _kalimat_tingkat_kepercayaan("High") == "Tingkat kepercayaan data: tinggi."
-
-    def test_medium_jadi_sedang(self):
-        assert _kalimat_tingkat_kepercayaan("Medium") == "Tingkat kepercayaan data: sedang."
-
-    def test_low_jadi_rendah(self):
-        assert _kalimat_tingkat_kepercayaan("Low") == "Tingkat kepercayaan data: rendah."
-
-    def test_case_insensitive(self):
-        assert _kalimat_tingkat_kepercayaan("high") == "Tingkat kepercayaan data: tinggi."
-        assert _kalimat_tingkat_kepercayaan("MEDIUM") == "Tingkat kepercayaan data: sedang."
-
-    def test_none_tidak_tampilkan_label(self):
-        assert _kalimat_tingkat_kepercayaan(None) is None
-
-    def test_nilai_tak_dikenal_tidak_tampilkan_label(self):
-        assert _kalimat_tingkat_kepercayaan("Sangat Tinggi Sekali") is None
-
-    def test_bahasa_indonesia_dari_be_juga_dikenali(self):
-        # APP-2026-INNER-01 (2026-09-26): BE kini (kadang) kirim data_confidence_keseluruhan dlm
-        # Bahasa Indonesia ("Tinggi") alih-alih Inggris ("High") — ditemukan live: SEBELUM
-        # diperbaiki, label kepercayaan senyap tak muncul sama sekali (bukan error).
-        assert _kalimat_tingkat_kepercayaan("Tinggi") == "Tingkat kepercayaan data: tinggi."
-        assert _kalimat_tingkat_kepercayaan("Sedang") == "Tingkat kepercayaan data: sedang."
-        assert _kalimat_tingkat_kepercayaan("Rendah") == "Tingkat kepercayaan data: rendah."
-        assert _kalimat_tingkat_kepercayaan("tinggi") == "Tingkat kepercayaan data: tinggi."  # case-insensitive
-
+class TestPaksaFieldWajibKonsistensiIntensitas:
     def test_cek_konsistensi_intensitas_men_trigger_low_confidence(self):
         assessment = _muat_assessment("l2_sample_amplop_6191.json")
         # rusak jadi tak konsisten: status dipaksa MEMENUHI_SYARAT tapi param kdb tetap memenuhi=False.
@@ -1104,6 +1057,26 @@ class TestDiagnosaSebab:
     def test_retrieval_kosong(self):
         d = DiagnosaPoin(poin_id="itbx", berhasil=False, jumlah_chunk=0, masalah_terakhir=["sitasi kosong"])
         assert d.sebab() == "retrieval_kosong"
+
+    def test_retrieval_provider_gagal_dibedakan_dari_llm_gagal(self):
+        # APP-2026-INNER-01 (2026-10-02, live): Jina API menolak panggilan embed (403 "Insufficient
+        # account balance") SEBELUM LLM sempat dipanggil — label lama "panggilan_llm_gagal"
+        # menyesatkan (user mengira bug reasoning, padahal provider retrieval eksternal). Dibedakan
+        # via penanda pesan `_provider_http.py::post_json` ("Panggilan provider '<nama>' gagal...").
+        d = DiagnosaPoin(
+            poin_id="intensitas", berhasil=False, jumlah_chunk=0,
+            exception_terakhir=(
+                "RuntimeError: Panggilan provider 'jina-embed' gagal setelah 3 percobaan: "
+                "Client error '403 Forbidden' for url 'https://api.jina.ai/v1/embeddings'"
+            ),
+        )
+        assert d.sebab() == "retrieval_provider_gagal"
+
+    def test_exception_llm_asli_tetap_panggilan_llm_gagal(self):
+        # Kontrol negatif — exception dari SDK Groq (RateLimitError/BadRequestError/dst, tanpa
+        # penanda "Panggilan provider") TETAP "panggilan_llm_gagal" spt semula.
+        d = DiagnosaPoin(poin_id="itbx", berhasil=False, exception_terakhir="RateLimitError: 429")
+        assert d.sebab() == "panggilan_llm_gagal"
 
     def test_guardrail_menolak(self):
         d = DiagnosaPoin(poin_id="itbx", berhasil=False, jumlah_chunk=3, masalah_terakhir=["verdict kontradiktif"])

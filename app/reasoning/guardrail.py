@@ -59,31 +59,6 @@ def caveat_fallback_itbx(status: str) -> str:
         return CAVEAT_FALLBACK_ITBX_LOLOS
     return CAVEAT_FALLBACK_ITBX_NON_LOLOS
 
-# APP-2026-INNER-01 (2026-09-26): BE kini (kadang) kirim `data_confidence_keseluruhan` dlm Bahasa
-# Indonesia ("Tinggi") alih-alih Inggris ("High") spt sebelumnya — ditemukan live: nilai Indonesia
-# tak match key dict lama, label kepercayaan SENYAP tak muncul sama sekali (bukan error, "tak
-# dikenal -> jangan tampilkan" di docstring bawah jadi diam-diam menyembunyikan info, bukan gagal
-# keras). Terima KEDUA bahasa (Inggris & Indonesia, case-insensitive) — key Indonesia memetakan ke
-# dirinya sendiri (sudah dlm bentuk tampilan yg benar), BE boleh ganti bahasa kapan pun tanpa kode
-# berubah lagi.
-_LABEL_DATA_CONFIDENCE = {
-    "high": "tinggi", "medium": "sedang", "low": "rendah",
-    "tinggi": "tinggi", "sedang": "sedang", "rendah": "rendah",
-}
-
-
-def _kalimat_tingkat_kepercayaan(data_confidence: str | None) -> str | None:
-    """Fix #4: label kepercayaan = FAKTA, dirakit DI KODE dari data_confidence — jangan diserahkan
-    ke LLM (token mentah "DATA_CONFIDENCE: X" tak lagi disuntikkan ke prompt, lihat prompts.py).
-    None/tak dikenal -> jangan tampilkan label kepercayaan sama sekali.
-    """
-    if not data_confidence:
-        return None
-    label = _LABEL_DATA_CONFIDENCE.get(data_confidence.strip().lower())
-    if label is None:
-        return None
-    return f"Tingkat kepercayaan data: {label}."
-
 
 _FRASA_DAMPAK_TINGGI = ("risiko tinggi", "dampak tinggi", "sangat berisiko", "risiko sangat tinggi")
 _FRASA_DAMPAK_RENDAH = ("risiko rendah", "dampak rendah", "aman sepenuhnya", "tanpa risiko")
@@ -524,13 +499,15 @@ def _paksa_field_wajib(
         # fungsi _bersihkan_disclaimer_fallback_palsu kenapa bukan cek pemicu-retry).
         disclaimer_dasar = _bersihkan_disclaimer_fallback_palsu(disclaimer_dasar)
 
-    # Cek #3 — meta.caveats / data_confidence WAJIB muncul. Kalimat kepercayaan SELALU dirakit
-    # deterministik (bukan echo raw value LLM/back-end) — konsisten sama persis di ketiga poin.
+    # Cek #3 — meta.caveats WAJIB muncul di disclaimer.
+    # Item permintaan user (2026-10-02): kalimat "Tingkat kepercayaan data: rendah/sedang/tinggi."
+    # SENGAJA DIHAPUS dari output (sebelumnya dirakit dari meta.data_confidence_keseluruhan di sini)
+    # — disclaimer seperti ini membuat sistem terkesan ragu pada datanya sendiri di mata reviewer,
+    # padahal label itu TIDAK pernah mengubah apa pun secara struktural (status/target/verdict tetap
+    # sama persis tak peduli label confidence-nya). meta.caveats (free-text spesifik dari BE, mis.
+    # "Data ITBX sebagian estimasi") TETAP tampil — itu catatan substantif, bukan skor generik.
     meta = assessment.meta
     if meta:
-        kalimat_confidence = _kalimat_tingkat_kepercayaan(meta.data_confidence_keseluruhan)
-        if kalimat_confidence and kalimat_confidence.lower() not in teks_sudah_ada.lower():
-            disclaimer_tambahan.append(kalimat_confidence)
         for caveat in meta.caveats or []:
             if caveat not in teks_sudah_ada and caveat not in " ".join(disclaimer_tambahan):
                 disclaimer_tambahan.append(f"Catatan: {caveat}")
@@ -751,10 +728,22 @@ class DiagnosaPoin:
     teks_ditolak_terakhir: str | None = None
 
     def sebab(self) -> str:
-        """Satu label kasar utk dihitung agregat: kenapa poin ini jatuh ke low_confidence."""
+        """Satu label kasar utk dihitung agregat: kenapa poin ini jatuh ke low_confidence.
+
+        APP-2026-INNER-01 (2026-10-02, live): ditemukan nyata di VPS — Jina API menolak SEMUA
+        panggilan embed (403 "Insufficient account balance") -> `ambil_chunks_pendukung()` raise
+        SEBELUM LLM sempat dipanggil sama sekali, tapi label sebelumnya ("panggilan_llm_gagal")
+        menyamaratakan dgn kegagalan LLM asli (rate limit/timeout Groq) — menyesatkan diagnosis:
+        user mengira ini bug reasoning/LLM, padahal akar masalahnya provider retrieval eksternal
+        (tagihan/kuota Jina habis, bukan kode). Dibedakan di sini via penanda pesan
+        `_provider_http.py::post_json` ("Panggilan provider '<nama>' gagal...") — SATU-SATUNYA
+        sumber exception dgn format persis itu (jina-embed/jina-rerank), beda dari exception LLM
+        (RateLimitError/BadRequestError/dst dari SDK Groq)."""
         if self.berhasil:
             return "berhasil"
         if self.exception_terakhir:
+            if "Panggilan provider '" in self.exception_terakhir:
+                return "retrieval_provider_gagal"
             return "panggilan_llm_gagal"
         if self.jumlah_chunk == 0:
             return "retrieval_kosong"
