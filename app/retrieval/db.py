@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import date
 
 try:  # muat .env (DATABASE_URL) bila belum diset shell — supaya retriever jalan dari entrypoint mana pun
     # SENGAJA BUKAN override=True (beda dari app/reasoning/llm_client.py) — dicoba, langsung

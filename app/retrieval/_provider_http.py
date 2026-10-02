@@ -68,15 +68,6 @@ def _record_failure(name: str) -> None:
             st["opened_until"] = time.monotonic() + _COOLDOWN_S
 
 
-def reset_circuit(name: str | None = None) -> None:
-    """Reset state breaker (test helper). `None` = reset semua."""
-    with _lock:
-        if name is None:
-            _state.clear()
-        else:
-            _state.pop(name, None)
-
-
 def post_json(
     name: str,
     url: str,
