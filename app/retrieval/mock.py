@@ -148,7 +148,11 @@ class MockRetriever:
         self._chunks = _build_mock_chunks()
         self._by_id = {c.id: c for c in self._chunks}
 
-    def search(self, query: str, filters: RetrievalFilters, top_k: int = 5) -> list[Chunk]:
+    def search(self, query: str, filters: RetrievalFilters, top_k: int = 5, *,
+               tanpa_lexical: bool = False) -> list[Chunk]:
+        # `tanpa_lexical` diterima agar patuh Protocol, lalu DIABAIKAN: mock tak punya leg
+        # lexical maupun fusi, jadi tak ada yang bisa dimatikan. Menerimanya tetap perlu supaya
+        # pemanggil produksi bisa diuji tanpa cabang khusus-mock.
         query_tokens = set(re.findall(r"\w+", query.lower()))
         candidates: list[Chunk] = []
         for chunk in self._chunks:

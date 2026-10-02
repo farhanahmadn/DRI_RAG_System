@@ -105,7 +105,7 @@ class TestAmbilChunksPendukungDibatasi:
         def __init__(self, jumlah: int):
             self._jumlah = jumlah
 
-        def search(self, query, filters, top_k=5):
+        def search(self, query, filters, top_k=5, *, tanpa_lexical=False):
             return []
 
         def get_by_reference(self, referensi):
@@ -173,10 +173,12 @@ class TestAmbilChunksPendukungZonaFilter:
         def __init__(self):
             self.filters_diterima = None
             self.query_diterima = None
+            self.tanpa_lexical_diterima = None
 
-        def search(self, query, filters, top_k=5):
+        def search(self, query, filters, top_k=5, *, tanpa_lexical=False):
             self.filters_diterima = filters
             self.query_diterima = query
+            self.tanpa_lexical_diterima = tanpa_lexical
             return []
 
         def get_by_reference(self, referensi):
@@ -263,6 +265,34 @@ class TestAmbilChunksPendukungZonaFilter:
         assert retriever.filters_diterima.zona is None
 
 
+    def test_intensitas_memakai_kandidat_dense_saja(self):
+        """Fusi per-poin: leg lexical praktis mati utk query intensitas (Hit@10 3%), sehingga RRF
+        hanya mengencerkan peringkat dense. Diukur pd cabang mayoritas: dense+rerank nDCG@3 0.978
+        vs 0.856 (p=0.016), peringkat 1 pada 21/21 keluarga zona lawan 16/21."""
+        retriever = self._RetrieverPerekamFilter()
+        poin = PoinKonteks(
+            poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS", fakta={}, dasar_hukum=[],
+            zona="Zona Perumahan", zona_subzone=None,
+        )
+        ambil_chunks_pendukung(poin, retriever)
+        assert retriever.tanpa_lexical_diterima is True
+
+    def test_poin_lain_tetap_hibrida_penuh(self):
+        """`dampak` arahnya justru sebaliknya tapi n=5 & p=0.625 — tak terbaca, jadi perilaku lama
+        dipertahankan. `itbx` lewat get_by_reference dan tak menyentuh fusi; kalau ia jatuh ke
+        search fallback, rerank di atas RRF memang merusak (0.829 -> 0.243) tapi itu persoalan
+        rerank, bukan leg lexical, dan belum diperbaiki."""
+        for pid, kategori in (("dampak", "Dampak Tata Guna Lahan"),
+                              ("itbx", "Klasifikasi Kegiatan (ITBX)")):
+            retriever = self._RetrieverPerekamFilter()
+            poin = PoinKonteks(
+                poin_id=pid, kategori=kategori, tipe_rekomendasi="numerik", status="Tinggi",
+                fakta={}, dasar_hukum=[], zona="Zona Perumahan", zona_subzone=None,
+            )
+            ambil_chunks_pendukung(poin, retriever)
+            assert retriever.tanpa_lexical_diterima is False, pid
+
     def test_dampak_dgn_subzone_query_tak_berubah(self):
         # Query lebih tajam HANYA berlaku utk poin_id="intensitas" — dampak/itbx tetap pakai
         # _QUERY_FALLBACK_PER_POIN spt biasa, walau zona_subzone tersedia.
@@ -308,7 +338,7 @@ class TestQueryFallbackDampak:
         dipanggil = {}
 
         class _RetrieverPencatatQuery:
-            def search(self, query, filters, top_k=5):
+            def search(self, query, filters, top_k=5, *, tanpa_lexical=False):
                 dipanggil["query"] = query
                 return []
 
@@ -935,7 +965,7 @@ class TestPilihChunksReferensiSadarZona:
             def __init__(self):
                 self.query_search = None
 
-            def search(self, query, filters, top_k=5):
+            def search(self, query, filters, top_k=5, *, tanpa_lexical=False):
                 self.query_search = (query, filters)
                 return [Chunk(id="hasil-search", level="tabel", teks="t", dokumen="d", zona="P-1")]
 
@@ -968,7 +998,7 @@ class TestAmbilKonteksInduk:
             self._raise = raise_exc
             self.dipanggil = []
 
-        def search(self, query, filters, top_k=5):
+        def search(self, query, filters, top_k=5, *, tanpa_lexical=False):
             return []
 
         def get_by_reference(self, referensi):

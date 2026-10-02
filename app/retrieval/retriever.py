@@ -112,7 +112,8 @@ class RetrieverAsli:
         self._cache.clear()
 
     # ---------------------------------------------------------------- search
-    def search(self, query: str, filters: RetrievalFilters, top_k: int = 5) -> list[Chunk]:
+    def search(self, query: str, filters: RetrievalFilters, top_k: int = 5, *,
+               tanpa_lexical: bool = False) -> list[Chunk]:
         # Pagar PII di titik pembentukan query retrieval (app/sanitize.py) — raise kalau query
         # (seharusnya selalu kategori indikator pendek) kebetulan membawa pola PII, SEBELUM query
         # dipakai apa pun (termasuk masuk cache key) atau dikirim ke provider embedding eksternal.
@@ -122,13 +123,25 @@ class RetrieverAsli:
         # dan provider embed+rerank aktif, supaya BENAR (bukan cuma cepat): tanpa provider di kunci,
         # ganti EMBEDDING_PROVIDER/RERANK_PROVIDER pada instance retriever yang sama (mis. eval
         # perbandingan 3 stack Tahap 5) bisa menyajikan hasil provider LAMA yang ke-cache secara diam-diam.
+        # `zona_prefix` WAJIB ada di kunci. Tanpa itu dua permohonan dgn query sama tapi
+        # KELUARGA zona berbeda bertabrakan: terbukti pada RetrieverAsli dgn cache aktif,
+        # pemohon keluarga "KT" disajikan tabel keluarga "R" dari cache — persis kelas bug
+        # APP-2026-6191, masuk lagi lewat pintu belakang. Dulu nyaris tak terlihat karena
+        # cabang keluarga memakai query pendek yang hampir tak pernah menemukan tabel; sejak
+        # query tajam dipakai di kedua cabang, tabrakan ini menyajikan tabel keluarga yang
+        # SALAH dgn percaya diri. `tanpa_lexical` juga masuk kunci: dua jalur kandidat yang
+        # berbeda tak boleh saling memakai hasil.
         cache_key = (
-            query.strip().lower(), filters.zona, filters.dokumen, filters.jenis, filters.as_of, top_k,
+            query.strip().lower(), filters.zona, filters.zona_prefix, filters.dokumen,
+            filters.jenis, filters.as_of, top_k, tanpa_lexical,
             os.getenv("EMBEDDING_PROVIDER", "local"), os.getenv("RERANK_PROVIDER", "local"),
         )
-        return list(self._cache.get_or_compute(cache_key, lambda: self._search_uncached(query, filters, top_k)))
+        return list(self._cache.get_or_compute(
+            cache_key,
+            lambda: self._search_uncached(query, filters, top_k, tanpa_lexical=tanpa_lexical)))
 
-    def _search_uncached(self, query: str, filters: RetrievalFilters, top_k: int) -> list[Chunk]:
+    def _search_uncached(self, query: str, filters: RetrievalFilters, top_k: int, *,
+                         tanpa_lexical: bool = False) -> list[Chunk]:
         q = _expand(query)
         conn = self._c()
 
@@ -143,8 +156,10 @@ class RetrieverAsli:
             dense = db.dense_search_ab(conn, qvec, embedding_provider, filters, self._candidate_k)
         # Query ASLI (bukan `q` yang sudah di-_expand): expansion ~10 kata membunuh sisi
         # lexical karena FTS meng-OR-kan lexeme query — lihat db.tsquery_or().
-        lexical = db.fts_search(conn, query, filters, self._candidate_k)
+        lexical = [] if tanpa_lexical else db.fts_search(conn, query, filters, self._candidate_k)
 
+        # RRF atas satu daftar = urutan daftar itu apa adanya, jadi jalur dense-saja tidak
+        # butuh cabang terpisah di sini.
         fused = fusion.reciprocal_rank_fusion([[i for i, _ in dense], [i for i, _ in lexical]])
         if not fused:
             return []

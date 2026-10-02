@@ -141,6 +141,22 @@ _QUERY_FALLBACK_PER_POIN = {
 # tanpa menutup kembali gating di bawah.
 _QUERY_INTENSITAS_TAJAM = "ambang KDB KLB KDH maksimal minimal"
 
+# Poin yang memakai kandidat dense-saja (leg lexical dimatikan) sebelum rerank.
+#
+# Diukur pada titik operasi k=3 SETELAH query tajam dipakai di kedua cabang
+# (eval/laporan_rag.html). Pada cabang mayoritas — filter keluarga, 73% request di
+# logs/precheck.jsonl — dense+rerank unggul nDCG@3 0.978 vs 0.856 (p=0.016, efek +1.00) dan
+# menempatkan tabel ambang yang benar di peringkat 1 pada 21/21 keluarga zona, lawan 16/21.
+# Sebabnya terbaca: leg lexical praktis mati untuk query intensitas (Hit@10 hanya 3%, karena
+# teks tabel Lampiran VI miskin lexeme yang cocok), sehingga RRF mengencerkan peringkat
+# dense dgn daftar yang tak membawa informasi.
+#
+# `dampak` SENGAJA tidak masuk: di sana arahnya justru sebaliknya (0.786 vs 0.719) tapi n=5
+# dan p=0.625 — tak terbaca. Mempertahankan perilaku lama di tempat yang belum terukur
+# adalah pilihan sadar, bukan kelupaan. `itbx` juga tidak: ia lewat get_by_reference dan
+# tak menyentuh fusi sama sekali.
+_TANPA_LEXICAL_PER_POIN = frozenset({"intensitas"})
+
 # Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
 # Pasal 17 (Zona Lindung) & Pasal 23 (Zona Budi Daya), "RDTR Kawasan Sleman Tengah 2023-2043.md"
 # (data/parsed/v1/) — diverifikasi thd `data/raw/*.pdf` langsung, BUKAN ditebak. Dipakai
@@ -272,7 +288,8 @@ def ambil_chunks_pendukung(
             filters = RetrievalFilters(zona=poin.zona_subzone)
         else:
             filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
-        chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan)
+        chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan,
+                                  tanpa_lexical=poin.poin_id in _TANPA_LEXICAL_PER_POIN)
     return chunks
 
 

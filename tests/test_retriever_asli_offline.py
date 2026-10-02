@@ -3,6 +3,7 @@ sungguhan (murni in-memory: cache). Beda dari tests/test_retrieval.py (live, but
 retrieval sungguhan) — constructor RetrieverAsli tidak connect DB secara eager, jadi aman
 diinstansiasi di sini tanpa DATABASE_URL."""
 
+from app.retrieval.base import Chunk, RetrievalFilters
 from app.retrieval.retriever import RetrieverAsli
 
 
@@ -85,3 +86,74 @@ class TestPecahSeriWilayahGetByReference:
 
         assert hasil == ["rdtr-sleman-tengah", "rdtr-sleman-timur"]
         assert dipanggil == [], "tak perlu query dokumen kalau wilayah default tidak diset"
+
+
+class TestKunciCacheMembedakanKeluargaZona:
+    """Regresi: kunci cache yang tak memuat `zona_prefix` menyajikan tabel keluarga zona yang SALAH.
+
+    Dibuktikan dulu, bukan diantisipasi: dengan kunci lama, `search()` dengan query yang sama untuk
+    pemohon keluarga "KT" mengembalikan hasil keluarga "R" yang sudah lebih dulu masuk cache — persis
+    kelas bug APP-2026-6191 (sitasi lintas keluarga zona), kali ini lewat cache bukan lewat SQL.
+
+    Sebelum query intensitas dipertajam, dampaknya nyaris tak terlihat: cabang keluarga memakai query
+    pendek yang hampir tak pernah menemukan tabel ambang, jadi yang tertukar pun sama-sama kosong.
+    Begitu query tajam dipakai di kedua cabang, tabrakan ini menyajikan tabel keluarga lain DENGAN
+    ambang KDB/KLB/KDH yang berbeda, dan terlihat meyakinkan.
+    """
+
+    QUERY = "ambang KDB KLB KDH maksimal minimal"
+
+    def _retriever_terekam(self):
+        r = RetrieverAsli(default_wilayah="Sleman Tengah")
+        r._cache._store.clear()
+        terpanggil: list[str | None] = []
+
+        def palsu(query, filters, top_k, *, tanpa_lexical=False):
+            terpanggil.append(filters.zona_prefix)
+            return [Chunk(id=f"chunk-{filters.zona_prefix}", level="tabel",
+                          dokumen="RDTR Sleman Tengah",
+                          teks=f"Lampiran VI keluarga {filters.zona_prefix}", skor=1.0)]
+
+        r._search_uncached = palsu
+        return r, terpanggil
+
+    def test_keluarga_zona_berbeda_tidak_saling_pakai_cache(self):
+        r, terpanggil = self._retriever_terekam()
+
+        hasil_r = r.search(self.QUERY, RetrievalFilters(zona_prefix="R"), top_k=3)
+        hasil_kt = r.search(self.QUERY, RetrievalFilters(zona_prefix="KT"), top_k=3)
+
+        assert [c.id for c in hasil_r] == ["chunk-R"]
+        assert [c.id for c in hasil_kt] == ["chunk-KT"], \
+            "pemohon KT tidak boleh menerima tabel keluarga R dari cache"
+        assert terpanggil == ["R", "KT"], "masing-masing keluarga wajib dihitung sendiri"
+
+    def test_keluarga_zona_sama_tetap_memakai_cache(self):
+        """Perbaikan tidak boleh mematikan cache-nya — permintaan identik tetap satu kali hitung."""
+        r, terpanggil = self._retriever_terekam()
+
+        r.search(self.QUERY, RetrievalFilters(zona_prefix="R"), top_k=3)
+        r.search(self.QUERY, RetrievalFilters(zona_prefix="R"), top_k=3)
+
+        assert terpanggil == ["R"]
+
+    def test_jalur_kandidat_berbeda_tidak_saling_pakai_cache(self):
+        """dense-saja dan hibrida menghasilkan kandidat berbeda — keduanya tak boleh bertukar hasil."""
+        r = RetrieverAsli(default_wilayah="Sleman Tengah")
+        r._cache._store.clear()
+        terpanggil: list[bool] = []
+
+        def palsu(query, filters, top_k, *, tanpa_lexical=False):
+            terpanggil.append(tanpa_lexical)
+            return [Chunk(id=f"chunk-{'dense' if tanpa_lexical else 'hibrida'}", level="tabel",
+                          dokumen="RDTR Sleman Tengah", teks="x", skor=1.0)]
+
+        r._search_uncached = palsu
+        f = RetrievalFilters(zona_prefix="R")
+
+        hibrida = r.search(self.QUERY, f, top_k=3)
+        dense = r.search(self.QUERY, f, top_k=3, tanpa_lexical=True)
+
+        assert [c.id for c in hibrida] == ["chunk-hibrida"]
+        assert [c.id for c in dense] == ["chunk-dense"]
+        assert terpanggil == [False, True]

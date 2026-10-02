@@ -45,7 +45,11 @@ class RetrievalFilters(BaseModel):
 
 @runtime_checkable
 class Retriever(Protocol):
-    def search(self, query: str, filters: RetrievalFilters, top_k: int = 5) -> list[Chunk]: ...
+    # `tanpa_lexical`: lewati leg lexical (FTS) sehingga kandidat murni dari pencarian vektor.
+    # Dipakai per-poin oleh generator — lihat generator._TANPA_LEXICAL_PER_POIN utk ukurannya.
+    # Default False = perilaku hibrida penuh, jadi implementasi lain tak wajib peduli.
+    def search(self, query: str, filters: RetrievalFilters, top_k: int = 5, *,
+               tanpa_lexical: bool = False) -> list[Chunk]: ...
 
     def get_by_reference(self, referensi: list[str]) -> list[Chunk]: ...
 
