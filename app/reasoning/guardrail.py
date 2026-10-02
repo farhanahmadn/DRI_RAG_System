@@ -59,7 +59,17 @@ def caveat_fallback_itbx(status: str) -> str:
         return CAVEAT_FALLBACK_ITBX_LOLOS
     return CAVEAT_FALLBACK_ITBX_NON_LOLOS
 
-_LABEL_DATA_CONFIDENCE = {"high": "tinggi", "medium": "sedang", "low": "rendah"}
+# APP-2026-INNER-01 (2026-09-26): BE kini (kadang) kirim `data_confidence_keseluruhan` dlm Bahasa
+# Indonesia ("Tinggi") alih-alih Inggris ("High") spt sebelumnya — ditemukan live: nilai Indonesia
+# tak match key dict lama, label kepercayaan SENYAP tak muncul sama sekali (bukan error, "tak
+# dikenal -> jangan tampilkan" di docstring bawah jadi diam-diam menyembunyikan info, bukan gagal
+# keras). Terima KEDUA bahasa (Inggris & Indonesia, case-insensitive) — key Indonesia memetakan ke
+# dirinya sendiri (sudah dlm bentuk tampilan yg benar), BE boleh ganti bahasa kapan pun tanpa kode
+# berubah lagi.
+_LABEL_DATA_CONFIDENCE = {
+    "high": "tinggi", "medium": "sedang", "low": "rendah",
+    "tinggi": "tinggi", "sedang": "sedang", "rendah": "rendah",
+}
 
 
 def _kalimat_tingkat_kepercayaan(data_confidence: str | None) -> str | None:

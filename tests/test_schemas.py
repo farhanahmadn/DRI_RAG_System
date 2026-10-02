@@ -33,6 +33,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
         "l2_sample_amplop_2428.json",
         "l2_sample_amplop_8025.json",
         "l2_sample_amplop_5067.json",
+        "l2_sample_amplop_inner01.json",
     ],
 )
 def test_l2_assessment_valid_dari_fixture_nyata(nama_file):
@@ -88,6 +89,14 @@ class TestKontrakBackendBerubah:
         )
         assessment = L2Assessment.model_validate(payload["data"])
         assert assessment.lokasi.geojson.type == "MultiPoint"
+
+    def test_geojson_multipolygon_diterima(self):
+        # APP-2026-INNER-01 (2026-09-26): back-end kirim geometry "MultiPolygon" (nesting 4 level —
+        # lebih dalam dari Polygon 3 level). `coordinates: Any` sudah longgar sejak APP-2026-8376,
+        # jadi SEHARUSNYA sudah diterima tanpa perubahan kode — tes ini memastikan itu benar.
+        payload = json.loads((FIXTURES_DIR / "l2_sample_amplop_inner01.json").read_text(encoding="utf-8"))
+        assessment = L2Assessment.model_validate(payload["data"])
+        assert assessment.lokasi.geojson.type == "MultiPolygon"
 
     def test_tahapan_intensitas_absen_diterima(self):
         # APP-2026-003: back-end OMIT `tahapan.intensitas` sama sekali kalau gate berhenti di ITBX

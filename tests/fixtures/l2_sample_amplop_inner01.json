@@ -1,0 +1,96 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "b288a601-c9a3-48fa-9794-f952ba55128d",
+    "application_number": "APP-2026-INNER-01",
+    "timestamp": "2026-09-26T08:33:04.487Z",
+    "lokasi": {
+      "koordinat": { "lat": -7.690244293253008, "lon": 110.33766848469038 },
+      "geojson": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[110.337501954, -7.690232011], [110.337530611, -7.690129324], [110.33784168, -7.69026001], [110.337798667, -7.690357186], [110.337501954, -7.690232011]]]]
+      },
+      "rdtr_zone": "Zona Pertanian",
+      "rdtr_subzone": "P-1",
+      "rdtr_subzone_source": "geojson_overlay",
+      "luas_lahan_m2": 426.47
+    },
+    "gate_hukum": {
+      "final_gate_status": "Lolos Bersyarat",
+      "rekomendasi_sistem": "Setuju Bersyarat",
+      "decisive_stage": "intensitas",
+      "tahapan": {
+        "itbx": {
+          "status": "I",
+          "lolos": true,
+          "kbli_diusulkan": "001",
+          "kegiatan_diusulkan": "Pertanian Tanaman Semusim",
+          "kegiatan_diizinkan": ["Pertanian Tanaman Semusim"],
+          "kegiatan_terbatas": [],
+          "kegiatan_bersyarat": [],
+          "keterangan_ketentuan": ["Ketentuan Umum kegiatan yang diperbolehkan secara Bersyarat (B): a. Kegiatan pada kelompok pertanian wajib memenuhi ketentuan."],
+          "reason": "Lolos karena kegiatan Diizinkan (I) di zona Pertanian",
+          "dasar_hukum": [{ "dokumen": "RDTR Sleman", "pasal": "Matriks ITBX", "kutipan": "Data KBLI referensi" }]
+        },
+        "lp2b": { "status": "AMAN", "lolos": true, "reason": null },
+        "sempadan": { "status": "AMAN", "lolos": true, "reason": null },
+        "intensitas": {
+          "status": "MELAMPAUI_BATAS",
+          "lolos": false,
+          "parameter": {
+            "kdb": { "usulan": 58.62, "ambang_maks": 10, "memenuhi": false, "satuan": "persen" },
+            "klb": { "usulan": 1.17, "ambang_maks": 1, "memenuhi": false, "satuan": "rasio" },
+            "kdh": { "usulan": 35.17, "ambang_min": 88, "memenuhi": false, "satuan": "persen" }
+          },
+          "luas_tapak_m2": 250,
+          "jumlah_lantai": 2,
+          "luas_rth_usulan_m2": 150,
+          "reason": "Melanggar Aturan: KDB (58.62 ) melebihi batas maksimal (10 ), KDH (35.17 ) berada di bawah ketentuan minimal (88 ), KLB (1.17) melebihi batas maksimal (1)",
+          "dasar_hukum": []
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": true,
+      "c_before": 0.3,
+      "c_after": 0.472,
+      "delta_c": 0.172,
+      "runoff_change_index": 1.573,
+      "impact_score": 65,
+      "impact_category": "SEDANG",
+      "calculation_details": "C_Sebelum = 0.3; C_Sesudah = 0.472 (Luas Persil: 580.03 m2, Permohonan: 400 m2)",
+      "threshold_bands": { "Rendah": "index < 1.5", "Sedang": "1.5-2.5", "Tinggi": "2.5-4.0", "Sangat Tinggi": "> 4.0" },
+      "rekomendasi_mitigasi": null,
+      "existing_surface_details": {
+        "kelas": "Daerah tak Terbangun / RTH", "luas_persil_m2": 580.03, "luas_persil_source": "persil",
+        "c_before_source": "rth_baseline_taman", "proporsi": 1, "C": 0.3
+      },
+      "proposed_surface_details": { "Bangunan/Atap": 43.1, "Taman/RTH": 25.9, "Sisa Persil Eksisting": 31 },
+      "detailed_surface_breakdown": {
+        "luas_persil_m2": 580.03, "luas_persil_source": "persil", "luas_permohonan_m2": 400,
+        "luas_sisa_m2": 180.03, "proporsi_sisa": 0.31, "proporsi_permohonan": 0.69,
+        "proporsi_terbangun": 0.625, "proporsi_taman": 0.375, "is_persil_found": true,
+        "is_multi_persil": false, "persil_count": 1, "persil_unioned": false,
+        "luas_usulan_melebihi_persil": false, "kdb_usulan_persen": 58.62, "kdh_usulan_persen": 35.17,
+        "Bangunan/Atap": { "luas_m2": 250, "proporsi": 0.431, "proporsi_dlm_permohonan": 0.625, "C": 0.7, "kelas": "Perdagangan Sekeliling Pusat Kota" },
+        "Taman/RTH": { "luas_m2": 150, "proporsi": 0.259, "proporsi_dlm_permohonan": 0.375, "C": 0.3, "kelas": "Taman / RTH" },
+        "Sisa Persil Eksisting": { "luas_m2": 180.03, "proporsi": 0.31, "C": 0.3, "kelas": "Daerah tak Terbangun / RTH" }
+      },
+      "c_coefficients": {
+        "C_Atap_KBLI": 0.7, "Kelas_Atap": "Perdagangan Sekeliling Pusat Kota", "C_Taman": 0.3, "C_Sisa_Persil": 0.3,
+        "Kelas_Eksisting": "Daerah tak Terbangun / RTH", "Luas_Persil_m2": 580.03, "Luas_Permohonan_m2": 400,
+        "Luas_Sisa_m2": 180.03, "Proporsi_Sisa": 0.31, "Proporsi_Permohonan": 0.69,
+        "Proporsi_Terbangun": 0.625, "Proporsi_Taman": 0.375, "Luas_Persil_Source": "persil", "C_Before_Source": "rth_baseline_taman"
+      },
+      "luas_lahan_m2": 426.47,
+      "luas_persil_source": "persil",
+      "c_before_source": "rth_baseline_taman",
+      "luas_usulan_melebihi_persil": false,
+      "data_confidence": "Tinggi",
+      "limitations": null,
+      "multi_persil": false
+    },
+    "meta": { "data_confidence_keseluruhan": "Tinggi", "caveats": [] }
+  }
+}

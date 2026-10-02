@@ -704,6 +704,17 @@ class TestPaksaFieldWajib:
         assert "DATA_CONFIDENCE" not in hasil.rekomendasi.disclaimer
         assert "Medium" not in hasil.rekomendasi.disclaimer
 
+    def test_meta_data_confidence_bahasa_indonesia_tetap_disuntik(self):
+        # APP-2026-INNER-01 (2026-09-26): data_confidence_keseluruhan dari fixture nyata dlm
+        # Bahasa Indonesia ("Tinggi") — integrasi penuh via _paksa_field_wajib, bukan cuma unit
+        # test _kalimat_tingkat_kepercayaan di TestKalimatTingkatKepercayaan.
+        assessment = _muat_assessment("l2_sample_amplop_inner01.json")
+        poin = _poin()
+        output = _poin_output()
+        hasil = _paksa_field_wajib(output, poin, assessment)
+
+        assert "Tingkat kepercayaan data: tinggi." in hasil.rekomendasi.disclaimer
+
     def test_luas_usulan_melebihi_persil_true_tambah_peringatan_disclaimer(self):
         # APP-2026-2428, Cek #3b: peringatan WAJIB dirakit deterministik di guardrail, jaring
         # pengaman kedua terlepas dari apakah LLM menyebutnya sendiri di reasoning/saran.
@@ -800,6 +811,15 @@ class TestKalimatTingkatKepercayaan:
 
     def test_nilai_tak_dikenal_tidak_tampilkan_label(self):
         assert _kalimat_tingkat_kepercayaan("Sangat Tinggi Sekali") is None
+
+    def test_bahasa_indonesia_dari_be_juga_dikenali(self):
+        # APP-2026-INNER-01 (2026-09-26): BE kini (kadang) kirim data_confidence_keseluruhan dlm
+        # Bahasa Indonesia ("Tinggi") alih-alih Inggris ("High") — ditemukan live: SEBELUM
+        # diperbaiki, label kepercayaan senyap tak muncul sama sekali (bukan error).
+        assert _kalimat_tingkat_kepercayaan("Tinggi") == "Tingkat kepercayaan data: tinggi."
+        assert _kalimat_tingkat_kepercayaan("Sedang") == "Tingkat kepercayaan data: sedang."
+        assert _kalimat_tingkat_kepercayaan("Rendah") == "Tingkat kepercayaan data: rendah."
+        assert _kalimat_tingkat_kepercayaan("tinggi") == "Tingkat kepercayaan data: tinggi."  # case-insensitive
 
     def test_cek_konsistensi_intensitas_men_trigger_low_confidence(self):
         assessment = _muat_assessment("l2_sample_amplop_6191.json")
