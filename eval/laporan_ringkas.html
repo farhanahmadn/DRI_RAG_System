@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ringkasan Evaluasi Sistem</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --kartu:#fff; --tinta:#17202a; --redup:#5b6673; --grs:#e3e7ec;
+    --baik:#0f9d58; --baik-bg:#e8f5ee; --sedang:#e8a33d; --sedang-bg:#fdf3e3;
+    --lemah:#d64541; --lemah-bg:#fdecec; --netral:#8b97a3;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--tinta);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1000px; margin:0 auto; padding:32px 16px 72px; }
+  header.atas { border-bottom:3px solid var(--tinta); padding-bottom:16px; margin-bottom:8px; }
+  h1 { font-size:28px; margin:0 0 6px; letter-spacing:-.02em; }
+  .sub { color:var(--redup); margin:0; font-size:15px; }
+  h2 { font-size:21px; margin:44px 0 6px; letter-spacing:-.01em; }
+  h2 .no { color:var(--netral); font-weight:400; margin-right:8px; }
+  h3 { font-size:17px; margin:22px 0 6px; }
+  .lead { color:var(--redup); margin:0 0 16px; font-size:16px; }
+  .ket { color:var(--redup); font-size:14.5px; }
+  .netral { color:var(--netral); }
+  .blok { background:var(--kartu); border:1px solid var(--grs); border-radius:12px;
+           padding:20px 22px; margin:16px 0; }
+  .grid3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;
+            margin:18px 0; }
+  .kartu-poin { background:var(--kartu); border:1px solid var(--grs); border-radius:12px;
+                 padding:18px; border-top:5px solid var(--netral); }
+  .kartu-poin.baik { border-top-color:var(--baik); }
+  .kartu-poin.sedang { border-top-color:var(--sedang); }
+  .kartu-poin.lemah { border-top-color:var(--lemah); }
+  .poin-kepala { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .poin-nama { font-weight:650; font-size:16px; }
+  .lencana { font-size:12px; font-weight:650; padding:3px 9px; border-radius:99px;
+              white-space:nowrap; }
+  .lencana.baik { background:var(--baik-bg); color:var(--baik); }
+  .lencana.sedang { background:var(--sedang-bg); color:var(--sedang); }
+  .lencana.lemah { background:var(--lemah-bg); color:var(--lemah); }
+  .lencana.netral { background:#eef1f4; color:var(--netral); }
+  .poin-angka { font-size:40px; font-weight:700; letter-spacing:-.03em; margin:10px 0 0; }
+  .poin-satuan { color:var(--netral); font-size:13px; }
+  .poin-ket { color:var(--redup); font-size:14px; margin:12px 0 0; }
+  .bar { display:inline-block; height:9px; background:#eceff3; border-radius:99px;
+          overflow:hidden; vertical-align:middle; margin-right:8px; }
+  .bar-isi { display:block; height:100%; border-radius:99px; background:var(--netral); }
+  .bar-isi.baik { background:var(--baik); }
+  .bar-isi.sedang { background:var(--sedang); }
+  .bar-isi.lemah { background:var(--lemah); }
+  table.tabel { width:100%; border-collapse:collapse; font-size:14.5px; }
+  table.tabel th, table.tabel td { text-align:left; padding:11px 10px;
+                                    border-bottom:1px solid var(--grs); vertical-align:top; }
+  table.tabel thead th { font-size:13px; color:var(--redup); font-weight:650;
+                          border-bottom:2px solid var(--grs); }
+  .th-ket { display:block; font-weight:400; color:var(--netral); font-size:12.5px;
+             margin-top:3px; }
+  .angka-kecil { font-weight:650; font-size:13.5px; }
+  .angka-besar { font-weight:700; font-size:17px; white-space:nowrap; }
+  .banding { display:grid; gap:7px; margin:12px 0; }
+  .banding-label { display:inline-block; width:72px; color:var(--redup); font-size:13.5px; }
+  .catat { background:#fffdf5; border:1px solid #f0e3bf; border-left:4px solid var(--sedang);
+            border-radius:8px; padding:16px 18px; margin:16px 0; font-size:14.5px; }
+  .catat b { color:#7a5a12; }
+  .meta { font-size:13px; color:var(--netral); border-top:1px solid var(--grs);
+           margin-top:40px; padding-top:16px; }
+  ul { margin:8px 0; padding-left:22px; }
+  li { margin:6px 0; }
+  @media print { body { background:#fff; } .blok, .kartu-poin { break-inside:avoid; } }
+</style></head><body><div class="wrap">
+
+<header class="atas">
+  <h1>Ringkasan Evaluasi Sistem Precheck RDTR</h1>
+  <p class="sub">Wilayah Sleman Tengah &middot; pengukuran 2026-10-04 &middot;
+  disusun untuk pembaca umum</p>
+</header>
+<p class="lead">Dokumen ini menjelaskan <b>seberapa bisa dipercaya</b> jawaban sistem, dalam bahasa
+sehari-hari. Versi teknisnya lengkap dengan uji statistik ada di <code>laporan_rag.html</code>.</p>
+
+<h2><span class="no">1</span>Kesimpulan</h2>
+<p class="lead">Sistem menjawab tiga pertanyaan untuk setiap permohonan. Dua di antaranya sudah
+bekerja mendekati batas terbaik yang mungkin; satu masih perlu perbaikan.</p>
+<div class="grid3">
+      <div class="kartu-poin baik">
+        <div class="poin-kepala">
+          <span class="poin-nama">Boleh atau tidak kegiatannya</span>
+          <span class="lencana baik">Sangat baik</span>
+        </div>
+        <div class="poin-angka">85%</div>
+        <div class="poin-satuan">dari nilai terbaik yang mungkin</div>
+        <p class="poin-ket">Apakah jenis usaha yang diajukan diizinkan di zona lokasi tersebut.</p>
+      </div>
+      <div class="kartu-poin baik">
+        <div class="poin-kepala">
+          <span class="poin-nama">Seberapa besar boleh membangun</span>
+          <span class="lencana baik">Sangat baik</span>
+        </div>
+        <div class="poin-angka">98%</div>
+        <div class="poin-satuan">dari nilai terbaik yang mungkin</div>
+        <p class="poin-ket">Batas KDB, KLB, dan KDH — berapa persen lahan boleh tertutup bangunan, berapa lantai, dan berapa yang wajib tetap hijau.</p>
+      </div>
+      <div class="kartu-poin lemah">
+        <div class="poin-kepala">
+          <span class="poin-nama">Dampak ke lingkungan</span>
+          <span class="lencana lemah">Perlu perbaikan</span>
+        </div>
+        <div class="poin-angka">32%</div>
+        <div class="poin-satuan">dari nilai terbaik yang mungkin</div>
+        <p class="poin-ket">Perubahan limpasan air hujan akibat pembangunan, dan ketentuan khusus yang berlaku bila lokasi berada di kawasan resapan air atau rawan bencana.</p>
+      </div></div>
+
+<div class="catat">
+<b>Cara membaca angka persen di atas.</b> Angka itu <b>bukan</b> "nilai ujian dari 100". Ia berarti
+<b>berapa persen dari hasil terbaik yang masih mungkin dicapai</b> pada kasus-kasus yang diuji.
+Pembedaan ini penting: pada sebagian kasus, mengambil seluruh jawaban yang benar memang mustahil
+karena sistem hanya mengirim 3 pasal sekaligus, sementara aturan yang
+berlaku bisa lebih banyak. Membandingkan dengan 100% apa adanya akan menyalahkan sistem atas batas
+yang kita sendiri tetapkan.
+<br><br>
+<b>Label "Sangat baik" sampai "Perlu perbaikan" adalah kesepakatan internal laporan ini</b>, bukan
+standar industri &mdash; untuk metrik seperti ini tidak ada ambang baku yang diakui di literatur
+ilmiah. Labelnya dipakai agar mudah dibaca, bukan untuk dikutip sebagai sertifikasi.
+</div>
+
+<h2><span class="no">2</span>Apa yang sebenarnya diuji</h2>
+<div class="blok">
+<p>Setiap kali ada permohonan masuk, sistem harus menjawab tiga hal &mdash; dan setiap jawaban
+<b>wajib menyebut pasal</b> yang menjadi dasarnya. Yang diuji di sini adalah bagian pencarian
+pasal itu: <b>apakah sistem menemukan pasal yang tepat dari keseluruhan peraturan.</b></p>
+<p class="ket">Bahan ujinya: Peraturan Bupati Sleman tentang RDTR Kawasan Sleman Tengah, yang
+dipecah menjadi <b>484 bagian</b> (356 ayat,
+65 pasal, 63 tabel lampiran).
+Diuji dengan <b>214 kasus uji</b>, dan untuk 261 di
+antaranya jawaban yang benar <b>ditentukan oleh struktur peraturannya sendiri</b>, bukan oleh
+pendapat siapa pun. Sebagai pembanding: kalau sistem menebak acak dari sekitar 424 pasal yang tersedia, nilainya hanya <b>0.006</b>. Jadi sistem bekerja puluhan kali lebih baik daripada menebak — tapi itu hanya membuktikan sistemnya hidup, bukan bahwa hasilnya sudah baik.</p>
+</div>
+
+<h2><span class="no">3</span>Hasil rinci</h2>
+<p class="lead">Sistem menempuh dua jalur berbeda, tergantung apakah data lokasi dari sistem lain
+menyertakan kode sub-zona yang presisi atau tidak. Kolom "bagian permohonan" menunjukkan seberapa
+sering tiap jalur dipakai.</p>
+<div class="blok" style="overflow-x:auto">
+<table class="tabel">
+  <thead><tr><th>Pertanyaan</th><th>Jalur</th><th>Bagian permohonan</th><th>Menemukan dasar hukumnya<span class="th-ket">Dari 10 permohonan, pada berapa permohonan sistem berhasil menemukan pasal yang mengatur.</span></th><th>Menaruhnya di urutan teratas<span class="th-ket">Setelah ditemukan, apakah pasal itu muncul di urutan pertama atau terkubur di bawah.</span></th><th>Mengambil SEMUA yang berlaku<span class="th-ket">Satu permohonan bisa terkena beberapa pasal sekaligus. Ini mengukur berapa bagian yang berhasil terambil.</span></th><th>Nilai gabungan<span class="th-ket">Menggabungkan ketiga hal di atas menjadi satu angka. Ini angka utama yang dipakai.</span></th></tr></thead>
+  <tbody><tr><td>Boleh atau tidak kegiatannya</td><td class="netral">get_by_reference (anchor dari back-end)</td><td>semua</td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:106px"></span></span><span class="angka-kecil">96%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:91px"></span></span><span class="angka-kecil">83%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:104px"></span></span><span class="angka-kecil">95%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:94px"></span></span><span class="angka-kecil">85%</span></td></tr><tr><td>Seberapa besar boleh membangun</td><td class="netral">sub-zona presisi diketahui</td><td>4%</td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:110px"></span></span><span class="angka-kecil">100%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:110px"></span></span><span class="angka-kecil">100%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:110px"></span></span><span class="angka-kecil">100%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:110px"></span></span><span class="angka-kecil">100%</span></td></tr><tr><td></td><td class="netral">tanpa sub-zona (filter keluarga)</td><td>96%</td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:110px"></span></span><span class="angka-kecil">100%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:110px"></span></span><span class="angka-kecil">100%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:107px"></span></span><span class="angka-kecil">97%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:108px"></span></span><span class="angka-kecil">98%</span></td></tr><tr><td>Dampak ke lingkungan</td><td class="netral">sub-zona presisi diketahui</td><td>4%</td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:82px"></span></span><span class="angka-kecil">75%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi sedang" style="width:76px"></span></span><span class="angka-kecil">69%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi lemah" style="width:29px"></span></span><span class="angka-kecil">27%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi lemah" style="width:37px"></span></span><span class="angka-kecil">34%</span></td></tr><tr><td></td><td class="netral">tanpa sub-zona (filter keluarga)</td><td>96%</td><td><span class="bar" style="width:110px"><span class="bar-isi baik" style="width:79px"></span></span><span class="angka-kecil">71%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi sedang" style="width:73px"></span></span><span class="angka-kecil">66%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi lemah" style="width:27px"></span></span><span class="angka-kecil">25%</span></td><td><span class="bar" style="width:110px"><span class="bar-isi lemah" style="width:35px"></span></span><span class="angka-kecil">32%</span></td></tr></tbody>
+</table>
+</div>
+<div class="catat">
+<b>Yang perlu diperhatikan pada "Dampak ke lingkungan".</b> Perhatikan pola angkanya: sistem
+<b>menemukan</b> pasal yang mengatur pada sekitar 7 dari 10 kasus dan menaruhnya di urutan teratas
+&mdash; jadi jawabannya <b>tidak salah</b>. Yang kurang adalah <b>kelengkapannya</b>: satu lokasi
+bisa terkena tiga ketentuan sekaligus (gempa, banjir lahar, resapan air), sementara sistem hanya
+mengirim 3 pasal. Jadi sistem memberi satu dasar hukum yang benar, bukan
+seluruhnya.
+<br><br>
+Keputusan yang dibutuhkan di sini <b>bukan keputusan teknis</b>: apakah satu dasar hukum sudah
+cukup untuk poin ini, atau ketiganya memang harus disebut? Itu pertanyaan untuk ahli tata ruang.
+</div>
+
+<h2><span class="no">4</span>Perbaikan yang sudah dilakukan</h2>
+<p class="lead">Dua masalah ditemukan lewat pengukuran ini, lalu diperbaiki. Keduanya terbukti
+berpengaruh besar.</p>
+<div class="blok">
+      <div class="perbaikan">
+        <h3>Memilih pasal menurut zona pemohon</h3>
+        <p class="ket">Dulu sistem mengambil pasal menurut urutan apa adanya dari basis data. Akibatnya pemohon di Zona Perumahan bisa disodori aturan Zona Perkantoran — dan itu benar-benar terjadi pada 7 permohonan nyata.</p>
+        <div class="banding">
+          <div><span class="banding-label">Sebelum</span>
+               <span class="bar" style="width:190px"><span class="bar-isi lemah" style="width:7px"></span></span><b>0.04</b></div>
+          <div><span class="banding-label">Sesudah</span>
+               <span class="bar" style="width:190px"><span class="bar-isi baik" style="width:162px"></span></span><b>0.85</b></div>
+        </div>
+        <p class="ket"><b>Naik 0.82 poin.</b> Permohonan yang sama sekali tidak mendapat pasal yang benar turun dari 39 menjadi 1 dari 52.</p>
+      </div>
+      <div class="perbaikan">
+        <h3>Memperbaiki kata kunci pencarian</h3>
+        <p class="ket">Saat back-end tidak memberi kode sub-zona yang presisi — dan itu terjadi pada 96% permohonan — sistem mencari dengan kata kunci yang terlalu pendek, sehingga tabel batas KDB/KLB/KDH yang benar hampir tak pernah terambil.</p>
+        <div class="banding">
+          <div><span class="banding-label">Sebelum</span>
+               <span class="bar" style="width:190px"><span class="bar-isi lemah" style="width:30px"></span></span><b>0.16</b></div>
+          <div><span class="banding-label">Sesudah</span>
+               <span class="bar" style="width:190px"><span class="bar-isi baik" style="width:163px"></span></span><b>0.86</b></div>
+        </div>
+        <p class="ket"><b>Naik 0.70 poin.</b> Tabel yang benar sampai ke urutan pertama: dari 0 menjadi 16 dari 21 keluarga zona.</p>
+      </div></div>
+
+<h2><span class="no">5</span>Mutu kutipan pada jawaban nyata</h2>
+<p class="lead">Selain mencari pasal yang tepat, sistem juga harus <b>mengutip dengan jujur</b>.
+Ini diperiksa langsung dari jawaban yang sudah pernah dikeluarkan sistem.</p>
+<div class="blok">
+      <table class="tabel">
+        <thead><tr><th>Yang diperiksa</th><th></th><th>Hasil</th><th></th></tr></thead>
+        <tbody><tr><td><b>Pasal yang dirujuk benar-benar ada</b><span class="th-ket">Tidak ada rujukan karangan. Setiap nomor pasal yang disebut bisa dibuka.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:150px"></span></span></td><td class="angka-besar">100.0%</td><td class="netral">dari 238 sitasi</td></tr><tr><td><b>Kutipannya benar-benar ada di pasal itu</b><span class="th-ket">Teks yang dikutip memang tertulis di pasal yang dirujuk, bukan dirangkai sendiri.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:147px"></span></span></td><td class="angka-besar">98.3%</td><td class="netral">dari 238 sitasi</td></tr><tr><td><b>Rujukan dari back-end dipakai dengan benar</b><span class="th-ket">Pasal yang dikirim sistem lain tidak tertukar atau salah nomor.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:150px"></span></span></td><td class="angka-besar">100.0%</td><td class="netral">dari 51 sitasi</td></tr></tbody>
+      </table>
+      <p class="ket"><b>Yang tersisa:</b> 2 kutipan berisi judul peraturannya, bukan isi pasalnya. Rujukannya benar, tapi kutipannya tidak menjelaskan apa pun.</p>
+      <p class="ket">Diperiksa dari <b>109</b> permohonan nyata
+      (289 sitasi). 335 permohonan lain di catatan
+      sistem berasal dari pengujian internal, bukan pemohon sungguhan, dan sengaja tidak dihitung.</p></div>
+
+<h2><span class="no">6</span>Apa yang angka-angka ini TIDAK katakan</h2>
+<div class="catat">
+<ul>
+  <li><b>Ini bukan ukuran kebenaran hukum.</b> Yang diuji adalah apakah sistem menemukan pasal
+      yang sesuai struktur peraturan. <b>Belum ada ahli tata ruang yang memvalidasi</b> bahwa
+      pasal itu memang jawaban hukum yang tepat untuk kasus tersebut.</li>
+  <li><b>Jangan dikutip sebagai "akurasi sistem N%".</b> Angka persen di laporan ini punya makna
+      khusus (persen dari yang mungkin dicapai) dan tidak sama dengan akurasi.</li>
+  <li><b>Hanya satu wilayah.</b> Seluruh pengujian memakai korpus Sleman Tengah. Wilayah lain
+      belum punya bahan uji yang setara.</li>
+  <li><b>Mutu bahasa jawaban tidak diuji di sini.</b> Yang diukur adalah pencarian pasal dan
+      kejujuran kutipan, bukan apakah kalimat penjelasannya enak dibaca atau mudah dipahami.</li>
+  <li><b>Sisi kecerdasan buatan bergantung pada layanan pihak ketiga</b> yang modelnya bisa
+      berubah tanpa pemberitahuan. Karena itu angka apa pun selalu terikat tanggal
+      pengukuran.</li>
+</ul>
+</div>
+
+<h2><span class="no">7</span>Catatan operasional</h2>
+<div class="blok">
+<p class="ket">Catatan sistem mencatat <b>124 permohonan</b>
+(372 jawaban) sejak instrumentasi dipasang. Dari jumlah itu,
+<b>253 dari 253 sitasi terverifikasi</b>
+&mdash; artinya setiap pasal yang disebut memang ada di daftar yang disodorkan ke mesin penjawab.</p>
+<p class="ket"><b>Sebagian besar catatan itu berasal dari pengujian internal, bukan pemohon
+sungguhan</b>, termasuk uji yang sengaja dibuat gagal untuk memeriksa pengamanan. Karena itu angka
+kegagalan di catatan sistem <b>belum bisa dibaca sebagai tingkat kegagalan layanan</b>. Angka
+sesungguhnya baru bisa dihitung setelah penggunaan nyata terkumpul lebih banyak.</p>
+</div>
+
+<div class="meta">
+Disusun otomatis oleh <code>eval/laporan_awam.py</code> dari hasil pengukuran
+<code>laporan_rag.json</code>, <code>ringkasan_produksi.json</code>, <code>baseline.json</code>,
+dan <code>atribusi.json</code> &mdash; tidak ada angka yang ditulis tangan di dokumen ini.<br>
+Versi kode saat diukur: 5c074dd &middot;
+model pencari: jina-embeddings-v3 &middot;
+model pemeringkat: jina-reranker-v3 &middot;
+model penjawab: openai/gpt-oss-20b<br>
+Bobot penggunaan dihitung dari 456 permohonan tercatat.
+Dokumen dibuat 2026-10-05 01:41.
+</div>
+
+</div></body></html>
