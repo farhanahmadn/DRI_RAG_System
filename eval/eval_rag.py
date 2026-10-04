@@ -1153,9 +1153,11 @@ def bangun_html(r: dict) -> str:
   </table>
   Karena itu <code>dense+rerank</code> yang unggul di tabel ini <b>bukan</b> temuan yang belum
   ditindaklanjuti: ia sudah menjadi jalur produksi untuk <code>intensitas</code>. Ia TIDAK
-  diterapkan ke <code>dampak</code> karena di sana arahnya justru sebaliknya dengan n=5 dan
-  p=0.625 — tak terbaca, sehingga perilaku lama dipertahankan. Dan ia tidak relevan bagi
-  <code>itbx</code>, yang di produksi tak menyentuh fusi sama sekali.
+  diterapkan ke <code>dampak</code>, dan itu kini <b>terbukti benar</b> — bukan lagi sikap
+  hati-hati: atas 53 topik dampak berlabel aturan, dense-saja <b>kalah</b> (nDCG@3 0.251 vs
+  0.330, p&lt;0.001, efek −0.66), dan ayat yang benar sampai peringkat 1 hanya pada 8/53 topik
+  lawan 31/53. Dan ia tidak relevan bagi <code>itbx</code>, yang di produksi tak menyentuh
+  fusi sama sekali.
   <br><br>Kolom pembanding memakai <b>{_esc(_LABEL.get(produksi, produksi))}</b> — konfigurasi
   yang berlaku saat angka ini diukur. Rata-rata tak tertimbang di tabel ini juga bukan angka
   produksi: 52 dari {r['n_query']} topik menguji jalur <code>itbx</code> lewat

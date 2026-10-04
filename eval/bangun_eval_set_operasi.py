@@ -57,6 +57,19 @@ from app.reasoning.generator import (  # noqa: E402
 # Rujukan generik yang SELALU dikirim BE utk poin itbx (terhitung 349/349 payload di log).
 _RUJUKAN_ITBX = "RDTR Sleman Matriks ITBX"
 
+# Pasal yang mengatur poin `dampak`, DIBATASI dua ini secara sadar. Keduanya "ketentuan khusus"
+# yang menyebut kode zona eksplisit di dalam teksnya, sehingga label bisa diturunkan dari aturan:
+#   Pasal 53 — kawasan resapan air (langsung soal infiltrasi/limpasan, inti poin dampak)
+#   Pasal 50 — kawasan rawan bencana (gempa, gunung api, banjir lahar, kekeringan, longsor)
+# Pasal lain TIDAK diikutkan walau teksnya mengandung kata "resapan"/"sempadan": penyaringan
+# kata kunci saja ikut menjaring Pasal 44 (luas minimal bidang tanah -> itu poin intensitas),
+# Pasal 1 (definisi istilah), dan Pasal 58. Yang menentukan di sini adalah pasal apa yang
+# MENGATUR dampak, bukan pasal apa yang menyebut katanya.
+_PASAL_DAMPAK = ("50", "53")
+
+# "... pada Zona Badan Jalan dengan kode BJ, Sub-zona Tanaman Pangan dengan kode P-1, ..."
+_RE_KODE_ZONA = re.compile(r"dengan kode ([A-Z]{1,4}(?:-\d+)?)")
+
 
 def _keluarga(zona: str) -> str:
     """'P-1 LP2B' -> 'P', 'RTH-2' -> 'RTH', 'CA' -> 'CA'. Sejalan dgn generator._keluarga_zona."""
@@ -85,6 +98,31 @@ def _muat_zona_korpus(conn, wilayah: str) -> dict[str, dict[str, list[str]]]:
         elif re.search(r"-vb-", cid):
             per_zona[zona]["vb"].append(cid)
     return dict(per_zona)
+
+
+def _muat_ayat_dampak(conn, wilayah: str) -> dict[str, list[str]]:
+    """kode zona -> ayat Pasal 50/53 yang menyebut kode itu eksplisit.
+
+    Inilah yang membuat label `dampak` bisa diturunkan dari aturan, bukan dari penilaian:
+    ayatnya sendiri yang menyatakan berlaku untuk zona mana. Terhitung 6 ayat memuat kode zona
+    (Pasal 50 ayat 3/4/8/9, Pasal 53 ayat 2/3), mencakup 31 dari 32 zona ber-tag di korpus.
+    """
+    per_zona: dict[str, set[str]] = defaultdict(set)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, teks FROM chunks WHERE dokumen ILIKE %s AND level = 'ayat' "
+            "AND pasal = ANY(%s) ORDER BY id",
+            [f"%{wilayah}%", list(_PASAL_DAMPAK)])
+        for cid, teks in cur.fetchall():
+            for kode in {k.upper() for k in _RE_KODE_ZONA.findall(teks or "")}:
+                per_zona[kode].add(cid)
+    return {z: sorted(ids) for z, ids in per_zona.items()}
+
+
+def _kode_dasar(zona: str) -> str:
+    """'P-1 LP2B' -> 'P-1'. Satu-satunya zona ber-tag yang tak disebut Pasal 50/53 adalah
+    'P-1 LP2B' — label gabungan di korpus, yang dasarnya tetap sub-zona P-1."""
+    return zona.split(" ")[0].upper()
 
 
 def _bobot_zona_nyata() -> Counter:
@@ -218,6 +256,49 @@ def bangun(conn, wilayah: str) -> list[dict]:
             dict(t["filter"]), t["relevan"], "aturan",
             "Filter keluarga + query tajam = perilaku PRODUKSI sejak gating dibuka. "
             f'Pasangan dari {t["id"]} — hanya string query yang berbeda.', t["bobot_traffic"]))
+
+    # ---- E. Dampak berlabel ATURAN, dari Pasal 50 & 53 ----
+    # Menggantikan ketergantungan pada 5 topik warisan di bagian C (4 di antaranya memakai query
+    # yang produksi tak pernah terbitkan, semuanya berlabel `seeded`). Topik lama TETAP ada
+    # sebagai pembanding historis, dan tandanya tetap `seeded` supaya pembaca laporan bisa
+    # memisahkan mana yang objektif.
+    #
+    # BATAS LABEL YANG HARUS IKUT TERBAWA: Pasal 53 ayat (1) membatasi keberlakuan ke SWP/Blok
+    # tertentu, dan dari KODE ZONA saja kita tidak bisa tahu apakah lokasi pemohon ada di blok
+    # resapan itu. Jadi label di sini bermakna "KALAU lokasi berada di kawasan resapan air /
+    # rawan bencana, inilah ayat yang mengatur" — bersyarat, lebih lemah daripada label
+    # intensitas/itbx yang tabelnya tanpa syarat milik pemohon. Dinyatakan di `catatan` tiap
+    # topik, bukan cuma di komentar kode, supaya batas itu ikut pindah bersama datanya.
+    ayat_dampak = _muat_ayat_dampak(conn, wilayah)
+    _CATATAN_DAMPAK = (
+        "Label turunan aturan: Pasal 50/53 menyebut kode zona ini eksplisit. BERSYARAT — "
+        "Pasal 53 ayat (1) membatasi keberlakuan ke SWP/Blok tertentu dan itu tak bisa "
+        "ditentukan dari kode zona, jadi ayat ini otoritatif HANYA bila lokasi memang berada "
+        "di kawasan resapan air/rawan bencana."
+    )
+    for zona in sorted(per_zona):
+        relevan = ayat_dampak.get(_kode_dasar(zona)) or []
+        if not relevan:
+            continue
+        topik.append(_topik(
+            f"dampak-zona-{zona}", "search", "dampak",
+            _QUERY_FALLBACK_PER_POIN["dampak"], {"zona": zona}, relevan, "aturan",
+            f"{_CATATAN_DAMPAK} Sub-zona presisi diketahui -> filter exact.",
+            bobot.get(zona, 0)))
+
+    # Cabang mayoritas: sub-zona tak dikonfirmasi -> filter keluarga, seluruh ayat yang mengatur
+    # anggota keluarga itu sah (sejalan dgn perlakuan Lampiran VI/V.B di bagian B).
+    kel_dampak: dict[str, set[str]] = defaultdict(set)
+    for zona in per_zona:
+        kel_dampak[_keluarga(zona)] |= set(ayat_dampak.get(_kode_dasar(zona)) or [])
+    for k, relevan in sorted(kel_dampak.items()):
+        if not relevan:
+            continue
+        topik.append(_topik(
+            f"dampak-keluarga-{k}", "search", "dampak",
+            _QUERY_FALLBACK_PER_POIN["dampak"], {"zona_prefix": k}, sorted(relevan), "aturan",
+            f"{_CATATAN_DAMPAK} Sub-zona tak diketahui -> filter keluarga {k}.",
+            0))
 
     return topik
 

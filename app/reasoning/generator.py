@@ -156,10 +156,12 @@ _QUERY_INTENSITAS_TAJAM = "ambang KDB KLB KDH maksimal minimal"
 # teks tabel Lampiran VI miskin lexeme yang cocok), sehingga RRF mengencerkan peringkat
 # dense dgn daftar yang tak membawa informasi.
 #
-# `dampak` SENGAJA tidak masuk: di sana arahnya justru sebaliknya (0.786 vs 0.719) tapi n=5
-# dan p=0.625 — tak terbaca. Mempertahankan perilaku lama di tempat yang belum terukur
-# adalah pilihan sadar, bukan kelupaan. `itbx` juga tidak: ia lewat get_by_reference dan
-# tak menyentuh fusi sama sekali.
+# `dampak` SENGAJA tidak masuk. Saat keputusan ini diambil alasannya masih lemah (n=5,
+# p=0.625 — tak terbaca, jadi perilaku lama dipertahankan). Setelah topik dampak dibangkitkan
+# berlabel aturan dari Pasal 50 & 53, n jadi 53 dan arahnya TERBUKTI berlawanan: dense-saja
+# KALAH, nDCG@3 0.251 vs 0.330 (p<0.001, efek -0.66), dan tabel yang benar sampai peringkat 1
+# hanya pada 8/53 topik lawan 31/53. Jadi menahan diri waktu itu memang benar, dan sekarang
+# ada buktinya. `itbx` juga tidak masuk: ia lewat get_by_reference dan tak menyentuh fusi.
 _TANPA_LEXICAL_PER_POIN = frozenset({"intensitas"})
 
 # Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
