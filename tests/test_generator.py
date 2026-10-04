@@ -246,8 +246,9 @@ class TestAmbilChunksPendukungZonaFilter:
 
         Pengukuran membalik penilaian itu. Atas 21 keluarga zona dengan filter & label IDENTIK,
         "kdb" memberi nDCG@3 0.157 / Recall@3 30.2% dan tabel ambang yang benar TIDAK PERNAH sampai
-        peringkat 1 (0/21) — jadi cabang ini (74.3% request nyata) bukan "aman", melainkan menjawab
-        tanpa tabel ambang sama sekali. Query tajam: 0.856 / 90.5%, peringkat 1 pada 16/21.
+        peringkat 1 (0/21) — jadi cabang ini bukan "aman", melainkan menjawab tanpa tabel ambang
+        sama sekali. Query tajam: 0.856 / 90.5%, peringkat 1 pada 16/21. Cabang ini menguasai
+        96.4% permohonan (425/441) pada desain 3-poin yang berjalan sekarang.
 
         Ketidakpastian sub-zona tetap nyata dan TIDAK dibantah angka itu — ia ditangani lewat
         caveat (lihat test_caveat_subzona_*), bukan dengan melemahkan query.

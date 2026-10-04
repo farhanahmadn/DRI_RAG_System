@@ -129,9 +129,14 @@ _QUERY_FALLBACK_PER_POIN = {
 # "lebih baik aman tapi kurang presisi". Pengukuran (eval/laporan_rag.html bagian 6, 21 keluarga
 # zona, filter & label IDENTIK, hanya teks query berbeda) menunjukkan ongkos "aman" itu jauh
 # lebih besar dari dugaan: dgn "kdb" polos, nDCG@3 0.157 & Recall@3 30.2%, dan tabel ambang yang
-# benar TIDAK PERNAH sampai peringkat 1 (0/21). Artinya pada cabang ini (74.3% request di
-# logs/precheck.jsonl) sistem sebagian besar bukan "aman", melainkan menjawab TANPA tabel ambang
-# sama sekali. Dgn query tajam: nDCG@3 0.856, Recall@3 90.5%, peringkat 1 pada 16/21 (p=5.3e-05).
+# benar TIDAK PERNAH sampai peringkat 1 (0/21). Artinya pada cabang ini sistem sebagian besar
+# bukan "aman", melainkan menjawab TANPA tabel ambang sama sekali. Dgn query tajam:
+# nDCG@3 0.856, Recall@3 90.5%, peringkat 1 pada 16/21 (p=5.3e-05).
+#
+# Cabang ini menguasai 96.4% permohonan (425 dari 441) pada desain 3-poin yang berjalan
+# sekarang — dihitung HANYA atas era itu. Angka 73%-74% yang sempat tertulis di sini keliru:
+# ia mencampur 309 permohonan era 8-indikator lama (2026-07-20..23, seluruhnya tanpa zona
+# induk) yang tak lagi mewakili produksi.
 #
 # Kekhawatiran aslinya TIDAK terbantah oleh angka itu — label eval menganggap seluruh tabel satu
 # keluarga sah, jadi ia tak bisa memutuskan apakah sub-zona yang DIKUTIP tepat. Karena itu
@@ -144,8 +149,8 @@ _QUERY_INTENSITAS_TAJAM = "ambang KDB KLB KDH maksimal minimal"
 # Poin yang memakai kandidat dense-saja (leg lexical dimatikan) sebelum rerank.
 #
 # Diukur pada titik operasi k=3 SETELAH query tajam dipakai di kedua cabang
-# (eval/laporan_rag.html). Pada cabang mayoritas — filter keluarga, 73% request di
-# logs/precheck.jsonl — dense+rerank unggul nDCG@3 0.978 vs 0.856 (p=0.016, efek +1.00) dan
+# (eval/laporan_rag.html). Pada cabang mayoritas — filter keluarga, 96.4% permohonan desain
+# 3-poin — dense+rerank unggul nDCG@3 0.978 vs 0.856 (p=0.016, efek +1.00) dan
 # menempatkan tabel ambang yang benar di peringkat 1 pada 21/21 keluarga zona, lawan 16/21.
 # Sebabnya terbaca: leg lexical praktis mati untuk query intensitas (Hit@10 hanya 3%, karena
 # teks tabel Lampiran VI miskin lexeme yang cocok), sehingga RRF mengencerkan peringkat
