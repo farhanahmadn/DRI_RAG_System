@@ -1,0 +1,68 @@
+{
+  "dibuat": "2026-10-04T17:21:52+00:00",
+  "cakupan": {
+    "rentang_tanggal_dinilai": [
+      "2026-07-30T07:22:09",
+      "2026-10-02T06:44:22"
+    ],
+    "permohonan_era_sekarang": 444,
+    "permohonan_retriever_nyata": 109,
+    "permohonan_dari_mock": 335,
+    "sitasi_dinilai": 289,
+    "sitasi_per_jenis_id": {
+      "korpus": 238,
+      "anchor": 51
+    },
+    "chunk_tersedia_dari_db": 19
+  },
+  "presisi_korpus": {
+    "n": 238,
+    "kena": 238,
+    "nilai": 1.0
+  },
+  "presisi_anchor": {
+    "n": 51,
+    "kena": 51,
+    "nilai": 1.0
+  },
+  "groundedness_kutipan": {
+    "n": 238,
+    "kena": 234,
+    "nilai": 0.9831932773109243,
+    "kutipan_judul_dokumen": 2,
+    "kutipan_terlalu_pendek_dilewati": 0
+  },
+  "recall_zona": {
+    "n": 66,
+    "kena": 20,
+    "nilai": 0.30303030303030304,
+    "per_poin": {
+      "intensitas": {
+        "n": 42,
+        "kena": 7,
+        "nilai": 0.16666666666666666
+      },
+      "itbx": {
+        "n": 24,
+        "kena": 13,
+        "nilai": 0.5416666666666666
+      }
+    },
+    "dilewati": {
+      "intensitas: tak ada sitasi ber-id korpus utk dinilai": 66,
+      "intensitas: poin tak dinilai/absen": 1,
+      "itbx: tak ada sitasi ber-id korpus utk dinilai": 85
+    }
+  },
+  "kesepakatan_flag_terverifikasi": {
+    "n": 238,
+    "sepakat": 238,
+    "beda": 0,
+    "nilai": 1.0
+  },
+  "berkas_log": "precheck.jsonl",
+  "sejak": null,
+  "dilewati": {
+    "era 8-indikator lama": 309
+  }
+}

@@ -56,18 +56,37 @@
   benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 2 &amp; 3) berguna untuk memahami
   perilaku, tapi <b>tidak boleh dipakai sebagai klaim kinerja</b>.
   Tiap angka disertai selang kepercayaan 95% (bootstrap atas topik, n=161); kolom
-  terakhir menguji apakah selisih terhadap jalur produksi nyata (Wilcoxon signed-rank berpasangan).
+  terakhir menguji apakah selisihnya nyata (Wilcoxon signed-rank berpasangan).
   <b>Selisih yang dinyatakan "setara" tidak boleh diklaim sebagai keunggulan.</b>
   </div>
   <div class="kartu"><table>
     <thead><tr><th>Konfigurasi</th><th>nDCG@3</th><th>Recall@3</th>
-      <th>Hit@3</th><th>MRR</th><th>vs produksi (nDCG@3)</th></tr></thead>
+      <th>Hit@3</th><th>MRR</th>
+      <th>vs RRF + rerank (produksi) (nDCG@3)</th></tr></thead>
     <tbody><tr><td><b>Dense saja</b></td><td>0.116 <span class="ci">[0.077–0.159]</span></td><td>16% <span class="ci">[11%–22%]</span></td><td>19% <span class="ci">[13%–25%]</span></td><td>0.196 <span class="ci">[0.159–0.236]</span></td><td><span class="buruk">lebih buruk -0.331</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>Lexical saja</b></td><td>0.019 <span class="ci">[0.006–0.035]</span></td><td>3% <span class="ci">[1%–5%]</span></td><td>4% <span class="ci">[1%–8%]</span></td><td>0.086 <span class="ci">[0.067–0.106]</span></td><td><span class="buruk">lebih buruk -0.428</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>RRF (tanpa rerank)</b></td><td>0.283 <span class="ci">[0.219–0.349]</span></td><td>31% <span class="ci">[24%–38%]</span></td><td>33% <span class="ci">[25%–40%]</span></td><td>0.396 <span class="ci">[0.341–0.452]</span></td><td><span class="buruk">lebih buruk -0.163</span> <span class="ci">(p=0.001)</span></td></tr><tr><td><b>Dense + rerank (tanpa lexical)</b></td><td>0.546 <span class="ci">[0.487–0.603]</span></td><td>71% <span class="ci">[64%–78%]</span></td><td>75% <span class="ci">[68%–81%]</span></td><td>0.543 <span class="ci">[0.490–0.598]</span></td><td><span class="baik">lebih baik +0.100</span> <span class="ci">(p=0.000)</span></td></tr><tr class="sorot"><td><b>RRF + rerank (produksi)</b></td><td>0.446 <span class="ci">[0.383–0.509]</span></td><td>59% <span class="ci">[51%–66%]</span></td><td>61% <span class="ci">[53%–68%]</span></td><td>0.498 <span class="ci">[0.448–0.550]</span></td><td><span class="net">— (pembanding)</span></td></tr></tbody>
   </table></div>
+  <div class="peringatan">
+  <b>Satu baris tabel di atas BUKAN "jalur produksi".</b> Sejak fusi retrieval dibuat per-poin,
+  tiap poin memakai jalur yang berbeda — justru karena tabel inilah. Yang mana untuk apa:
+  <table style="margin:10px 0">
+    <thead><tr><th>Poin</th><th>Jalur produksi</th></tr></thead>
+    <tbody><tr><td><b>itbx</b></td><td>get_by_reference (lihat bagian ablasi jalur rujukan)</td></tr><tr><td><b>intensitas</b></td><td>dense+rerank</td></tr><tr><td><b>dampak</b></td><td>rrf+rerank</td></tr></tbody>
+  </table>
+  Karena itu <code>dense+rerank</code> yang unggul di tabel ini <b>bukan</b> temuan yang belum
+  ditindaklanjuti: ia sudah menjadi jalur produksi untuk <code>intensitas</code>. Ia TIDAK
+  diterapkan ke <code>dampak</code> karena di sana arahnya justru sebaliknya dengan n=5 dan
+  p=0.625 — tak terbaca, sehingga perilaku lama dipertahankan. Dan ia tidak relevan bagi
+  <code>itbx</code>, yang di produksi tak menyentuh fusi sama sekali.
+  <br><br>Kolom pembanding memakai <b>RRF + rerank (produksi)</b> — konfigurasi
+  yang berlaku saat angka ini diukur. Rata-rata tak tertimbang di tabel ini juga bukan angka
+  produksi: 52 dari 161 topik menguji jalur <code>itbx</code> lewat
+  <code>search</code>, yang di produksi hampir tak pernah menyala.
+  </div>
 
   <h2>2. Ringkasan metrik &amp; ablasi per lapis</h2>
-  <p class="cat">Pipeline produksi adalah dense + lexical → RRF → rerank. Tiap lapis dinilai
-  sendiri supaya kontribusinya terlihat, bukan diasumsikan. Baris hijau = jalur produksi.</p>
+  <p class="cat">Tiap lapis dinilai sendiri supaya kontribusinya terlihat, bukan diasumsikan.
+  Baris hijau = konfigurasi pembanding (RRF + rerank (produksi)), yaitu yang
+  berlaku saat angka ini diukur — bukan jalur produksi tiap poin hari ini (lihat bagian 1).</p>
   <div class="kartu"><table>
     <thead><tr><th>Konfigurasi</th><th>Hit@1</th><th>Hit@3</th><th>Hit@5</th><th>Hit@10</th>
       <th>MRR</th><th>MAP</th><th>nDCG@5</th><th>Recall@5</th><th>P@5</th>
@@ -129,7 +148,37 @@
   dan harus ditangani di sana (mis. narasi menyatakan sub-zona belum terkonfirmasi).
   </div>
 
-  <h2>7. Sisi generasi — data operasional historis</h2>
+  <h2>7. Atribusi sitasi — dihitung dari keluaran nyata</h2>
+  <p class="cat">Bagian-bagian di atas mengukur leg <b>retrieval</b>: apakah chunk yang benar
+  masuk top-k. Bagian ini mengukur hal lain, dan tidak butuh anotator: apakah sitasi yang
+  <b>akhirnya muncul di luaran</b> menunjuk chunk yang nyata, dan apakah kutipannya benar ada di
+  chunk itu. Dihitung dari <code>logs/precheck.jsonl</code> + korpus oleh
+  <code>eval/metrik_atribusi.py</code>.</p>
+  <div class="peringatan">
+  <b>Baca cakupannya dulu.</b> Log bukan trafik produksi yang bersih: dari
+  <b>444</b> permohonan era 3-poin, hanya
+  <b>109</b> yang sitasinya berasal dari retriever nyata —
+  <b>335</b> berasal dari <code>MockRetriever</code> (replay/test
+  lokal) dan dibuang. Kalau tidak dipilah, yang terukur adalah mock, bukan sistem.
+  Rentang tanggal yang terhitung: <b>2026-07-30 .. 2026-10-02</b>.
+  <b>TIDAK disaring per tanggal</b>, jadi angkanya mencampur beberapa versi kode — pakai <code>--sejak</code> sebelum mengutipnya.
+  Sitasi yang dinilai: <b>289</b> {'korpus': 238, 'anchor': 51}.
+  </div>
+  <div class="kartu"><table>
+    <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang ditangkap</th></tr></thead>
+    <tbody><tr><td>Presisi sitasi — id chunk ada di korpus</td><td><b>100.0%</b> <span class="net">(n=238, 238)</span></td><td class='net'>menangkap halusinasi rujukan</td></tr><tr><td>Presisi sitasi anchor — indeks dasar_hukum sah</td><td><b>100.0%</b> <span class="net">(n=51, 51)</span></td><td class='net'>anchor-N harus menunjuk item yang benar-benar dikirim back-end</td></tr><tr><td>Groundedness kutipan — teks ada di chunk disitasi</td><td><b>98.3%</b> <span class="net">(n=238, 234)</span></td><td class='net'>menangkap kutipan karangan; normalisasi spasi &amp;amp; tanda baca</td></tr><tr><td>Recall sitasi terhadap keluarga zona pemohon</td><td><b>30.3%</b> <span class="net">(n=66, 20)</span></td><td class='net'>menangkap kelas bug APP-2026-6191/2428</td></tr><tr><td>Kesepakatan flag &lt;code&gt;terverifikasi&lt;/code&gt;</td><td><b>100.0%</b> <span class="net">(n=238, 238)</span></td><td class='net'>flag sistem hanya memeriksa keberadaan id, bukan isi kutipan</td></tr></tbody>
+  </table></div>
+  <p class="cat">Recall zona dihitung <b>per poin</b>, bukan per permohonan: ketentuan
+  <code>dampak</code> tersaji sebagai pasal prosa lintas-zona, jadi menuntut sitasi ber-zona di
+  sana akan menandai jawaban yang benar sebagai salah — karena itu ia tidak muncul di tabel
+  berikut.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>Recall sitasi thd zona pemohon</th></tr></thead>
+    <tbody><tr><td><code>intensitas</code></td><td><b>16.7%</b> <span class="net">(n=42, 7)</span></td></tr><tr><td><code>itbx</code></td><td><b>54.2%</b> <span class="net">(n=24, 13)</span></td></tr></tbody>
+  </table></div>
+  <div class="peringatan"><br><br><b>Mode gagal yang tertangkap:</b> 2 kutipan berisi <b>judul dokumen</b>, bukan isi pasal — formalnya bersitasi dan <code>terverifikasi</code> tetap true, substansinya tidak menjelaskan apa pun.</div>
+
+  <h2>8. Sisi generasi — data operasional historis</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Baca dengan hati-hati — ini BUKAN tingkat kegagalan produksi.</b> Rekap ini diambil dari kunci
   <code>diagnostik</code> yang sudah terkumpul di <code>logs/precheck.jsonl</code>
@@ -146,7 +195,7 @@
   "terverifikasi" berarti <i>citation_id</i> memang ada di daftar kandidat yang disodorkan
   (anti-halusinasi) — bukan jaminan kandidatnya relevan secara hukum.</p>
 
-  <h2>8. Batas pembacaan</h2>
+  <h2>9. Batas pembacaan</h2>
   <div class="peringatan">
   <ul>
     <li><b>Ground truth diseed developer, belum divalidasi ahli tata ruang.</b> Angka di sini

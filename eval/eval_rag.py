@@ -53,8 +53,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.reasoning.generator import (  # noqa: E402
-    _QUERY_INTENSITAS_TAJAM,
     _QUERY_FALLBACK_PER_POIN,
+    _QUERY_INTENSITAS_TAJAM,
+    _TANPA_LEXICAL_PER_POIN,
     _pilih_chunks_referensi,
 )
 from app.retrieval import db, fusion, rerank  # noqa: E402
@@ -781,10 +782,64 @@ def _fmt_uji(e: dict | None) -> str:
             f'<span class="ci">(p={e["p"]:.3f})</span>')
 
 
+def muat_atribusi(berkas: Path | None = None) -> dict | None:
+    """Baca hasil eval/metrik_atribusi.py kalau sudah pernah dijalankan.
+
+    Terpisah dari evaluasi retrieval dengan sengaja: metrik atribusi dihitung dari log keluaran
+    nyata dan tidak memanggil DB/API retrieval, jadi keduanya punya siklus hidup berbeda dan
+    tidak boleh saling memaksa dijalankan ulang. Kalau belum ada, bagiannya TIDAK dicetak —
+    laporan tanpa bagian itu lebih jujur daripada bagian berisi angka basi.
+    """
+    berkas = berkas or (Path(__file__).parent / "atribusi.json")
+    if not berkas.exists():
+        return None
+    try:
+        return json.loads(berkas.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _fmt_atribusi(e: dict) -> str:
+    """Penyebut nol -> "tak terukur", bukan 0%. 0% terbaca sebagai gagal total."""
+    nilai = e.get("nilai")
+    if nilai is None:
+        return '<span class="net">tak terukur</span>'
+    inti = e.get("kena", e.get("sepakat"))
+    return f'<b>{nilai:.1%}</b> <span class="net">(n={e["n"]}, {inti})</span>'
+
+
+def _konfigurasi_produksi_per_poin() -> dict[str, str]:
+    """Poin -> baris tabel mana yang mewakili jalur produksinya.
+
+    Diturunkan dari `generator._TANPA_LEXICAL_PER_POIN`, bukan ditulis ulang di sini: sejak fusi
+    jadi per-poin, "produksi" BUKAN satu baris tabel lagi, dan laporan yang menyorot satu baris
+    sebagai produksi akan menyesatkan pembacanya. Kalau konfigurasi di generator berubah, tabel
+    ini ikut berubah dengan sendirinya.
+    """
+    peta = {}
+    for poin in ("itbx", "intensitas", "dampak"):
+        if poin == "itbx":
+            # Produksi selalu lewat get_by_reference (anchor dari back-end); jalur search hanya
+            # cadangan kalau BE tak mengirim dasar_hukum. Lihat bagian ablasi jalur rujukan.
+            peta[poin] = "get_by_reference (lihat bagian ablasi jalur rujukan)"
+        elif poin in _TANPA_LEXICAL_PER_POIN:
+            peta[poin] = "dense+rerank"
+        else:
+            peta[poin] = "rrf+rerank"
+    return peta
+
+
 def bangun_html(r: dict) -> str:
     kfg = r["konfigurasi"]
     agg = r["agregat"]
-    produksi = "rrf+rerank" if "rrf+rerank" in kfg else "rrf"
+    # Pembanding statistik = konfigurasi yang dipakai saat angka ini DIUKUR (tersimpan di hasil),
+    # bukan konfigurasi produksi hari ini. Keduanya bisa beda setelah perubahan, dan menamainya
+    # "produksi" tanpa syarat adalah cara tercepat membuat tabel ini berbohong.
+    produksi = r.get("produksi") or ("rrf+rerank" if "rrf+rerank" in kfg else "rrf")
+    peta_produksi = _konfigurasi_produksi_per_poin()
+    baris_peta = "".join(
+        f"<tr><td><b>{_esc(poin)}</b></td><td>{_esc(cfg)}</td></tr>"
+        for poin, cfg in peta_produksi.items())
 
     hit = {k: [agg[k][f"hit@{n}"] for n in _K_LIST] for k in kfg}
     mutu_kat = ["MRR", "MAP", "nDCG@5", "Recall@5"]
@@ -830,9 +885,11 @@ def bangun_html(r: dict) -> str:
     _ada_anchor = bool((r.get("anchor") or {}).get("n_query"))
     _ada_abq = bool((r.get("ablasi_query") or {}).get("n_keluarga"))
     _ada_gen = bool((r.get("generasi") or {}).get("n_poin"))
+    _ada_atr = bool(r.get("atribusi") or muat_atribusi())
     _nomor_anchor = 5
     _nomor_abq = _nomor_anchor + (1 if _ada_anchor else 0)
-    _nomor_gen = _nomor_abq + (1 if _ada_abq else 0)
+    _nomor_atr = _nomor_abq + (1 if _ada_abq else 0)
+    _nomor_gen = _nomor_atr + (1 if _ada_atr else 0)
     _nomor_batas = _nomor_gen + (1 if _ada_gen else 0)
 
     # --- Ablasi jalur rujukan (anchor) ---------------------------------------------------
@@ -915,6 +972,70 @@ def bangun_html(r: dict) -> str:
   sub-zona yang salah sebagai milik pemohon. Risiko itu ada di lapis generasi, bukan retrieval,
   dan harus ditangani di sana (mis. narasi menyatakan sub-zona belum terkonfirmasi).
   </div>"""
+
+    # --- Atribusi sitasi (dari log keluaran nyata) --------------------------------------
+    atr = r.get("atribusi") or muat_atribusi()
+    blok_atr = ""
+    if atr:
+        ca = atr["cakupan"]
+        rt = ca.get("rentang_tanggal_dinilai")
+        rz = atr["recall_zona"]
+        baris_atr = "".join(
+            f"<tr><td>{_esc(label)}</td><td>{_fmt_atribusi(atr[kunci])}</td>"
+            f"<td class='net'>{_esc(ket)}</td></tr>"
+            for kunci, label, ket in (
+                ("presisi_korpus", "Presisi sitasi — id chunk ada di korpus",
+                 "menangkap halusinasi rujukan"),
+                ("presisi_anchor", "Presisi sitasi anchor — indeks dasar_hukum sah",
+                 "anchor-N harus menunjuk item yang benar-benar dikirim back-end"),
+                ("groundedness_kutipan", "Groundedness kutipan — teks ada di chunk disitasi",
+                 "menangkap kutipan karangan; normalisasi spasi &amp; tanda baca"),
+                ("recall_zona", "Recall sitasi terhadap keluarga zona pemohon",
+                 "menangkap kelas bug APP-2026-6191/2428"),
+                ("kesepakatan_flag_terverifikasi", "Kesepakatan flag <code>terverifikasi</code>",
+                 "flag sistem hanya memeriksa keberadaan id, bukan isi kutipan"),
+            ))
+        baris_rz = "".join(
+            f"<tr><td><code>{_esc(pid)}</code></td><td>{_fmt_atribusi(e)}</td></tr>"
+            for pid, e in rz.get("per_poin", {}).items())
+        g = atr["groundedness_kutipan"]
+        catatan_judul = (
+            f"<br><br><b>Mode gagal yang tertangkap:</b> {g['kutipan_judul_dokumen']} kutipan "
+            "berisi <b>judul dokumen</b>, bukan isi pasal — formalnya bersitasi dan "
+            "<code>terverifikasi</code> tetap true, substansinya tidak menjelaskan apa pun."
+        ) if g.get("kutipan_judul_dokumen") else ""
+        blok_atr = f"""
+  <h2>{_nomor_atr}. Atribusi sitasi — dihitung dari keluaran nyata</h2>
+  <p class="cat">Bagian-bagian di atas mengukur leg <b>retrieval</b>: apakah chunk yang benar
+  masuk top-k. Bagian ini mengukur hal lain, dan tidak butuh anotator: apakah sitasi yang
+  <b>akhirnya muncul di luaran</b> menunjuk chunk yang nyata, dan apakah kutipannya benar ada di
+  chunk itu. Dihitung dari <code>logs/precheck.jsonl</code> + korpus oleh
+  <code>eval/metrik_atribusi.py</code>.</p>
+  <div class="peringatan">
+  <b>Baca cakupannya dulu.</b> Log bukan trafik produksi yang bersih: dari
+  <b>{ca['permohonan_era_sekarang']}</b> permohonan era 3-poin, hanya
+  <b>{ca['permohonan_retriever_nyata']}</b> yang sitasinya berasal dari retriever nyata —
+  <b>{ca['permohonan_dari_mock']}</b> berasal dari <code>MockRetriever</code> (replay/test
+  lokal) dan dibuang. Kalau tidak dipilah, yang terukur adalah mock, bukan sistem.
+  {f"Rentang tanggal yang terhitung: <b>{rt[0][:10]} .. {rt[1][:10]}</b>." if rt else ""}
+  {f"Disaring sejak <b>{_esc(atr['sejak'])}</b>." if atr.get("sejak") else
+   "<b>TIDAK disaring per tanggal</b>, jadi angkanya mencampur beberapa versi kode — "
+   "pakai <code>--sejak</code> sebelum mengutipnya."}
+  Sitasi yang dinilai: <b>{ca['sitasi_dinilai']}</b> {_esc(str(ca['sitasi_per_jenis_id']))}.
+  </div>
+  <div class="kartu"><table>
+    <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang ditangkap</th></tr></thead>
+    <tbody>{baris_atr}</tbody>
+  </table></div>
+  <p class="cat">Recall zona dihitung <b>per poin</b>, bukan per permohonan: ketentuan
+  <code>dampak</code> tersaji sebagai pasal prosa lintas-zona, jadi menuntut sitasi ber-zona di
+  sana akan menandai jawaban yang benar sebagai salah — karena itu ia tidak muncul di tabel
+  berikut.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>Recall sitasi thd zona pemohon</th></tr></thead>
+    <tbody>{baris_rz}</tbody>
+  </table></div>
+  <div class="peringatan">{catatan_judul}</div>"""
 
     gen = r.get("generasi") or {}
     blok_gen = ""
@@ -1014,18 +1135,37 @@ def bangun_html(r: dict) -> str:
   benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 2 &amp; 3) berguna untuk memahami
   perilaku, tapi <b>tidak boleh dipakai sebagai klaim kinerja</b>.
   Tiap angka disertai selang kepercayaan 95% (bootstrap atas topik, n={r['n_query']}); kolom
-  terakhir menguji apakah selisih terhadap jalur produksi nyata (Wilcoxon signed-rank berpasangan).
+  terakhir menguji apakah selisihnya nyata (Wilcoxon signed-rank berpasangan).
   <b>Selisih yang dinyatakan "setara" tidak boleh diklaim sebagai keunggulan.</b>
   </div>
   <div class="kartu"><table>
     <thead><tr><th>Konfigurasi</th><th>nDCG@{_K_OPERASI}</th><th>Recall@{_K_OPERASI}</th>
-      <th>Hit@{_K_OPERASI}</th><th>MRR</th><th>vs produksi (nDCG@{_K_OPERASI})</th></tr></thead>
+      <th>Hit@{_K_OPERASI}</th><th>MRR</th>
+      <th>vs {_esc(_LABEL.get(produksi, produksi))} (nDCG@{_K_OPERASI})</th></tr></thead>
     <tbody>{baris_operasi}</tbody>
   </table></div>
+  <div class="peringatan">
+  <b>Satu baris tabel di atas BUKAN "jalur produksi".</b> Sejak fusi retrieval dibuat per-poin,
+  tiap poin memakai jalur yang berbeda — justru karena tabel inilah. Yang mana untuk apa:
+  <table style="margin:10px 0">
+    <thead><tr><th>Poin</th><th>Jalur produksi</th></tr></thead>
+    <tbody>{baris_peta}</tbody>
+  </table>
+  Karena itu <code>dense+rerank</code> yang unggul di tabel ini <b>bukan</b> temuan yang belum
+  ditindaklanjuti: ia sudah menjadi jalur produksi untuk <code>intensitas</code>. Ia TIDAK
+  diterapkan ke <code>dampak</code> karena di sana arahnya justru sebaliknya dengan n=5 dan
+  p=0.625 — tak terbaca, sehingga perilaku lama dipertahankan. Dan ia tidak relevan bagi
+  <code>itbx</code>, yang di produksi tak menyentuh fusi sama sekali.
+  <br><br>Kolom pembanding memakai <b>{_esc(_LABEL.get(produksi, produksi))}</b> — konfigurasi
+  yang berlaku saat angka ini diukur. Rata-rata tak tertimbang di tabel ini juga bukan angka
+  produksi: 52 dari {r['n_query']} topik menguji jalur <code>itbx</code> lewat
+  <code>search</code>, yang di produksi hampir tak pernah menyala.
+  </div>
 
   <h2>2. Ringkasan metrik &amp; ablasi per lapis</h2>
-  <p class="cat">Pipeline produksi adalah dense + lexical → RRF → rerank. Tiap lapis dinilai
-  sendiri supaya kontribusinya terlihat, bukan diasumsikan. Baris hijau = jalur produksi.</p>
+  <p class="cat">Tiap lapis dinilai sendiri supaya kontribusinya terlihat, bukan diasumsikan.
+  Baris hijau = konfigurasi pembanding ({_esc(_LABEL.get(produksi, produksi))}), yaitu yang
+  berlaku saat angka ini diukur — bukan jalur produksi tiap poin hari ini (lihat bagian 1).</p>
   <div class="kartu"><table>
     <thead><tr><th>Konfigurasi</th>{''.join(f'<th>Hit@{n}</th>' for n in _K_LIST)}
       <th>MRR</th><th>MAP</th><th>nDCG@5</th><th>Recall@5</th><th>P@5</th>
@@ -1048,6 +1188,7 @@ def bangun_html(r: dict) -> str:
       [_WARNA.get(k, "#64748b") for k in kfg], " ms")}</div>
 {blok_anchor}
 {blok_abq}
+{blok_atr}
 {blok_gen}
 
   <h2>{_nomor_batas}. Batas pembacaan</h2>
