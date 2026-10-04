@@ -782,6 +782,17 @@ def _fmt_uji(e: dict | None) -> str:
             f'<span class="ci">(p={e["p"]:.3f})</span>')
 
 
+def muat_baseline(berkas: Path | None = None) -> dict | None:
+    """Baca lantai acak & langit-langit dari eval/baseline_acak.py kalau sudah dijalankan."""
+    berkas = berkas or (Path(__file__).parent / "baseline.json")
+    if not berkas.exists():
+        return None
+    try:
+        return json.loads(berkas.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 def muat_atribusi(berkas: Path | None = None) -> dict | None:
     """Baca hasil eval/metrik_atribusi.py kalau sudah pernah dijalankan.
 
@@ -880,17 +891,123 @@ def bangun_html(r: dict) -> str:
             f'<td>{_fmt_ci(c["mrr"])}</td>'
             f'<td>{_fmt_uji(uji_all.get(k, {}).get(f"ndcg@{_K_OPERASI}"))}</td></tr>')
 
-    # Bagian 1-4 selalu ada; sisanya bergantung isi hasil. Nomornya diturunkan dari data,
+    # Bagian 1-5 selalu ada (bagian 2 hanya bila baseline.json ada); sisanya bergantung isi
+    # hasil. Nomornya diturunkan dari data,
     # bukan ditanam, supaya laporan dari eval set tanpa jalur rujukan tidak melompati nomor.
     _ada_anchor = bool((r.get("anchor") or {}).get("n_query"))
     _ada_abq = bool((r.get("ablasi_query") or {}).get("n_keluarga"))
     _ada_gen = bool((r.get("generasi") or {}).get("n_poin"))
     _ada_atr = bool(r.get("atribusi") or muat_atribusi())
-    _nomor_anchor = 5
+    _nomor_anchor = 6
     _nomor_abq = _nomor_anchor + (1 if _ada_anchor else 0)
     _nomor_atr = _nomor_abq + (1 if _ada_abq else 0)
     _nomor_gen = _nomor_atr + (1 if _ada_atr else 0)
     _nomor_batas = _nomor_gen + (1 if _ada_gen else 0)
+
+    # --- Cara membaca skor: lantai, langit-langit, rujukan terbitan ----------------------
+    bl = r.get("baseline") or muat_baseline()
+    blok_tafsir = ""
+    if bl:
+        la = bl["lantai_acak"]["metrik"]
+        bk = bl["lantai_acak"]["besar_kandidat"]
+        lg = bl["langit_langit"]
+        nd_acak = la.get(f"ndcg@{_K_OPERASI}", 0.0)
+        baris_banding = ""
+        # Urutan sengaja: lantai -> jalur nyata -> langit. Pembaca melihat rentang yang mungkin
+        # dulu, baru posisi sistem di dalamnya.
+        banding = [("Urutan ACAK dari kandidat yang lolos filter (lantai, dihitung)",
+                    nd_acak, "simulasi 2.000x/topik atas korpus ini")]
+        for k in kfg:
+            c = ci_all.get(k, {})
+            if c:
+                banding.append((f"{_LABEL.get(k, k)} (terukur)", c[f"ndcg@{_K_OPERASI}"]["rata"],
+                                f"n={r['n_query']} topik"))
+        for label, nilai, ket in banding:
+            kali = f"{nilai / nd_acak:,.0f}&times;" if nd_acak > 0 else "—"
+            baris_banding += (f"<tr><td>{_esc(label)}</td><td><b>{nilai:.3f}</b></td>"
+                              f"<td>{kali}</td><td class='net'>{_esc(ket)}</td></tr>")
+        blok_tafsir = f"""
+  <h2>2. Cara membaca skor — dan mengapa tidak ada ambang &ldquo;bagus/buruk&rdquo; yang baku</h2>
+  <div class="peringatan" style="margin-bottom:14px">
+  <b>Tidak ada ambang absolut untuk nDCG di literatur yang ditelaah sejawat.</b> Yang beredar
+  (&ldquo;&gt;0,9 sangat baik, 0,7&ndash;0,9 baik, &lt;0,5 buruk&rdquo;) berasal dari dokumentasi
+  vendor dan blog, bukan dari makalah. Ambang semacam itu <b>tidak bisa</b> ada, karena nDCG
+  bergantung pada koleksinya: berapa kandidat yang lolos filter, berapa chunk yang dilabeli
+  relevan, dan serapat apa pesaingnya. Skor yang sama bisa berarti nyaris sempurna di satu
+  koleksi dan nyaris acak di koleksi lain. Mencantumkan ambang pinjaman di laporan ini justru
+  akan <b>melemahkan</b> keabsahannya di mata pemeriksa yang paham IR.
+  </div>
+  <p class="cat">Yang sah adalah tiga pembanding berikut: <b>lantai</b> yang dihitung dari
+  koleksi ini sendiri, <b>langit-langit</b> yang ditentukan struktur label, dan <b>rujukan
+  terbitan</b> sebagai konteks besaran.</p>
+
+  <h3>a. Lantai: berapa skor &ldquo;tanpa kepintaran apa pun&rdquo;</h3>
+  <p class="cat">Harapan nDCG@{_K_OPERASI} bila sistem mengambil {_K_OPERASI} chunk ACAK dari
+  kandidat yang lolos filter topik itu — jadi filternya sama, yang hilang hanya peringkatnya.
+  Besar kandidat per topik: min {bk['min']}, median {bk['median']:.0f}, maks {bk['maks']} chunk.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Jalur</th><th>nDCG@{_K_OPERASI}</th><th>Kelipatan lantai</th>
+      <th>Dasar</th></tr></thead>
+    <tbody>{baris_banding}</tbody>
+  </table></div>
+  <p class="cat">Inilah satu-satunya pernyataan absolut yang bisa dipertahankan dari tabel ini:
+  jalur produksi berada <b>puluhan kali</b> di atas lantai acak, sementara leg lexical sendirian
+  hanya beberapa kali di atasnya &mdash; itu ukuran kuantitatif bahwa leg tersebut nyaris tak
+  membawa informasi untuk query yang dipakai sistem, bukan kesan.</p>
+
+  <h3>b. Langit-langit: skor 1,0 belum tentu mungkin</h3>
+  <p class="cat">{_esc(lg["catatan"])} Recall@{_K_OPERASI} tertinggi yang mungkin atas eval set
+  ini: <b>{lg[f"recall@{_K_OPERASI}_maks"]:.3f}</b>. Jadi membandingkan Recall@{_K_OPERASI}
+  dengan 1,0 di sini masih adil, tapi pemeriksaannya wajib dilakukan &mdash; kalau satu topik
+  punya 6 chunk relevan sedangkan sistem mengirim {_K_OPERASI}, langit-langitnya 50% dan menuntut
+  100% berarti menghukum sistem atas batas yang dibuat desain.</p>
+
+  <h3>c. Rujukan terbitan: berapa skor yang wajar di koleksi nyata</h3>
+  <p class="cat">Pada <b>BEIR</b> &mdash; tolok ukur retrieval zero-shot yang paling banyak
+  dipakai, 18 koleksi lintas domain &mdash; <b>BM25</b>, baseline leksikal standar yang kuat,
+  mencatat rata-rata <b>nDCG@10 &asymp; 0,43</b>. Artinya kisaran 0,3&ndash;0,5 adalah wilayah
+  kerja baseline yang terhormat di koleksi heterogen nyata, bukan tanda kegagalan. Angka itu
+  <b>bukan ambang</b> dan tidak sebanding langsung dengan angka kita (beda koleksi, beda k, beda
+  bentuk relevansi) &mdash; ia hanya memberi rasa besaran.</p>
+
+  <h3>d. Untuk klaim perbandingan: signifikansi dan ukuran efek</h3>
+  <p class="cat">Karena ambang absolut tak tersedia, klaim yang dapat dipertahankan adalah klaim
+  <b>relatif</b>: konfigurasi A versus B atas topik dan label yang IDENTIK. Untuk itu laporan ini
+  memakai uji berpasangan <b>Wilcoxon signed-rank</b> dan melaporkan <b>ukuran efek</b>
+  (rank-biserial) berdampingan dengan p-value, supaya &ldquo;signifikan&rdquo; tidak tertukar
+  dengan &ldquo;besar&rdquo;. Konvensi besaran yang dipakai sebagai rujukan kasar adalah
+  Cohen: 0,10 kecil &middot; 0,30 sedang &middot; 0,50 besar &mdash; dengan catatan Cohen sendiri
+  kemudian memperingatkan agar konvensi itu tidak dipakai lepas dari konteks bidangnya.
+  Selang kepercayaan dihitung lewat <b>bootstrap</b> atas topik.</p>
+
+  <div class="peringatan">
+  <b>Rujukan.</b> Metodologi di laporan ini bersandar pada:
+  <ul>
+    <li>Järvelin, K. &amp; Kekäläinen, J. (2002). <i>Cumulated Gain-Based Evaluation of IR
+        Techniques.</i> ACM TOIS 20(4):422&ndash;446. doi:10.1145/582415.582418 &mdash; asal
+        metrik nDCG. <b>Catatan penting:</b> nDCG dirancang untuk relevansi BERGRADASI,
+        sedangkan label kita biner, sehingga nDCG di sini lebih kasar daripada maksud aslinya.</li>
+    <li>Thakur, N., Reimers, N., Rücklé, A., Srivastava, A. &amp; Gurevych, I. (2021).
+        <i>BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of Information Retrieval
+        Models.</i> NeurIPS 2021 Datasets &amp; Benchmarks Track &mdash; alasan nDCG@k dipakai
+        sebagai metrik primer.</li>
+    <li>Kamalloo, E., Thakur, N., Lassance, C., Ma, X., Yang, J. &amp; Lin, J. (2024).
+        <i>Resources for Brewing BEIR: Reproducible Reference Models and Statistical Analyses.</i>
+        SIGIR 2024, 1431&ndash;1440 &mdash; sumber angka baseline BM25 di butir (c).</li>
+    <li>Sakai, T. (2018). <i>Laboratory Experiments in Information Retrieval: Sample Sizes,
+        Effect Sizes, and Statistical Power.</i> Springer &mdash; dasar pelaporan ukuran efek,
+        daya statistik, dan penentuan jumlah topik.</li>
+    <li>Wilcoxon, F. (1945). <i>Individual Comparisons by Ranking Methods.</i> Biometrics
+        Bulletin 1(6):80&ndash;83 &mdash; uji berpasangan yang dipakai.</li>
+    <li>Efron, B. (1979). <i>Bootstrap Methods: Another Look at the Jackknife.</i> Annals of
+        Statistics 7(1):1&ndash;26 &mdash; dasar selang kepercayaan bootstrap.</li>
+    <li>Cohen, J. (1988). <i>Statistical Power Analysis for the Behavioral Sciences</i> (ed. ke-2).
+        Lawrence Erlbaum &mdash; konvensi besaran ukuran efek.</li>
+  </ul>
+  Rincian bibliografis di atas dirangkum dari pencarian sumber sekunder. <b>Sebelum dikutip di
+  dokumen resmi (mis. berkas pengajuan paten), tiap entri &mdash; terutama angka baseline BM25
+  dan nomor halaman &mdash; wajib diperiksa ulang ke makalah aslinya.</b>
+  </div>"""
 
     # --- Ablasi jalur rujukan (anchor) ---------------------------------------------------
     anc = r.get("anchor") or {}
@@ -1089,6 +1206,7 @@ def bangun_html(r: dict) -> str:
   main {{ max-width: 860px; margin: 0 auto; }}
   h1 {{ font-size:25px; margin:0 0 4px; letter-spacing:-.02em; }}
   h2 {{ font-size:18px; margin:34px 0 10px; letter-spacing:-.01em; }}
+  h3 {{ font-size:15px; margin:22px 0 6px; color:var(--redup); font-weight:600; }}
   .sub {{ color:var(--redup); margin:0 0 6px; }}
   .kartu {{ background:var(--kartu); border:1px solid var(--grs); border-radius:10px;
             padding:14px; margin:14px 0; overflow-x:auto; }}
@@ -1163,8 +1281,9 @@ def bangun_html(r: dict) -> str:
   produksi: 52 dari {r['n_query']} topik menguji jalur <code>itbx</code> lewat
   <code>search</code>, yang di produksi hampir tak pernah menyala.
   </div>
+{blok_tafsir}
 
-  <h2>2. Ringkasan metrik &amp; ablasi per lapis</h2>
+  <h2>3. Ringkasan metrik &amp; ablasi per lapis</h2>
   <p class="cat">Tiap lapis dinilai sendiri supaya kontribusinya terlihat, bukan diasumsikan.
   Baris hijau = konfigurasi pembanding ({_esc(_LABEL.get(produksi, produksi))}), yaitu yang
   berlaku saat angka ini diukur — bukan jalur produksi tiap poin hari ini (lihat bagian 1).</p>
@@ -1175,11 +1294,11 @@ def bangun_html(r: dict) -> str:
     <tbody>{baris_tabel}</tbody>
   </table></div>
 
-  <h2>3. Hit-Rate menurut kedalaman</h2>
+  <h2>4. Hit-Rate menurut kedalaman</h2>
   <p class="cat">Seberapa sering minimal satu chunk relevan masuk peringkat-k teratas.</p>
   <div class="kartu">{_bar_berkelompok("Hit-Rate@k", [f"@{n}" for n in _K_LIST], hit)}</div>
 
-  <h2>4. Mutu peringkat</h2>
+  <h2>5. Mutu peringkat</h2>
   <p class="cat">Hit-Rate hanya menanyakan "ketemu atau tidak". Metrik di bawah menanyakan
   "ketemu di posisi berapa" dan "berapa banyak yang ketemu" — di sinilah reranker seharusnya
   membayar dirinya sendiri.</p>

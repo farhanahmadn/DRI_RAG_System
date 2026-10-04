@@ -1,0 +1,40 @@
+{
+  "dibuat": "2026-10-04T18:10:58+00:00",
+  "berkas_eval": "eval_set_operasi.jsonl",
+  "n_simulasi": 2000,
+  "seed": 20261005,
+  "k_operasi": 3,
+  "lantai_acak": {
+    "metrik": {
+      "rr": 0.010646699302774069,
+      "hit@1": 0.003670560747663551,
+      "recall@1": 0.0023142523364485983,
+      "precision@1": 0.003670560747663551,
+      "ndcg@1": 0.003670560747663551,
+      "hit@3": 0.010995327102803739,
+      "recall@3": 0.007066394080996885,
+      "precision@3": 0.003676791277258567,
+      "ndcg@3": 0.005598208634100733,
+      "hit@5": 0.01808644859813084,
+      "recall@5": 0.011601246105919004,
+      "precision@5": 0.0036345794392523365,
+      "ndcg@5": 0.007649432990188588,
+      "hit@10": 0.03613551401869159,
+      "recall@10": 0.023573792834890965,
+      "precision@10": 0.003649299065420561,
+      "ndcg@10": 0.011887229997771245,
+      "ap": 0.0068730516460218565
+    },
+    "n_topik": 214,
+    "besar_kandidat": {
+      "min": 423,
+      "median": 424.0,
+      "maks": 484
+    }
+  },
+  "langit_langit": {
+    "recall@3_maks": 0.9964953271028038,
+    "topik_relevan_lebih_dari_k": 3,
+    "catatan": "nDCG@3 tetap bisa 1.0 karena idealnya ikut dibatasi k, tapi Recall@3 tidak: 3 topik punya lebih dari 3 chunk relevan, sehingga Recall@3 tertingginya di bawah 100%."
+  }
+}
