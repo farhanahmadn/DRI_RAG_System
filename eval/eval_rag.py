@@ -782,6 +782,17 @@ def _fmt_uji(e: dict | None) -> str:
             f'<span class="ci">(p={e["p"]:.3f})</span>')
 
 
+def muat_ringkasan_produksi(berkas: Path | None = None) -> dict | None:
+    """Baca hasil eval/ringkasan_produksi.py kalau sudah dijalankan."""
+    berkas = berkas or (Path(__file__).parent / "ringkasan_produksi.json")
+    if not berkas.exists():
+        return None
+    try:
+        return json.loads(berkas.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 def muat_baseline(berkas: Path | None = None) -> dict | None:
     """Baca lantai acak & langit-langit dari eval/baseline_acak.py kalau sudah dijalankan."""
     berkas = berkas or (Path(__file__).parent / "baseline.json")
@@ -891,18 +902,90 @@ def bangun_html(r: dict) -> str:
             f'<td>{_fmt_ci(c["mrr"])}</td>'
             f'<td>{_fmt_uji(uji_all.get(k, {}).get(f"ndcg@{_K_OPERASI}"))}</td></tr>')
 
-    # Bagian 1-5 selalu ada (bagian 2 hanya bila baseline.json ada); sisanya bergantung isi
+    # Bagian 1 & 4-6 selalu ada; bagian 2 bergantung ringkasan_produksi.json dan bagian 3
+    # bergantung baseline.json. Sisanya bergantung isi
     # hasil. Nomornya diturunkan dari data,
     # bukan ditanam, supaya laporan dari eval set tanpa jalur rujukan tidak melompati nomor.
     _ada_anchor = bool((r.get("anchor") or {}).get("n_query"))
     _ada_abq = bool((r.get("ablasi_query") or {}).get("n_keluarga"))
     _ada_gen = bool((r.get("generasi") or {}).get("n_poin"))
     _ada_atr = bool(r.get("atribusi") or muat_atribusi())
-    _nomor_anchor = 6
+    _nomor_anchor = 7
     _nomor_abq = _nomor_anchor + (1 if _ada_anchor else 0)
     _nomor_atr = _nomor_abq + (1 if _ada_abq else 0)
     _nomor_gen = _nomor_atr + (1 if _ada_atr else 0)
     _nomor_batas = _nomor_gen + (1 if _ada_gen else 0)
+
+    # --- Ringkasan kinerja per-poin pada jalur produksi -----------------------------------
+    rp = r.get("ringkasan_produksi") or muat_ringkasan_produksi()
+    blok_produksi = ""
+    if rp and rp.get("baris"):
+        bt = rp["bobot_trafik"]
+        baris_rp = ""
+        poin_terakhir = None
+        for row in rp["baris"]:
+            m = row["metrik"]
+
+            def sel(kunci, e=m):
+                d = e.get(kunci) or {}
+                u = d.get("ukur")
+                if u is None:
+                    return "<td>&mdash;</td>"
+                dl = d.get("dari_langit")
+                tail = f' <span class="net">{dl:.0%}</span>' if dl is not None else ""
+                return f"<td><b>{u:.3f}</b>{tail}</td>"
+
+            bobot = row.get("bobot_nilai")
+            bobot_txt = f"{bobot:.0%}" if bobot is not None else "&mdash;"
+            # Nama poin dicetak sekali per kelompok supaya mata membaca tiga poin, bukan lima baris.
+            nama_poin = f"<b>{_esc(row['poin'])}</b>" if row["poin"] != poin_terakhir else ""
+            poin_terakhir = row["poin"]
+            baris_rp += (
+                f"<tr><td>{nama_poin}</td><td>{_esc(row['cabang'])}</td>"
+                f"<td>{bobot_txt}</td><td>{row['n']}</td>"
+                # Nama jalur bisa datang dari dua kamus: konfigurasi search (_LABEL) atau
+                # konfigurasi jalur rujukan (_LABEL_ANCHOR). Jangan biarkan id mentah tampil.
+                f"<td class='net'>{_esc(_LABEL.get(row['konfigurasi']) or _LABEL_ANCHOR.get(row['konfigurasi'], row['konfigurasi']))}</td>"
+                + sel(f"ndcg@{_K_OPERASI}") + sel(f"recall@{_K_OPERASI}")
+                + sel(f"hit@{_K_OPERASI}") + sel("mrr") + "</tr>")
+        blok_produksi = f"""
+  <h2>2. Kinerja jalur produksi, per poin</h2>
+  <div class="peringatan" style="margin-bottom:14px">
+  <b>Inilah satu-satunya tabel di laporan ini yang boleh dibaca sebagai kinerja produksi.</b>
+  Tabel bagian 1 merata-ratakan seluruh topik dengan bobot sama, dan itu sengaja memuat jalur
+  yang produksi TIDAK pakai: 52 topik menguji <code>itbx</code> lewat <code>search</code> yang
+  hampir tak pernah menyala, ditambah puluhan topik kontrafaktual (query pendek
+  <code>kdb</code>, topik dampak warisan berlabel <i>seeded</i>) yang ada untuk membuktikan
+  sebab-akibat, bukan untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang
+  benar-benar dijalankan.
+  </div>
+  <p class="cat">Angka tebal = skor terukur. Angka kecil abu-abu di sebelahnya =
+  <b>persen dari langit-langit</b>, yaitu nilai tertinggi yang MUNGKIN dicapai mengingat
+  struktur label subset itu &mdash; bukan dari 1,0. Inilah angka yang layak dibaca sebagai
+  &ldquo;seberapa dekat ke sempurna&rdquo;; bagian 3 menjelaskan alasannya. Lantai acak dan
+  langit-langit dihitung <b>per subset</b>, bukan dipinjam dari angka global.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>Cabang</th><th>Bobot trafik</th><th>n topik</th>
+      <th>Jalur</th><th>nDCG@{_K_OPERASI}</th><th>Recall@{_K_OPERASI}</th>
+      <th>Hit@{_K_OPERASI}</th><th>MRR</th></tr></thead>
+    <tbody>{baris_rp}</tbody>
+  </table></div>
+  <p class="cat">Bobot trafik dihitung dari <code>{_esc(bt["sumber"])}</code>
+  (n={bt["n"]} permohonan): <b>{bt["tanpa_subzona"]:.1%}</b> permohonan tiba TANPA sub-zona
+  presisi, sehingga cabang berfilter keluarga yang dominan &mdash; bukan cabang exact.
+  Poin <code>itbx</code> tidak punya pembagian cabang karena seluruh payload back-end membawa
+  <code>dasar_hukum</code>, jadi ia selalu lewat <code>get_by_reference</code>.</p>
+  <div class="peringatan">
+  <b>Bacaannya.</b> Dua dari tiga poin berada di <b>85&ndash;100%</b> dari langit-langitnya.
+  Yang lemah adalah <code>dampak</code>, dan metriknya menunjukkan bahwa masalahnya
+  <b>cakupan, bukan ketepatan</b>: Hit@{_K_OPERASI} sekitar 0,7 berarti sistem MENEMUKAN ayat
+  yang mengatur pada ~7 dari 10 topik, MRR sekitar 0,68 berarti ayat itu biasanya di peringkat
+  1&ndash;2, tetapi Recall@{_K_OPERASI} sekitar 0,26 berarti ia hanya mengambil <b>sekitar satu
+  dari ~3 ayat</b> yang berlaku. Tiap permohonan bisa terkena tiga ketentuan sekaligus (gempa,
+  banjir lahar, resapan air) sementara sistem mengirim {_K_OPERASI} chunk. Jadi perbaikannya
+  bukan mengganti retriever, melainkan memutuskan apakah satu dasar hukum sudah cukup untuk
+  poin ini &mdash; dan itu pertimbangan hukum, bukan statistik.
+  </div>"""
 
     # --- Cara membaca skor: lantai, langit-langit, rujukan terbitan ----------------------
     bl = r.get("baseline") or muat_baseline()
@@ -949,7 +1032,7 @@ def bangun_html(r: dict) -> str:
                 + f"<td>{langit_v:.3f}</td><td>{kali}</td><td><b>{dari_langit}</b></td>"
                 f"<td class='net'>{catatan_metrik}</td></tr>")
         blok_tafsir = f"""
-  <h2>2. Cara membaca skor — dan mengapa tidak ada ambang &ldquo;bagus/buruk&rdquo; yang baku</h2>
+  <h2>3. Cara membaca skor — dan mengapa tidak ada ambang &ldquo;bagus/buruk&rdquo; yang baku</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Tidak ada ambang absolut untuk nDCG di literatur yang ditelaah sejawat.</b> Yang beredar
   (&ldquo;&gt;0,9 sangat baik, 0,7&ndash;0,9 baik, &lt;0,5 buruk&rdquo;) berasal dari dokumentasi
@@ -1331,9 +1414,10 @@ def bangun_html(r: dict) -> str:
   produksi: 52 dari {r['n_query']} topik menguji jalur <code>itbx</code> lewat
   <code>search</code>, yang di produksi hampir tak pernah menyala.
   </div>
+{blok_produksi}
 {blok_tafsir}
 
-  <h2>3. Ringkasan metrik &amp; ablasi per lapis</h2>
+  <h2>4. Ringkasan metrik &amp; ablasi per lapis</h2>
   <p class="cat">Tiap lapis dinilai sendiri supaya kontribusinya terlihat, bukan diasumsikan.
   Baris hijau = konfigurasi pembanding ({_esc(_LABEL.get(produksi, produksi))}), yaitu yang
   berlaku saat angka ini diukur — bukan jalur produksi tiap poin hari ini (lihat bagian 1).</p>
@@ -1344,11 +1428,11 @@ def bangun_html(r: dict) -> str:
     <tbody>{baris_tabel}</tbody>
   </table></div>
 
-  <h2>4. Hit-Rate menurut kedalaman</h2>
+  <h2>5. Hit-Rate menurut kedalaman</h2>
   <p class="cat">Seberapa sering minimal satu chunk relevan masuk peringkat-k teratas.</p>
   <div class="kartu">{_bar_berkelompok("Hit-Rate@k", [f"@{n}" for n in _K_LIST], hit)}</div>
 
-  <h2>5. Mutu peringkat</h2>
+  <h2>6. Mutu peringkat</h2>
   <p class="cat">Hit-Rate hanya menanyakan "ketemu atau tidak". Metrik di bawah menanyakan
   "ketemu di posisi berapa" dan "berapa banyak yang ketemu" — di sinilah reranker seharusnya
   membayar dirinya sendiri.</p>

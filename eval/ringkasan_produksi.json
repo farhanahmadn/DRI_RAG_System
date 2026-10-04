@@ -1,0 +1,214 @@
+{
+  "dibuat": "2026-10-04T18:32:50+00:00",
+  "berkas_eval": "eval_set_operasi.jsonl",
+  "n_simulasi_lantai": 400,
+  "bobot_trafik": {
+    "ada_subzona": 0.03508771929824561,
+    "tanpa_subzona": 0.9649122807017544,
+    "n": 456,
+    "sumber": "precheck.jsonl, era 3-poin saja"
+  },
+  "baris": [
+    {
+      "poin": "itbx",
+      "cabang": "get_by_reference (anchor dari back-end)",
+      "bobot": null,
+      "konfigurasi": "anchor-sadar-zona",
+      "n": 52,
+      "bobot_nilai": 1.0,
+      "metrik": {
+        "ndcg@3": {
+          "ukur": 0.8545524261430832,
+          "lantai": null,
+          "langit": 1.0,
+          "dari_langit": 0.8545524261430832
+        },
+        "recall@3": {
+          "ukur": 0.9487179487179488,
+          "lantai": null,
+          "langit": 1.0,
+          "dari_langit": 0.9487179487179488
+        },
+        "hit@3": {
+          "ukur": 0.9615384615384616,
+          "lantai": null,
+          "langit": 1.0,
+          "dari_langit": 0.9615384615384616
+        },
+        "mrr": {
+          "ukur": 0.8275641025641025,
+          "lantai": null,
+          "langit": 1.0,
+          "dari_langit": 0.8275641025641025
+        },
+        "map": {
+          "ukur": 0.8335241147741148,
+          "lantai": null,
+          "langit": 1.0,
+          "dari_langit": 0.8335241147741148
+        }
+      },
+      "catatan": "Jalur SQL; tidak melewati embedding/rerank sehingga kebal pilihan fusi."
+    },
+    {
+      "poin": "intensitas",
+      "cabang": "sub-zona presisi diketahui",
+      "bobot": "ada_subzona",
+      "konfigurasi": "dense+rerank",
+      "n": 31,
+      "bobot_nilai": 0.03508771929824561,
+      "metrik": {
+        "ndcg@3": {
+          "ukur": 1.0,
+          "lantai": 0.00444887363709684,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        },
+        "recall@3": {
+          "ukur": 1.0,
+          "lantai": 0.0064516129032258064,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        },
+        "hit@3": {
+          "ukur": 1.0,
+          "lantai": 0.0064516129032258064,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        },
+        "mrr": {
+          "ukur": 1.0,
+          "lantai": 0.006264176907322068,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        },
+        "map": {
+          "ukur": 1.0,
+          "lantai": 0.006264176907322068,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        }
+      }
+    },
+    {
+      "poin": "intensitas",
+      "cabang": "tanpa sub-zona (filter keluarga)",
+      "bobot": "tanpa_subzona",
+      "konfigurasi": "dense+rerank",
+      "n": 21,
+      "bobot_nilai": 0.9649122807017544,
+      "metrik": {
+        "ndcg@3": {
+          "ukur": 0.9776533939989163,
+          "lantai": 0.006092294036533187,
+          "langit": 1.0,
+          "dari_langit": 0.9776533939989163
+        },
+        "recall@3": {
+          "ukur": 0.9603174603174603,
+          "lantai": 0.007658730158730158,
+          "langit": 0.9880952380952381,
+          "dari_langit": 0.9718875502008032
+        },
+        "hit@3": {
+          "ukur": 1.0,
+          "lantai": 0.012023809523809523,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        },
+        "mrr": {
+          "ukur": 1.0,
+          "lantai": 0.01096801776266062,
+          "langit": 1.0,
+          "dari_langit": 1.0
+        },
+        "map": {
+          "ukur": 0.9890873015873015,
+          "lantai": 0.0069742968946838,
+          "langit": 1.0,
+          "dari_langit": 0.9890873015873015
+        }
+      }
+    },
+    {
+      "poin": "dampak",
+      "cabang": "sub-zona presisi diketahui",
+      "bobot": "ada_subzona",
+      "konfigurasi": "rrf+rerank",
+      "n": 32,
+      "bobot_nilai": 0.03508771929824561,
+      "metrik": {
+        "ndcg@3": {
+          "ukur": 0.33838471092155636,
+          "lantai": 0.005771178954012582,
+          "langit": 1.0,
+          "dari_langit": 0.33838471092155636
+        },
+        "recall@3": {
+          "ukur": 0.265625,
+          "lantai": 0.0062890624999999995,
+          "langit": 1.0,
+          "dari_langit": 0.265625
+        },
+        "hit@3": {
+          "ukur": 0.75,
+          "lantai": 0.016484375,
+          "langit": 1.0,
+          "dari_langit": 0.75
+        },
+        "mrr": {
+          "ukur": 0.6893229166666667,
+          "lantai": 0.01629935515873016,
+          "langit": 1.0,
+          "dari_langit": 0.6893229166666667
+        },
+        "map": {
+          "ukur": 0.30717799272486773,
+          "lantai": 0.0063967478918650796,
+          "langit": 1.0,
+          "dari_langit": 0.30717799272486773
+        }
+      }
+    },
+    {
+      "poin": "dampak",
+      "cabang": "tanpa sub-zona (filter keluarga)",
+      "bobot": "tanpa_subzona",
+      "konfigurasi": "rrf+rerank",
+      "n": 21,
+      "bobot_nilai": 0.9649122807017544,
+      "metrik": {
+        "ndcg@3": {
+          "ukur": 0.31730756723397024,
+          "lantai": 0.006237707601549458,
+          "langit": 1.0,
+          "dari_langit": 0.31730756723397024
+        },
+        "recall@3": {
+          "ukur": 0.246031746031746,
+          "lantai": 0.006567460317460317,
+          "langit": 1.0,
+          "dari_langit": 0.246031746031746
+        },
+        "hit@3": {
+          "ukur": 0.7142857142857143,
+          "lantai": 0.01738095238095238,
+          "langit": 1.0,
+          "dari_langit": 0.7142857142857143
+        },
+        "mrr": {
+          "ukur": 0.6646825396825398,
+          "lantai": 0.016982473544973547,
+          "langit": 1.0,
+          "dari_langit": 0.6646825396825398
+        },
+        "map": {
+          "ukur": 0.2802626606198035,
+          "lantai": 0.0065561303224993695,
+          "langit": 1.0,
+          "dari_langit": 0.2802626606198035
+        }
+      }
+    }
+  ]
+}
