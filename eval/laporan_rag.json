@@ -1,9 +1,9 @@
 {
-  "dibuat": "2026-10-04T19:33:41+00:00",
+  "dibuat": "2026-10-04T21:04:33+00:00",
   "wilayah": "Sleman Tengah",
   "provider_embedding": "jina",
   "provider_rerank": "jina",
-  "n_query": 214,
+  "n_query": 210,
   "top_n_dinilai": 10,
   "korpus": {
     "chunk": 484,
@@ -24,24 +24,24 @@
   "produksi": "rrf+rerank",
   "agregat": {
     "dense": {
-      "hit@1": 0.19626168224299065,
-      "recall@1": 0.08878504672897196,
-      "precision@1": 0.19626168224299065,
-      "ndcg@1": 0.19626168224299065,
-      "hit@3": 0.32242990654205606,
-      "recall@3": 0.18419003115264795,
-      "precision@3": 0.11526479750778815,
-      "ndcg@3": 0.16885179301979708,
-      "hit@5": 0.48598130841121495,
-      "recall@5": 0.3450155763239875,
-      "precision@5": 0.10747663551401869,
-      "ndcg@5": 0.23569226186105127,
-      "hit@10": 0.6869158878504673,
-      "recall@10": 0.5556853582554517,
-      "precision@10": 0.07897196261682243,
-      "ndcg@10": 0.30742090361672925,
-      "mrr": 0.3110128319240469,
-      "map": 0.19826991544281264,
+      "hit@1": 0.19047619047619047,
+      "recall@1": 0.0873015873015873,
+      "precision@1": 0.19047619047619047,
+      "ndcg@1": 0.19047619047619047,
+      "hit@3": 0.30952380952380953,
+      "recall@3": 0.17579365079365078,
+      "precision@3": 0.10634920634920635,
+      "ndcg@3": 0.1614666158128841,
+      "hit@5": 0.47619047619047616,
+      "recall@5": 0.3380952380952381,
+      "precision@5": 0.10190476190476191,
+      "ndcg@5": 0.2287157517152224,
+      "hit@10": 0.680952380952381,
+      "recall@10": 0.5527777777777777,
+      "precision@10": 0.07666666666666667,
+      "ndcg@10": 0.30181065331386564,
+      "mrr": 0.3034448223733938,
+      "map": 0.19342214663643234,
       "median_peringkat_pertama": 4,
       "query_tanpa_hasil_relevan": 67
     },
@@ -50,86 +50,86 @@
       "recall@1": 0.0,
       "precision@1": 0.0,
       "ndcg@1": 0.0,
-      "hit@3": 0.03271028037383177,
-      "recall@3": 0.02102803738317757,
-      "precision@3": 0.010903426791277258,
-      "ndcg@3": 0.01414096281327201,
-      "hit@5": 0.22897196261682243,
-      "recall@5": 0.21066978193146418,
-      "precision@5": 0.048598130841121495,
-      "ndcg@5": 0.09433721484565766,
-      "hit@10": 0.26635514018691586,
-      "recall@10": 0.25856697819314645,
-      "precision@10": 0.03271028037383177,
-      "ndcg@10": 0.1119726594533226,
-      "mrr": 0.06486240913811007,
-      "map": 0.06399953023784799,
+      "hit@3": 0.023809523809523808,
+      "recall@3": 0.01746031746031746,
+      "precision@3": 0.007936507936507936,
+      "ndcg@3": 0.011833109917362396,
+      "hit@5": 0.22380952380952382,
+      "recall@5": 0.2091269841269841,
+      "precision@5": 0.04666666666666667,
+      "ndcg@5": 0.09259449367179087,
+      "hit@10": 0.2523809523809524,
+      "recall@10": 0.24682539682539684,
+      "precision@10": 0.02904761904761905,
+      "ndcg@10": 0.1058472956733476,
+      "mrr": 0.06153439153439154,
+      "map": 0.06043304358780549,
       "median_peringkat_pertama": 4,
       "query_tanpa_hasil_relevan": 157
     },
     "rrf": {
-      "hit@1": 0.1822429906542056,
-      "recall@1": 0.16082554517133954,
-      "precision@1": 0.1822429906542056,
-      "ndcg@1": 0.1822429906542056,
-      "hit@3": 0.24766355140186916,
-      "recall@3": 0.23091900311526478,
-      "precision@3": 0.09501557632398754,
-      "ndcg@3": 0.21295425768667672,
-      "hit@5": 0.602803738317757,
-      "recall@5": 0.4781931464174455,
-      "precision@5": 0.13177570093457946,
-      "ndcg@5": 0.3279616801219255,
-      "hit@10": 0.9158878504672897,
-      "recall@10": 0.7858255451713395,
-      "precision@10": 0.10560747663551402,
-      "ndcg@10": 0.43120408621455303,
-      "mrr": 0.3407395045245512,
-      "map": 0.3065094508727686,
+      "hit@1": 0.1761904761904762,
+      "recall@1": 0.16071428571428573,
+      "precision@1": 0.1761904761904762,
+      "ndcg@1": 0.1761904761904762,
+      "hit@3": 0.23333333333333334,
+      "recall@3": 0.225,
+      "precision@3": 0.0873015873015873,
+      "ndcg@3": 0.2071441757694165,
+      "hit@5": 0.5952380952380952,
+      "recall@5": 0.4738095238095238,
+      "precision@5": 0.12666666666666668,
+      "ndcg@5": 0.3224173839034267,
+      "hit@10": 0.9142857142857143,
+      "recall@10": 0.7833333333333333,
+      "precision@10": 0.10285714285714287,
+      "ndcg@10": 0.4261363536348829,
+      "mrr": 0.33373771730914586,
+      "map": 0.3020038107835727,
       "median_peringkat_pertama": 4.0,
       "query_tanpa_hasil_relevan": 18
     },
     "dense+rerank": {
-      "hit@1": 0.29906542056074764,
-      "recall@1": 0.24805295950155765,
-      "precision@1": 0.29906542056074764,
-      "ndcg@1": 0.29906542056074764,
-      "hit@3": 0.7476635514018691,
-      "recall@3": 0.6000778816199377,
-      "precision@3": 0.26635514018691586,
-      "ndcg@3": 0.4728030773340671,
-      "hit@5": 0.7897196261682243,
-      "recall@5": 0.6534267912772586,
-      "precision@5": 0.17570093457943925,
-      "ndcg@5": 0.49591299811697154,
-      "hit@10": 0.9158878504672897,
-      "recall@10": 0.7866043613707165,
-      "precision@10": 0.10607476635514018,
-      "ndcg@10": 0.5459900618250655,
-      "mrr": 0.5186915887850467,
-      "map": 0.4397854546803145,
+      "hit@1": 0.2904761904761905,
+      "recall@1": 0.2472222222222222,
+      "precision@1": 0.2904761904761905,
+      "ndcg@1": 0.2904761904761905,
+      "hit@3": 0.7428571428571429,
+      "recall@3": 0.5996031746031746,
+      "precision@3": 0.2603174603174603,
+      "ndcg@3": 0.46945499056962964,
+      "hit@5": 0.7857142857142857,
+      "recall@5": 0.6523809523809524,
+      "precision@5": 0.17142857142857143,
+      "ndcg@5": 0.4920426843841106,
+      "hit@10": 0.9142857142857143,
+      "recall@10": 0.7880952380952381,
+      "precision@10": 0.1042857142857143,
+      "ndcg@10": 0.5430735969247397,
+      "mrr": 0.5119047619047619,
+      "map": 0.43718348450491307,
       "median_peringkat_pertama": 2.0,
       "query_tanpa_hasil_relevan": 18
     },
     "rrf+rerank": {
-      "hit@1": 0.3644859813084112,
+      "hit@1": 0.35714285714285715,
       "recall@1": 0.25,
-      "precision@1": 0.3644859813084112,
-      "ndcg@1": 0.3644859813084112,
-      "hit@3": 0.6401869158878505,
-      "recall@3": 0.5046728971962616,
-      "precision@3": 0.22741433021806853,
-      "ndcg@3": 0.41754264609270103,
-      "hit@5": 0.9112149532710281,
-      "recall@5": 0.7597352024922119,
-      "precision@5": 0.197196261682243,
-      "ndcg@5": 0.5285913013819162,
-      "hit@10": 0.9626168224299065,
-      "recall@10": 0.8590342679127726,
-      "precision@10": 0.12289719626168225,
-      "ndcg@10": 0.5687106829248676,
-      "mrr": 0.5432242990654206,
-      "map": 0.43797347080057364,
+      "precision@1": 0.35714285714285715,
+      "ndcg@1": 0.35714285714285715,
+      "hit@3": 0.6333333333333333,
+      "recall@3": 0.5,
+      "precision@3": 0.21904761904761905,
+      "ndcg@3": 0.41155266903433035,
+      "hit@5": 0.9095238095238095,
+      "recall@5": 0.7567460317460317,
+      "precision@5": 0.19142857142857145,
+      "ndcg@5": 0.5228896361431596,
+      "hit@10": 0.9619047619047619,
+      "recall@10": 0.8579365079365079,
+      "precision@10": 0.12047619047619047,
+      "ndcg@10": 0.5637731963821673,
+      "mrr": 0.5369047619047619,
+      "map": 0.4322682035777274,
       "median_peringkat_pertama": 3.0,
       "query_tanpa_hasil_relevan": 8
     }
@@ -138,311 +138,311 @@
     "ci": {
       "dense": {
         "ndcg@3": {
-          "rata": 0.16885179301979708,
-          "bawah": 0.13407211606690775,
-          "atas": 0.20526712526717159,
-          "n": 214
+          "rata": 0.1614666158128841,
+          "bawah": 0.12618618590736222,
+          "atas": 0.19786133247850932,
+          "n": 210
         },
         "recall@3": {
-          "rata": 0.18419003115264795,
-          "bawah": 0.1433021806853582,
-          "atas": 0.22819314641744548,
-          "n": 214
+          "rata": 0.17579365079365078,
+          "bawah": 0.13492063492063486,
+          "atas": 0.21944444444444455,
+          "n": 210
         },
         "hit@3": {
-          "rata": 0.32242990654205606,
-          "bawah": 0.2616822429906542,
-          "atas": 0.38317757009345793,
-          "n": 214
+          "rata": 0.30952380952380953,
+          "bawah": 0.24761904761904763,
+          "atas": 0.37142857142857144,
+          "n": 210
         },
         "mrr": {
-          "rata": 0.3110128319240469,
-          "bawah": 0.26331219403649336,
-          "atas": 0.36002633140483625,
-          "n": 214
+          "rata": 0.3034448223733938,
+          "bawah": 0.25507936507936524,
+          "atas": 0.35289682539682554,
+          "n": 210
         },
         "map": {
-          "rata": 0.19826991544281264,
-          "bawah": 0.17056631063640412,
-          "atas": 0.22744029075804786,
-          "n": 214
+          "rata": 0.19342214663643234,
+          "bawah": 0.1658049886621315,
+          "atas": 0.22277588813303117,
+          "n": 210
         }
       },
       "lexical": {
         "ndcg@3": {
-          "rata": 0.01414096281327201,
-          "bawah": 0.004248734129585624,
-          "atas": 0.026402306242618016,
-          "n": 214
+          "rata": 0.011833109917362396,
+          "bawah": 0.002819827723484431,
+          "atas": 0.0236662198347248,
+          "n": 210
         },
         "recall@3": {
-          "rata": 0.02102803738317757,
-          "bawah": 0.006230529595015576,
-          "atas": 0.0397196261682243,
-          "n": 214
+          "rata": 0.01746031746031746,
+          "bawah": 0.0031746031746031746,
+          "atas": 0.03492063492063492,
+          "n": 210
         },
         "hit@3": {
-          "rata": 0.03271028037383177,
-          "bawah": 0.009345794392523364,
-          "atas": 0.06074766355140187,
-          "n": 214
+          "rata": 0.023809523809523808,
+          "bawah": 0.004761904761904762,
+          "atas": 0.047619047619047616,
+          "n": 210
         },
         "mrr": {
-          "rata": 0.06486240913811007,
-          "bawah": 0.04919522326064382,
-          "atas": 0.08068535825545167,
-          "n": 214
+          "rata": 0.06153439153439154,
+          "bawah": 0.046666666666666655,
+          "atas": 0.07765873015873012,
+          "n": 210
         },
         "map": {
-          "rata": 0.06399953023784799,
-          "bawah": 0.04856660732828957,
-          "atas": 0.07982433367947384,
-          "n": 214
+          "rata": 0.06043304358780549,
+          "bawah": 0.04571428571428571,
+          "atas": 0.07599048878810778,
+          "n": 210
         }
       },
       "rrf": {
         "ndcg@3": {
-          "rata": 0.21295425768667672,
-          "bawah": 0.16158018365677057,
-          "atas": 0.26423027858184583,
-          "n": 214
+          "rata": 0.2071441757694165,
+          "bawah": 0.15579587482753737,
+          "atas": 0.2593955084164092,
+          "n": 210
         },
         "recall@3": {
-          "rata": 0.23091900311526478,
-          "bawah": 0.17601246105919002,
-          "atas": 0.28582554517133957,
-          "n": 214
+          "rata": 0.225,
+          "bawah": 0.17023809523809524,
+          "atas": 0.28015873015873016,
+          "n": 210
         },
         "hit@3": {
-          "rata": 0.24766355140186916,
-          "bawah": 0.19158878504672897,
-          "atas": 0.3037383177570093,
-          "n": 214
+          "rata": 0.23333333333333334,
+          "bawah": 0.1761904761904762,
+          "atas": 0.2904761904761905,
+          "n": 210
         },
         "mrr": {
-          "rata": 0.3407395045245512,
-          "bawah": 0.2958296246847652,
-          "atas": 0.3851561341047327,
-          "n": 214
+          "rata": 0.33373771730914586,
+          "bawah": 0.29077475434618344,
+          "atas": 0.37778533635676514,
+          "n": 210
         },
         "map": {
-          "rata": 0.3065094508727686,
-          "bawah": 0.26220964372249456,
-          "atas": 0.350655967215547,
-          "n": 214
+          "rata": 0.3020038107835727,
+          "bawah": 0.2578099017384736,
+          "atas": 0.3473891408415221,
+          "n": 210
         }
       },
       "dense+rerank": {
         "ndcg@3": {
-          "rata": 0.4728030773340671,
-          "bawah": 0.42464133854838265,
-          "atas": 0.5210150661266726,
-          "n": 214
+          "rata": 0.46945499056962964,
+          "bawah": 0.42049625098186805,
+          "atas": 0.5189963996402621,
+          "n": 210
         },
         "recall@3": {
-          "rata": 0.6000778816199377,
-          "bawah": 0.5408878504672893,
-          "atas": 0.6569314641744546,
-          "n": 214
+          "rata": 0.5996031746031746,
+          "bawah": 0.5404761904761901,
+          "atas": 0.6579365079365077,
+          "n": 210
         },
         "hit@3": {
-          "rata": 0.7476635514018691,
-          "bawah": 0.6869158878504673,
-          "atas": 0.8037383177570093,
-          "n": 214
+          "rata": 0.7428571428571429,
+          "bawah": 0.680952380952381,
+          "atas": 0.8,
+          "n": 210
         },
         "mrr": {
-          "rata": 0.5186915887850467,
-          "bawah": 0.4729750778816197,
-          "atas": 0.5648753894080994,
-          "n": 214
+          "rata": 0.5119047619047619,
+          "bawah": 0.4658730158730156,
+          "atas": 0.5583333333333333,
+          "n": 210
         },
         "map": {
-          "rata": 0.4397854546803145,
-          "bawah": 0.39496829105473946,
-          "atas": 0.48628356326954464,
-          "n": 214
+          "rata": 0.43718348450491307,
+          "bawah": 0.39122071050642454,
+          "atas": 0.48445861678004515,
+          "n": 210
         }
       },
       "rrf+rerank": {
         "ndcg@3": {
-          "rata": 0.41754264609270103,
-          "bawah": 0.36787032996428926,
-          "atas": 0.4668658576389763,
-          "n": 214
+          "rata": 0.41155266903433035,
+          "bawah": 0.36126008547264227,
+          "atas": 0.4611485678799382,
+          "n": 210
         },
         "recall@3": {
-          "rata": 0.5046728971962616,
-          "bawah": 0.4439252336448597,
-          "atas": 0.5638629283489094,
-          "n": 214
+          "rata": 0.5,
+          "bawah": 0.43809523809523804,
+          "atas": 0.5611111111111109,
+          "n": 210
         },
         "hit@3": {
-          "rata": 0.6401869158878505,
-          "bawah": 0.5747663551401869,
-          "atas": 0.705607476635514,
-          "n": 214
+          "rata": 0.6333333333333333,
+          "bawah": 0.5666666666666667,
+          "atas": 0.6952380952380952,
+          "n": 210
         },
         "mrr": {
-          "rata": 0.5432242990654206,
-          "bawah": 0.49384735202492225,
-          "atas": 0.5913811007268949,
-          "n": 214
+          "rata": 0.5369047619047619,
+          "bawah": 0.4892328042328044,
+          "atas": 0.5852380952380951,
+          "n": 210
         },
         "map": {
-          "rata": 0.43797347080057364,
-          "bawah": 0.39674473371903274,
-          "atas": 0.4799065420560748,
-          "n": 214
+          "rata": 0.4322682035777274,
+          "bawah": 0.3916181657848326,
+          "atas": 0.47451467624086646,
+          "n": 210
         }
       }
     },
     "uji_vs_produksi": {
       "dense": {
         "ndcg@3": {
-          "p": 8.310912723488997e-14,
-          "n_beda": 95,
-          "efek": -0.8706140350877193,
-          "selisih_rata": -0.24869085307290398,
+          "p": 2.0126638836759704e-13,
+          "n_beda": 91,
+          "efek": -0.873865265169613,
+          "selisih_rata": -0.2500860532214463,
           "signifikan": true
         },
         "recall@3": {
-          "p": 3.029247785488751e-15,
-          "n_beda": 84,
-          "efek": -0.9112044817927171,
-          "selisih_rata": -0.3204828660436137,
+          "p": 4.2969125484684464e-15,
+          "n_beda": 81,
+          "efek": -0.9129780186690756,
+          "selisih_rata": -0.32420634920634916,
           "signifikan": true
         },
         "hit@3": {
           "p": 2.901697212562865e-14,
           "n_beda": 80,
           "efek": -0.85,
-          "selisih_rata": -0.3177570093457944,
+          "selisih_rata": -0.3238095238095238,
           "signifikan": true
         },
         "mrr": {
-          "p": 7.217311760538847e-21,
-          "n_beda": 154,
-          "efek": -0.8694595726853791,
-          "selisih_rata": -0.2322114671413737,
+          "p": 3.448920574224713e-21,
+          "n_beda": 151,
+          "efek": -0.8852387591495294,
+          "selisih_rata": -0.23345993953136812,
           "signifikan": true
         },
         "map": {
-          "p": 1.2816355476077844e-25,
-          "n_beda": 190,
-          "efek": -0.8748415541471479,
-          "selisih_rata": -0.239703555357761,
+          "p": 1.2170927346308452e-25,
+          "n_beda": 186,
+          "efek": -0.8845954804209074,
+          "selisih_rata": -0.23884605694129504,
           "signifikan": true
         }
       },
       "lexical": {
         "ndcg@3": {
-          "p": 2.1580209482539956e-23,
-          "n_beda": 141,
-          "efek": -0.961242633103586,
-          "selisih_rata": -0.4034016832794291,
+          "p": 1.004957658563831e-22,
+          "n_beda": 137,
+          "efek": -0.9593779752459537,
+          "selisih_rata": -0.399719559116968,
           "signifikan": true
         },
         "recall@3": {
-          "p": 3.740338018986227e-24,
-          "n_beda": 140,
-          "efek": -0.9529888551165147,
-          "selisih_rata": -0.48364485981308414,
+          "p": 1.3107192404312311e-23,
+          "n_beda": 136,
+          "efek": -0.9521253756977244,
+          "selisih_rata": -0.4825396825396825,
           "signifikan": true
         },
         "hit@3": {
-          "p": 1.827217377201384e-28,
-          "n_beda": 138,
-          "efek": -0.9420289855072463,
-          "selisih_rata": -0.6074766355140186,
+          "p": 4.990115841178994e-28,
+          "n_beda": 136,
+          "efek": -0.9411764705882353,
+          "selisih_rata": -0.6095238095238096,
           "signifikan": true
         },
         "mrr": {
-          "p": 3.9268652634996815e-32,
-          "n_beda": 196,
-          "efek": -0.9646741945509169,
-          "selisih_rata": -0.4783618899273105,
+          "p": 1.8914782548757841e-31,
+          "n_beda": 192,
+          "efek": -0.9631908462867013,
+          "selisih_rata": -0.4753703703703704,
           "signifikan": true
         },
         "map": {
-          "p": 4.717986980146725e-31,
-          "n_beda": 198,
-          "efek": -0.9484290137556469,
-          "selisih_rata": -0.3739739405627256,
+          "p": 2.431156231891689e-30,
+          "n_beda": 194,
+          "efek": -0.9462860163891091,
+          "selisih_rata": -0.3718351599899219,
           "signifikan": true
         }
       },
       "rrf": {
         "ndcg@3": {
-          "p": 4.664622761340615e-05,
-          "n_beda": 161,
-          "efek": -0.3674564833985124,
-          "selisih_rata": -0.20458838840602436,
+          "p": 6.540250856982239e-05,
+          "n_beda": 157,
+          "efek": -0.3646698379424333,
+          "selisih_rata": -0.20440849326491387,
           "signifikan": true
         },
         "recall@3": {
-          "p": 1.06410865196745e-08,
-          "n_beda": 137,
-          "efek": -0.5453295250185126,
-          "selisih_rata": -0.2737538940809969,
+          "p": 1.8300819575013608e-08,
+          "n_beda": 133,
+          "efek": -0.5430366962181573,
+          "selisih_rata": -0.275,
           "signifikan": true
         },
         "hit@3": {
           "p": 2.6464582658705794e-13,
           "n_beda": 132,
           "efek": -0.6363636363636364,
-          "selisih_rata": -0.3925233644859813,
+          "selisih_rata": -0.4,
           "signifikan": true
         },
         "mrr": {
-          "p": 9.500021749871248e-10,
-          "n_beda": 204,
-          "efek": -0.49100908656145387,
-          "selisih_rata": -0.2024847945408693,
+          "p": 1.3243521743784506e-09,
+          "n_beda": 202,
+          "efek": -0.4890503828707994,
+          "selisih_rata": -0.20316704459561602,
           "signifikan": true
         },
         "map": {
-          "p": 1.631995907858765e-06,
-          "n_beda": 206,
-          "efek": -0.38487875803198723,
-          "selisih_rata": -0.131464019927805,
+          "p": 2.714637604186451e-06,
+          "n_beda": 202,
+          "efek": -0.3802858118324148,
+          "selisih_rata": -0.1302643927941547,
           "signifikan": true
         }
       },
       "dense+rerank": {
         "ndcg@3": {
-          "p": 0.0011571933647023475,
-          "n_beda": 96,
-          "efek": 0.3790807560137457,
-          "selisih_rata": 0.055260431241366016,
+          "p": 0.0006666593134425345,
+          "n_beda": 92,
+          "efek": 0.4050958391771856,
+          "selisih_rata": 0.057902321535299256,
           "signifikan": true
         },
         "recall@3": {
-          "p": 0.00010440839968459526,
-          "n_beda": 35,
-          "efek": 0.7222222222222222,
-          "selisih_rata": 0.09540498442367602,
+          "p": 6.521386754102899e-05,
+          "n_beda": 32,
+          "efek": 0.7670454545454546,
+          "selisih_rata": 0.09960317460317461,
           "signifikan": true
         },
         "hit@3": {
           "p": 1.94604710965541e-05,
           "n_beda": 29,
           "efek": 0.7931034482758621,
-          "selisih_rata": 0.10747663551401869,
+          "selisih_rata": 0.10952380952380952,
           "signifikan": true
         },
         "mrr": {
-          "p": 0.22018332417742215,
-          "n_beda": 133,
-          "efek": -0.12164740208730782,
-          "selisih_rata": -0.02453271028037383,
+          "p": 0.21593022135828,
+          "n_beda": 131,
+          "efek": -0.12375665047420772,
+          "selisih_rata": -0.025,
           "signifikan": false
         },
         "map": {
-          "p": 0.7866175907076518,
-          "n_beda": 140,
-          "efek": -0.02634245187436677,
-          "selisih_rata": 0.001811983879740884,
+          "p": 0.8996253369980284,
+          "n_beda": 136,
+          "efek": -0.0124516960068699,
+          "selisih_rata": 0.004915280927185685,
           "signifikan": false
         }
       }
@@ -450,11 +450,11 @@
     "pembanding": "rrf+rerank"
   },
   "latensi_ms": {
-    "dense": 102.50193317759147,
-    "lexical": 3.763956074877892,
-    "rrf": 0.08533411203634982,
-    "dense+rerank": 1382.5526028037793,
-    "rrf+rerank": 1926.567065887543
+    "dense": 69.89204285682285,
+    "lexical": 2.391367142644456,
+    "rrf": 0.061055237893015146,
+    "dense+rerank": 864.4117290475281,
+    "rrf+rerank": 1260.6010242859027
   },
   "detail_per_query": [
     {
@@ -7768,227 +7768,12 @@
       "rrf+rerank": 3
     },
     {
-      "query": "dampak-resapan",
-      "n_relevan": 3,
-      "sumber_label": "seeded",
-      "teks_query": "Resapan",
-      "filter": {},
-      "relevan": [
-        "rdtr-sleman-tengah-p53",
-        "rdtr-sleman-tengah-p53-a2",
-        "rdtr-sleman-tengah-p53-a3"
-      ],
-      "terambil": {
-        "dense": [
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a1",
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p53-a4",
-          "rdtr-sleman-tengah-p1-a74"
-        ],
-        "lexical": [
-          "rdtr-sleman-tengah-p44-a2",
-          "rdtr-sleman-tengah-p44",
-          "rdtr-sleman-tengah-p53",
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p58-a3"
-        ],
-        "rrf": [
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p53-a4",
-          "rdtr-sleman-tengah-vi-ba",
-          "rdtr-sleman-tengah-p58-a3"
-        ],
-        "dense+rerank": [
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a1",
-          "rdtr-sleman-tengah-p53-a4",
-          "rdtr-sleman-tengah-vi-ba"
-        ],
-        "rrf+rerank": [
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53",
-          "rdtr-sleman-tengah-p53-a4",
-          "rdtr-sleman-tengah-p53-a1"
-        ]
-      },
-      "dense": 1,
-      "lexical": 3,
-      "rrf": 1,
-      "dense+rerank": 1,
-      "rrf+rerank": 1
-    },
-    {
-      "query": "dampak-kawasan-resapan-air",
-      "n_relevan": 2,
-      "sumber_label": "seeded",
-      "teks_query": "kawasan resapan air",
-      "filter": {},
-      "relevan": [
-        "rdtr-sleman-tengah-p53",
-        "rdtr-sleman-tengah-p53-a2"
-      ],
-      "terambil": {
-        "dense": [
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a1",
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p1-a74",
-          "rdtr-sleman-tengah-p50-a11"
-        ],
-        "lexical": [
-          "rdtr-sleman-tengah-p1",
-          "rdtr-sleman-tengah-p50",
-          "rdtr-sleman-tengah-p53",
-          "rdtr-sleman-tengah-p44",
-          "rdtr-sleman-tengah-p48"
-        ],
-        "rrf": [
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-vb-ba",
-          "rdtr-sleman-tengah-p53-a4",
-          "rdtr-sleman-tengah-p58-a3"
-        ],
-        "dense+rerank": [
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a4",
-          "rdtr-sleman-tengah-p53-a1",
-          "rdtr-sleman-tengah-p58-a3"
-        ],
-        "rrf+rerank": [
-          "rdtr-sleman-tengah-p53-a2",
-          "rdtr-sleman-tengah-p53",
-          "rdtr-sleman-tengah-p53-a3",
-          "rdtr-sleman-tengah-p53-a1",
-          "rdtr-sleman-tengah-p53-a4"
-        ]
-      },
-      "dense": 3,
-      "lexical": 3,
-      "rrf": 2,
-      "dense+rerank": 1,
-      "rrf+rerank": 1
-    },
-    {
-      "query": "dampak-banjir",
-      "n_relevan": 3,
-      "sumber_label": "seeded",
-      "teks_query": "Banjir",
-      "filter": {},
-      "relevan": [
-        "rdtr-sleman-tengah-p50-a7",
-        "rdtr-sleman-tengah-p50-a8",
-        "rdtr-sleman-tengah-p50-a9"
-      ],
-      "terambil": {
-        "dense": [
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a11",
-          "rdtr-sleman-tengah-p50-a9"
-        ],
-        "lexical": [
-          "rdtr-sleman-tengah-p50",
-          "rdtr-sleman-tengah-p10",
-          "rdtr-sleman-tengah-p1",
-          "rdtr-sleman-tengah-p1-a46",
-          "rdtr-sleman-tengah-p10-a6"
-        ],
-        "rrf": [
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a9",
-          "rdtr-sleman-tengah-p10-a1"
-        ],
-        "dense+rerank": [
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a9",
-          "rdtr-sleman-tengah-p50-a14"
-        ],
-        "rrf+rerank": [
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a11",
-          "rdtr-sleman-tengah-p50",
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a9"
-        ]
-      },
-      "dense": 2,
-      "lexical": 6,
-      "rrf": 1,
-      "dense+rerank": 2,
-      "rrf+rerank": 1
-    },
-    {
-      "query": "dampak-rawan-bencana-banjir-lahar",
-      "n_relevan": 2,
-      "sumber_label": "seeded",
-      "teks_query": "rawan bencana banjir lahar",
-      "filter": {},
-      "relevan": [
-        "rdtr-sleman-tengah-p50-a8",
-        "rdtr-sleman-tengah-p50-a9"
-      ],
-      "terambil": {
-        "dense": [
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a9",
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p50-a11"
-        ],
-        "lexical": [
-          "rdtr-sleman-tengah-p50",
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p1",
-          "rdtr-sleman-tengah-p51"
-        ],
-        "rrf": [
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a9",
-          "rdtr-sleman-tengah-p50-a13"
-        ],
-        "dense+rerank": [
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a9",
-          "rdtr-sleman-tengah-p50-a1",
-          "rdtr-sleman-tengah-p10-a7"
-        ],
-        "rrf+rerank": [
-          "rdtr-sleman-tengah-p50-a7",
-          "rdtr-sleman-tengah-p50-a8",
-          "rdtr-sleman-tengah-p50-a9",
-          "rdtr-sleman-tengah-p50",
-          "rdtr-sleman-tengah-p50-a1"
-        ]
-      },
-      "dense": 1,
-      "lexical": 8,
-      "rrf": 3,
-      "dense+rerank": 1,
-      "rrf+rerank": 2
-    },
-    {
       "query": "dampak-query-produksi",
-      "n_relevan": 3,
-      "sumber_label": "seeded",
+      "n_relevan": 2,
+      "sumber_label": "aturan",
       "teks_query": "dampak tata guna lahan",
       "filter": {},
       "relevan": [
-        "rdtr-sleman-tengah-p53",
         "rdtr-sleman-tengah-p53-a2",
         "rdtr-sleman-tengah-p53-a3"
       ],
@@ -13071,39 +12856,11 @@
         "map": 0.1111111111111111
       },
       {
-        "ndcg@3": 0.7039180890341347,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.5555555555555555
-      },
-      {
-        "ndcg@3": 0.3065735963827292,
-        "recall@3": 0.5,
-        "hit@3": 1.0,
-        "mrr": 0.3333333333333333,
-        "map": 0.16666666666666666
-      },
-      {
-        "ndcg@3": 0.5307212739772434,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 0.5,
-        "map": 0.5888888888888889
-      },
-      {
-        "ndcg@3": 0.9197207891481876,
+        "ndcg@3": 1.0,
         "recall@3": 1.0,
         "hit@3": 1.0,
         "mrr": 1.0,
-        "map": 0.8333333333333333
-      },
-      {
-        "ndcg@3": 0.7653606369886217,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.6666666666666666
+        "map": 1.0
       },
       {
         "ndcg@3": 0.5,
@@ -14569,34 +14326,6 @@
         "hit@3": 0.0,
         "mrr": 0.25,
         "map": 0.25
-      },
-      {
-        "ndcg@3": 0.23463936301137822,
-        "recall@3": 0.3333333333333333,
-        "hit@3": 1.0,
-        "mrr": 0.3333333333333333,
-        "map": 0.40277777777777773
-      },
-      {
-        "ndcg@3": 0.3065735963827292,
-        "recall@3": 0.5,
-        "hit@3": 1.0,
-        "mrr": 0.3333333333333333,
-        "map": 0.16666666666666666
-      },
-      {
-        "ndcg@3": 0.0,
-        "recall@3": 0.0,
-        "hit@3": 0.0,
-        "mrr": 0.16666666666666666,
-        "map": 0.26190476190476186
-      },
-      {
-        "ndcg@3": 0.0,
-        "recall@3": 0.0,
-        "hit@3": 0.0,
-        "mrr": 0.125,
-        "map": 0.1736111111111111
       },
       {
         "ndcg@3": 0.0,
@@ -16071,39 +15800,11 @@
         "map": 1.0
       },
       {
-        "ndcg@3": 0.7653606369886217,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.7666666666666666
-      },
-      {
         "ndcg@3": 0.38685280723454163,
         "recall@3": 0.5,
         "hit@3": 1.0,
         "mrr": 0.5,
-        "map": 0.35
-      },
-      {
-        "ndcg@3": 0.7039180890341347,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.8055555555555555
-      },
-      {
-        "ndcg@3": 0.3065735963827292,
-        "recall@3": 0.5,
-        "hit@3": 1.0,
-        "mrr": 0.3333333333333333,
-        "map": 0.41666666666666663
-      },
-      {
-        "ndcg@3": 0.2960819109658652,
-        "recall@3": 0.3333333333333333,
-        "hit@3": 1.0,
-        "mrr": 0.5,
-        "map": 0.3333333333333333
+        "map": 0.5
       },
       {
         "ndcg@3": 0.0,
@@ -17571,39 +17272,11 @@
         "map": 0.5
       },
       {
-        "ndcg@3": 0.7653606369886217,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.6666666666666666
-      },
-      {
-        "ndcg@3": 0.6131471927654584,
-        "recall@3": 0.5,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.5
-      },
-      {
-        "ndcg@3": 0.5307212739772434,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 0.5,
-        "map": 0.6388888888888888
-      },
-      {
-        "ndcg@3": 0.9197207891481876,
+        "ndcg@3": 1.0,
         "recall@3": 1.0,
         "hit@3": 1.0,
         "mrr": 1.0,
-        "map": 0.8333333333333333
-      },
-      {
-        "ndcg@3": 0.7653606369886217,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.6666666666666666
+        "map": 1.0
       },
       {
         "ndcg@3": 1.0,
@@ -19085,34 +18758,6 @@
         "map": 1.0
       },
       {
-        "ndcg@3": 0.46927872602275644,
-        "recall@3": 0.3333333333333333,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.7000000000000001
-      },
-      {
-        "ndcg@3": 0.6934264036172708,
-        "recall@3": 1.0,
-        "hit@3": 1.0,
-        "mrr": 0.5,
-        "map": 0.5833333333333333
-      },
-      {
-        "ndcg@3": 0.7653606369886217,
-        "recall@3": 0.6666666666666666,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 0.6666666666666666
-      },
-      {
-        "ndcg@3": 1.0,
-        "recall@3": 1.0,
-        "hit@3": 1.0,
-        "mrr": 1.0,
-        "map": 1.0
-      },
-      {
         "ndcg@3": 0.6309297535714575,
         "recall@3": 1.0,
         "hit@3": 1.0,
@@ -19626,7 +19271,7 @@
     ]
   },
   "metadata": {
-    "commit": "09a7bfc",
+    "commit": "7ca7549",
     "commit_kotor": true,
     "model_embedding": "jina-embeddings-v3",
     "model_rerank": "jina-reranker-v3",
@@ -19637,8 +19282,7 @@
   },
   "berkas_eval": "eval_set_operasi.jsonl",
   "sumber_label": {
-    "aturan": 261,
-    "seeded": 5
+    "aturan": 262
   },
   "anchor": {
     "konfigurasi": [
@@ -19802,8 +19446,8 @@
       "pembanding": "anchor-sadar-zona"
     },
     "latensi_ms": {
-      "anchor-urutan-db": 19.48072692259582,
-      "anchor-sadar-zona": 19.48072692259582
+      "anchor-urutan-db": 13.513838461501738,
+      "anchor-sadar-zona": 13.513838461501738
     },
     "detail_per_query": [
       {
@@ -22626,14 +22270,14 @@
     "query_kdb": "kdb"
   },
   "generasi": {
-    "n_permohonan": 139,
-    "n_poin": 417,
+    "n_permohonan": 145,
+    "n_poin": 435,
     "sebab": {
-      "berhasil": 271,
-      "panggilan_llm_gagal": 143,
+      "berhasil": 283,
+      "panggilan_llm_gagal": 149,
       "guardrail_menolak": 3
     },
-    "sitasi": 283,
-    "sitasi_terverifikasi": 283
+    "sitasi": 295,
+    "sitasi_terverifikasi": 295
   }
 }

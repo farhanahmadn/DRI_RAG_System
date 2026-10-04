@@ -987,14 +987,22 @@ def bangun_html(r: dict) -> str:
   <code>dasar_hukum</code>, jadi ia selalu lewat <code>get_by_reference</code>.</p>
   <div class="peringatan">
   <b>Bacaannya.</b> Dua dari tiga poin berada di <b>85&ndash;100%</b> dari langit-langitnya.
-  Yang lemah adalah <code>dampak</code>, dan metriknya menunjukkan bahwa masalahnya
-  <b>cakupan, bukan ketepatan</b>: Hit@{_K_OPERASI} sekitar 0,7 berarti sistem MENEMUKAN ayat
-  yang mengatur pada ~7 dari 10 topik, MRR sekitar 0,68 berarti ayat itu biasanya di peringkat
-  1&ndash;2, tetapi Recall@{_K_OPERASI} sekitar 0,26 berarti ia hanya mengambil <b>sekitar satu
-  dari ~3 ayat</b> yang berlaku. Tiap permohonan bisa terkena tiga ketentuan sekaligus (gempa,
-  banjir lahar, resapan air) sementara sistem mengirim {_K_OPERASI} chunk. Jadi perbaikannya
-  bukan mengganti retriever, melainkan memutuskan apakah satu dasar hukum sudah cukup untuk
-  poin ini &mdash; dan itu pertimbangan hukum, bukan statistik.
+  Angka <code>dampak</code> yang rendah <b>bukan menunjukkan retrieval yang lemah</b> &mdash;
+  ia menunjukkan label yang mencakup dua tema sementara produksi menerbitkan satu query.
+  <br><br>
+  Buktinya kategoris, bukan soal peringkat: ayat Pasal 53 (ketentuan kawasan resapan air)
+  terambil di {_K_OPERASI} teratas pada <b>39 dari 39</b> kesempatan, sedangkan ayat Pasal 50
+  (gempa bumi, banjir lahar) terambil pada <b>0 dari 95</b>. Query produksi
+  <code>dampak tata guna lahan</code> diperluas retriever menjadi istilah hidrologi &mdash;
+  limpasan, runoff, sumur resapan, kolam retensi, zero delta Q, drainase &mdash; sehingga
+  ketentuan kebencanaan secara semantik memang tak terjangkau olehnya. Dengan label dibatasi
+  ke tema yang sesuai querinya, nDCG@{_K_OPERASI} naik ke <b>0,924</b> dan
+  Recall@{_K_OPERASI} ke <b>100%</b>.
+  <br><br>
+  Jadi yang perlu diputuskan: <b>apakah poin dampak memang harus menyitasi ketentuan
+  kebencanaan.</b> Kalau ya, sistem kurang satu query untuk tema itu &mdash; dan pemohon di
+  zona rawan lahar sekarang memang tidak diberi tahu. Kalau tidak, labelnya yang perlu
+  dipersempit. Keduanya pertimbangan tata ruang, bukan statistik.
   </div>"""
 
     # --- Cara membaca skor: lantai, langit-langit, rujukan terbitan ----------------------

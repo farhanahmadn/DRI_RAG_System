@@ -408,15 +408,20 @@ sering tiap jalur dipakai.</p>
 </table>
 </div>
 <div class="catat">
-<b>Yang perlu diperhatikan pada "Dampak ke lingkungan".</b> Perhatikan pola angkanya: sistem
-<b>menemukan</b> pasal yang mengatur pada sekitar 7 dari 10 kasus dan menaruhnya di urutan teratas
-&mdash; jadi jawabannya <b>tidak salah</b>. Yang kurang adalah <b>kelengkapannya</b>: satu lokasi
-bisa terkena tiga ketentuan sekaligus (gempa, banjir lahar, resapan air), sementara sistem hanya
-mengirim {md.get('k_operasi', 3)} pasal. Jadi sistem memberi satu dasar hukum yang benar, bukan
-seluruhnya.
+<b>Kenapa angka "Dampak ke lingkungan" rendah &mdash; dan kenapa itu bukan berarti sistemnya
+salah.</b> Sistem mencari dengan satu kata kunci yang seluruhnya tentang <b>air</b>: limpasan,
+sumur resapan, drainase. Ketentuan tentang air (Pasal 53, kawasan resapan air) ditemukannya
+<b>100% &mdash; 39 dari 39 kali</b>. Tetapi daftar jawaban benar yang kami susun juga memuat
+ketentuan tentang <b>gempa bumi dan banjir lahar</b> (Pasal 50), dan itu <b>0 dari 95 kali</b>
+ditemukan &mdash; wajar, karena kata kunci tentang air memang tidak menanyakan soal gempa.
 <br><br>
-Keputusan yang dibutuhkan di sini <b>bukan keputusan teknis</b>: apakah satu dasar hukum sudah
-cukup untuk poin ini, atau ketiganya memang harus disebut? Itu pertanyaan untuk ahli tata ruang.
+Jadi yang rendah adalah <b>penilaian kami</b>, bukan kemampuan sistem. Bila dinilai hanya pada
+tema yang memang ditanyakan, angkanya <b>92%</b>.
+<br><br>
+Yang perlu diputuskan ahli tata ruang: <b>apakah penilaian dampak suatu permohonan memang harus
+menyebut ketentuan kebencanaan?</b> Kalau ya, sistem kurang satu pencarian untuk tema itu, dan
+pemohon di zona rawan lahar saat ini memang tidak diberi tahu. Kalau tidak, daftar jawaban
+benarnya yang perlu dipersempit.
 </div>
 
 <h2><span class="no">4</span>Perbaikan yang sudah dilakukan</h2>

@@ -44,7 +44,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _AKAR = Path(__file__).parent.parent
-_EVAL_LAMA = _AKAR / "tests" / "eval_set.jsonl"
 _LOG_PRECHECK = _AKAR / "logs" / "precheck.jsonl"
 
 # String query PERSIS seperti yang diterbitkan app/reasoning/generator.py. Diimpor, bukan disalin,
@@ -219,27 +218,28 @@ def bangun(conn, wilayah: str) -> list[dict]:
                 _RUJUKAN_ITBX, {"zona_prefix": k}, lamp["vb"], "aturan",
                 "Jalur rujukan tanpa sub-zona presisi — kasus paling sering di produksi.", w))
 
-    # ---- C. Dampak hidrologi — TIDAK ada tabel per-zona, labelnya memang penilaian ----
-    # Diwarisi dari eval set lama & ditandai seeded. Jujur lebih berguna daripada memaksakan
-    # label "aturan" untuk sesuatu yang tak punya dasar struktural.
-    if _EVAL_LAMA.exists():
-        kunci_dampak = ("resapan", "banjir", "dampak")
-        for baris in _EVAL_LAMA.read_text(encoding="utf-8").splitlines():
-            if not baris.strip():
-                continue
-            lama = json.loads(baris)
-            if any(k in lama["query"].lower() for k in kunci_dampak):
-                topik.append(_topik(
-                    "dampak-" + re.sub(r"\W+", "-", lama["query"].lower()).strip("-"),
-                    "search", "dampak", lama["query"], {}, lama["relevan"], "seeded",
-                    f"Diwarisi eval set lama; tak ada tabel per-zona utk dampak. {lama.get('catatan','')}".strip(),
-                    0))
+    # ---- C. Kontrol tanpa filter zona ----
+    # Sebelumnya bagian ini mewarisi 5 topik dampak dari eval set lama. EMPAT di antaranya memakai
+    # query yang produksi TIDAK PERNAH terbitkan ("Resapan", "Banjir", "kawasan resapan air",
+    # "rawan bencana banjir lahar") — peninggalan desain 8-indikator. Menguji query yang tak pernah
+    # dipakai hanya menambah angka tanpa menambah informasi tentang sistem yang berjalan, dan
+    # membuat metrik `dampak` tercampur antara jalur produksi dan jalur yang sudah mati.
+    #
+    # Yang tersisa satu: query dampak produksi TANPA filter zona. Dipertahankan sebagai KONTROL —
+    # topik `dampak-zona-*` dan `dampak-keluarga-*` memakai query yang sama dengan filter, jadi
+    # selisihnya mengisolasi sumbangan filter itu sendiri. Labelnya kini diturunkan dari aturan
+    # (ayat Pasal 53 yang menyebut kode zona), bukan diwarisi, sehingga eval set tak lagi
+    # bergantung pada berkas lama sama sekali.
+    ayat_resapan = sorted({c for z, ids in _muat_ayat_dampak(conn, wilayah).items()
+                           for c in ids if "-p53-" in c})
+    if ayat_resapan:
         topik.append(_topik(
             "dampak-query-produksi", "search", "dampak",
-            _QUERY_FALLBACK_PER_POIN["dampak"], {},
-            [t["relevan"] for t in topik if t["poin"] == "dampak"][0] if any(
-                t["poin"] == "dampak" for t in topik) else [],
-            "seeded", "Query dampak yang PERSIS diterbitkan produksi.", 0))
+            _QUERY_FALLBACK_PER_POIN["dampak"], {}, ayat_resapan, "aturan",
+            "KONTROL: query dampak produksi TANPA filter zona. Pasangannya dampak-zona-* dan "
+            "dampak-keluarga-* memakai query sama dengan filter, jadi selisihnya mengukur "
+            "sumbangan filter. Label = ayat Pasal 53 (ketentuan kawasan resapan air), yaitu tema "
+            "yang memang dijangkau query ini.", 0))
 
     # ---- D. KONTRAFAKTUAL: filter keluarga + query TAJAM ----
     # Produksi tidak pernah menerbitkan kombinasi ini: query tajam dipakai HANYA saat sub-zona

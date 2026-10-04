@@ -159,9 +159,11 @@ _QUERY_INTENSITAS_TAJAM = "ambang KDB KLB KDH maksimal minimal"
 # `dampak` SENGAJA tidak masuk. Saat keputusan ini diambil alasannya masih lemah (n=5,
 # p=0.625 — tak terbaca, jadi perilaku lama dipertahankan). Setelah topik dampak dibangkitkan
 # berlabel aturan dari Pasal 50 & 53, n jadi 53 dan arahnya TERBUKTI berlawanan: dense-saja
-# KALAH, nDCG@3 0.251 vs 0.330 (p<0.001, efek -0.66), dan tabel yang benar sampai peringkat 1
-# hanya pada 8/53 topik lawan 31/53. Jadi menahan diri waktu itu memang benar, dan sekarang
-# ada buktinya. `itbx` juga tidak masuk: ia lewat get_by_reference dan tak menyentuh fusi.
+# KALAH, nDCG@3 0.251 vs 0.330 (p<0.001, efek -0.66). Belakangan ketahuan label itu mencakup
+# dua tema sementara query produksi hanya satu, jadi kesimpulannya diuji ulang dengan label
+# yang setema: selisihnya justru MELEBAR (0.707 vs 0.924, p<0.001), bukan hilang. Keputusan
+# ini karena itu tidak bergantung pada cacat label tersebut. `itbx` juga tidak masuk: ia lewat
+# get_by_reference dan tak menyentuh fusi.
 _TANPA_LEXICAL_PER_POIN = frozenset({"intensitas"})
 
 # Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
