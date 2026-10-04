@@ -1,11 +1,11 @@
 {
-  "dibuat": "2026-10-04T18:32:50+00:00",
+  "dibuat": "2026-10-04T19:34:55+00:00",
   "berkas_eval": "eval_set_operasi.jsonl",
   "n_simulasi_lantai": 400,
   "bobot_trafik": {
-    "ada_subzona": 0.03508771929824561,
-    "tanpa_subzona": 0.9649122807017544,
-    "n": 456,
+    "ada_subzona": 0.03463203463203463,
+    "tanpa_subzona": 0.9653679653679653,
+    "n": 462,
     "sumber": "precheck.jsonl, era 3-poin saja"
   },
   "baris": [
@@ -56,7 +56,7 @@
       "bobot": "ada_subzona",
       "konfigurasi": "dense+rerank",
       "n": 31,
-      "bobot_nilai": 0.03508771929824561,
+      "bobot_nilai": 0.03463203463203463,
       "metrik": {
         "ndcg@3": {
           "ukur": 1.0,
@@ -96,7 +96,7 @@
       "bobot": "tanpa_subzona",
       "konfigurasi": "dense+rerank",
       "n": 21,
-      "bobot_nilai": 0.9649122807017544,
+      "bobot_nilai": 0.9653679653679653,
       "metrik": {
         "ndcg@3": {
           "ukur": 0.9776533939989163,
@@ -136,7 +136,7 @@
       "bobot": "ada_subzona",
       "konfigurasi": "rrf+rerank",
       "n": 32,
-      "bobot_nilai": 0.03508771929824561,
+      "bobot_nilai": 0.03463203463203463,
       "metrik": {
         "ndcg@3": {
           "ukur": 0.33838471092155636,
@@ -176,7 +176,7 @@
       "bobot": "tanpa_subzona",
       "konfigurasi": "rrf+rerank",
       "n": 21,
-      "bobot_nilai": 0.9649122807017544,
+      "bobot_nilai": 0.9653679653679653,
       "metrik": {
         "ndcg@3": {
           "ukur": 0.31730756723397024,

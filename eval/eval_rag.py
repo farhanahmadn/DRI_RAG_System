@@ -75,6 +75,7 @@ _KANDIDAT = 30       # sejajar dgn candidate_k/rerank_pool retriever produksi
 # kedalaman LAIN berguna untuk memahami perilaku, tapi hanya k=3 yang mewakili apa yang benar-benar
 # diterima sistem — laporan menyorotnya secara terpisah supaya tak terbaca dari kedalaman yang salah.
 _K_OPERASI = 3
+_BUKTI_TERATAS = 5
 # Metrik yang dipakai untuk klaim & uji signifikansi. Sengaja dibatasi: menguji SEMUA metrik x SEMUA
 # pasangan konfigurasi menaikkan peluang temuan palsu tanpa menambah informasi.
 _METRIK_KLAIM = (f"ndcg@{_K_OPERASI}", f"recall@{_K_OPERASI}", f"hit@{_K_OPERASI}", "mrr", "map")
@@ -343,7 +344,13 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
             latensi[kfg].append(nilai)
 
         baris_detail = {"query": row["id"], "n_relevan": len(relevan),
-                        "sumber_label": row["sumber_label"]}
+                        "sumber_label": row["sumber_label"],
+                        # Bukti mentah: apa yang BENAR-BENAR terambil, bukan hanya skornya. Tanpa
+                        # ini laporan hanya bisa mengklaim angka, dan pembacanya tak punya cara
+                        # memeriksa klaim itu selain menjalankan ulang seluruh evaluasi.
+                        "teks_query": row["query"], "filter": row.get("filter") or {},
+                        "relevan": sorted(relevan),
+                        "terambil": {k: urutan[k][:_BUKTI_TERATAS] for k in konfigurasi}}
         for kfg in konfigurasi:
             m = _metrik_satu_query(urutan[kfg][:_TOP_N], relevan)
             per_query[kfg].append(m)
@@ -466,7 +473,10 @@ def evaluasi_anchor(rt, topik: list[dict]) -> dict:
             "anchor-urutan-db": [c.id for c in kandidat[:_TOP_N]],
             "anchor-sadar-zona": [c.id for c in _pilih_chunks_referensi(kandidat, poin, _TOP_N)],
         }
-        baris = {"query": row.get("id", row["query"]), "n_relevan": len(relevan)}
+        baris = {"query": row.get("id", row["query"]), "n_relevan": len(relevan),
+                 "teks_query": row["query"], "filter": row.get("filter") or {},
+                 "relevan": sorted(relevan),
+                 "terambil": {k: v[:_BUKTI_TERATAS] for k, v in urutan.items()}}
         for kfg in _KFG_ANCHOR:
             m = _metrik_satu_query(urutan[kfg], relevan)
             per_query[kfg].append(m)
