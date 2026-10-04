@@ -101,30 +101,54 @@ def lantai_acak(topik: list[dict], kandidat: dict[str, list[str]], top_n: int,
     }
 
 
-def langit_langit(topik: list[dict], k: int) -> dict:
-    """Nilai maksimum yang mungkin, mengingat satu topik bisa punya lebih banyak relevan drpd k."""
-    recall_maks, n_terbatas = [], 0
-    for row in topik:
-        r = len(set(row["relevan"]))
-        if not r:
-            continue
-        batas = min(k, r) / r
-        recall_maks.append(batas)
-        if r > k:
-            n_terbatas += 1
+def langit_langit(topik: list[dict], k_list: tuple[int, ...], k_operasi: int) -> dict:
+    """Nilai TERTINGGI yang mungkin dicapai tiap metrik, mengingat struktur label.
+
+    Ini bukan hiasan. Dua metrik punya langit-langit di bawah 1.0, dan membandingkannya dengan 1.0
+    berarti menghukum sistem atas batas yang dibuat desain, bukan atas kegagalannya:
+
+      * Recall@k    — kalau satu topik punya R > k chunk relevan, mustahil mengambil semuanya dalam
+                      k slot. Langit-langitnya min(k,R)/R.
+      * Precision@k — kalau R < k, sebagian slot PASTI terisi chunk tak relevan walau sistem
+                      sempurna. Langit-langitnya min(k,R)/k. Untuk eval set yang mayoritas topiknya
+                      berlabel tunggal, Precision@5 tertingginya hanya sekitar 0.2 — jadi angka P@5
+                      yang "kelihatan buruk" sebenarnya nyaris mentok.
+
+    nDCG@k, MRR, dan MAP TIDAK terkena: idealnya ikut dibatasi min(R,k), jadi 1.0 tetap bisa
+    dicapai. Hit@k juga tidak — cukup satu chunk relevan yang masuk.
+    """
+    relevan_n = [len(set(row["relevan"])) for row in topik if row.get("relevan")]
+    maks: dict[str, float] = {}
+    for k in k_list:
+        maks[f"recall@{k}"] = statistics.fmean(min(k, r) / r for r in relevan_n)
+        maks[f"precision@{k}"] = statistics.fmean(min(k, r) / k for r in relevan_n)
+        maks[f"hit@{k}"] = 1.0
+        maks[f"ndcg@{k}"] = 1.0
+    maks["rr"] = 1.0
+    maks["ap"] = 1.0
+
+    lebih = sum(1 for r in relevan_n if r > k_operasi)
+    kurang = sum(1 for r in relevan_n if r < k_operasi)
     return {
-        f"recall@{k}_maks": statistics.fmean(recall_maks) if recall_maks else None,
-        "topik_relevan_lebih_dari_k": n_terbatas,
-        "catatan": (f"nDCG@{k} tetap bisa 1.0 karena idealnya ikut dibatasi k, tapi Recall@{k} "
-                    f"tidak: {n_terbatas} topik punya lebih dari {k} chunk relevan, sehingga "
-                    f"Recall@{k} tertingginya di bawah 100%."),
+        "maks": maks,
+        "n_relevan_rata": statistics.fmean(relevan_n) if relevan_n else None,
+        "topik_relevan_lebih_dari_k": lebih,
+        "topik_relevan_kurang_dari_k": kurang,
+        "catatan": (
+            f"Recall@{k_operasi} tertinggi yang mungkin {maks[f'recall@{k_operasi}']:.3f} — "
+            f"{lebih} topik punya lebih dari {k_operasi} chunk relevan. "
+            f"Precision@{k_operasi} tertinggi hanya {maks[f'precision@{k_operasi}']:.3f} — "
+            f"{kurang} topik punya KURANG dari {k_operasi} chunk relevan, sehingga sebagian slot "
+            f"pasti terisi chunk tak relevan walau sistem sempurna. nDCG, MRR, dan MAP tidak "
+            f"terkena batas ini dan tetap bisa mencapai 1.0."
+        ),
     }
 
 
 def main() -> None:
     import psycopg
 
-    from eval.eval_rag import _K_OPERASI, _TOP_N, _muat_topik
+    from eval.eval_rag import _K_LIST, _K_OPERASI, _TOP_N, _muat_topik
 
     ap = argparse.ArgumentParser(description="Lantai acak & langit-langit metrik utk korpus ini.")
     ap.add_argument("--eval-set", type=Path, default=_AKAR / "tests" / "eval_set_operasi.jsonl")
@@ -143,7 +167,7 @@ def main() -> None:
         conn.close()
 
     lantai = lantai_acak(cari, kandidat, _TOP_N, args.n_simulasi)
-    langit = langit_langit(cari, _K_OPERASI)
+    langit = langit_langit(cari, _K_LIST, _K_OPERASI)
 
     hasil = {
         "dibuat": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -163,9 +187,13 @@ def main() -> None:
     for kunci in (f"ndcg@{_K_OPERASI}", f"recall@{_K_OPERASI}", f"hit@{_K_OPERASI}", "rr", "ap"):
         if kunci in m:
             print(f"  {kunci:12s} {m[kunci]:.4f}")
-    print(f"\n=== LANGIT-LANGIT ===")
-    print(f"  recall@{_K_OPERASI} tertinggi yang mungkin: {langit[f'recall@{_K_OPERASI}_maks']:.3f}")
-    print(f"  topik dgn relevan > {_K_OPERASI}: {langit['topik_relevan_lebih_dari_k']}")
+    print("\n=== LANGIT-LANGIT (tertinggi yang MUNGKIN, bukan 1.0 utk semua) ===")
+    print(f"  rata-rata chunk relevan/topik: {langit['n_relevan_rata']:.2f}")
+    for kunci in (f"recall@{_K_OPERASI}", f"precision@{_K_OPERASI}", "recall@5", "precision@5",
+                  f"ndcg@{_K_OPERASI}", "rr", "ap"):
+        if kunci in langit["maks"]:
+            print(f"  {kunci:12s} maks={langit['maks'][kunci]:.3f}")
+    print(f"  {langit['catatan']}")
     print(f"\n[baseline] -> {args.out}")
 
 

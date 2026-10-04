@@ -911,21 +911,43 @@ def bangun_html(r: dict) -> str:
         la = bl["lantai_acak"]["metrik"]
         bk = bl["lantai_acak"]["besar_kandidat"]
         lg = bl["langit_langit"]
-        nd_acak = la.get(f"ndcg@{_K_OPERASI}", 0.0)
-        baris_banding = ""
-        # Urutan sengaja: lantai -> jalur nyata -> langit. Pembaca melihat rentang yang mungkin
-        # dulu, baru posisi sistem di dalamnya.
-        banding = [("Urutan ACAK dari kandidat yang lolos filter (lantai, dihitung)",
-                    nd_acak, "simulasi 2.000x/topik atas korpus ini")]
-        for k in kfg:
-            c = ci_all.get(k, {})
-            if c:
-                banding.append((f"{_LABEL.get(k, k)} (terukur)", c[f"ndcg@{_K_OPERASI}"]["rata"],
-                                f"n={r['n_query']} topik"))
-        for label, nilai, ket in banding:
-            kali = f"{nilai / nd_acak:,.0f}&times;" if nd_acak > 0 else "—"
-            baris_banding += (f"<tr><td>{_esc(label)}</td><td><b>{nilai:.3f}</b></td>"
-                              f"<td>{kali}</td><td class='net'>{_esc(ket)}</td></tr>")
+        lgm = lg["maks"]
+        # Nama agregat MRR/MAP -> kunci per-topik rr/ap, sama seperti _KUNCI_PER_QUERY.
+        _BASE = {"mrr": "rr", "map": "ap"}
+        pembanding_a, pembanding_b = produksi, (
+            "dense+rerank" if produksi != "dense+rerank" and "dense+rerank" in kfg else None)
+        baris_metrik = ""
+        for metrik, catatan_metrik in (
+            ("hit@1", "apakah chunk benar langsung di peringkat 1"),
+            (f"hit@{_K_OPERASI}", "apakah retrieval GAGAL TOTAL pada kedalaman operasi"),
+            ("hit@5", "idem, kedalaman lain (bukan titik operasi)"),
+            ("hit@10", "idem, sejauh daftar dinilai"),
+            (f"recall@{_K_OPERASI}", "berapa bagian chunk otoritatif yang sampai ke LLM"),
+            ("recall@5", "idem, kedalaman lain"),
+            (f"precision@{_K_OPERASI}", "LANGIT-LANGITNYA RENDAH — lihat catatan di bawah"),
+            ("precision@5", "idem, langit-langitnya lebih rendah lagi"),
+            (f"ndcg@{_K_OPERASI}", "metrik primer: jumlah DAN posisi, pada titik operasi"),
+            ("ndcg@5", "idem, kedalaman lain"),
+            ("mrr", "posisi chunk relevan PERTAMA"),
+            ("map", "presisi rata-rata di tiap posisi relevan"),
+        ):
+            kunci_base = _BASE.get(metrik, metrik)
+            lantai_v = la.get(kunci_base)
+            langit_v = lgm.get(kunci_base)
+            ukur_a = agg.get(produksi, {}).get(metrik)
+            ukur_b = agg.get(pembanding_b, {}).get(metrik) if pembanding_b else None
+            if lantai_v is None or ukur_a is None:
+                continue
+            kali = f"{ukur_a / lantai_v:,.0f}&times;" if lantai_v > 0 else "&mdash;"
+            dari_langit = (f"{ukur_a / langit_v:.0%}" if langit_v else "&mdash;")
+            sorot = ' class="sorot"' if metrik == f"ndcg@{_K_OPERASI}" else ""
+            baris_metrik += (
+                f"<tr{sorot}><td><b>{_esc(metrik)}</b></td>"
+                f"<td>{lantai_v:.4f}</td>"
+                f"<td><b>{ukur_a:.3f}</b></td>"
+                + (f"<td>{ukur_b:.3f}</td>" if ukur_b is not None else "<td>&mdash;</td>")
+                + f"<td>{langit_v:.3f}</td><td>{kali}</td><td><b>{dari_langit}</b></td>"
+                f"<td class='net'>{catatan_metrik}</td></tr>")
         blok_tafsir = f"""
   <h2>2. Cara membaca skor — dan mengapa tidak ada ambang &ldquo;bagus/buruk&rdquo; yang baku</h2>
   <div class="peringatan" style="margin-bottom:14px">
@@ -941,26 +963,54 @@ def bangun_html(r: dict) -> str:
   koleksi ini sendiri, <b>langit-langit</b> yang ditentukan struktur label, dan <b>rujukan
   terbitan</b> sebagai konteks besaran.</p>
 
-  <h3>a. Lantai: berapa skor &ldquo;tanpa kepintaran apa pun&rdquo;</h3>
-  <p class="cat">Harapan nDCG@{_K_OPERASI} bila sistem mengambil {_K_OPERASI} chunk ACAK dari
-  kandidat yang lolos filter topik itu — jadi filternya sama, yang hilang hanya peringkatnya.
-  Besar kandidat per topik: min {bk['min']}, median {bk['median']:.0f}, maks {bk['maks']} chunk.</p>
+  <h3>a. Lantai, langit-langit, dan posisi sistem &mdash; tiap metrik</h3>
+  <p class="cat"><b>Lantai</b> = harapan metrik bila sistem mengambil {_TOP_N} chunk ACAK dari
+  kandidat yang lolos filter topik itu; filternya sama, yang hilang hanya peringkatnya. Besar
+  kandidat per topik: min {bk['min']}, median {bk['median']:.0f}, maks {bk['maks']} chunk, jadi
+  menebak bukan hal yang mudah. <b>Langit-langit</b> = nilai tertinggi yang MUNGKIN mengingat
+  struktur label (rata-rata {lg['n_relevan_rata']:.2f} chunk relevan per topik). Kolom terakhir
+  sebelum catatan &mdash; <b>% dari langit-langit</b> &mdash; adalah angka yang paling layak
+  dibaca sebagai &ldquo;seberapa dekat ke sempurna&rdquo;.</p>
   <div class="kartu"><table>
-    <thead><tr><th>Jalur</th><th>nDCG@{_K_OPERASI}</th><th>Kelipatan lantai</th>
-      <th>Dasar</th></tr></thead>
-    <tbody>{baris_banding}</tbody>
+    <thead><tr><th>Metrik</th><th>Lantai acak</th>
+      <th>{_esc(_LABEL.get(produksi, produksi))}</th>
+      <th>{_esc(_LABEL.get(pembanding_b, pembanding_b or '&mdash;'))}</th>
+      <th>Langit-langit</th><th>&divide; lantai</th><th>% dari langit</th>
+      <th>Yang diukurnya</th></tr></thead>
+    <tbody>{baris_metrik}</tbody>
   </table></div>
-  <p class="cat">Inilah satu-satunya pernyataan absolut yang bisa dipertahankan dari tabel ini:
-  jalur produksi berada <b>puluhan kali</b> di atas lantai acak, sementara leg lexical sendirian
-  hanya beberapa kali di atasnya &mdash; itu ukuran kuantitatif bahwa leg tersebut nyaris tak
-  membawa informasi untuk query yang dipakai sistem, bukan kesan.</p>
 
-  <h3>b. Langit-langit: skor 1,0 belum tentu mungkin</h3>
-  <p class="cat">{_esc(lg["catatan"])} Recall@{_K_OPERASI} tertinggi yang mungkin atas eval set
-  ini: <b>{lg[f"recall@{_K_OPERASI}_maks"]:.3f}</b>. Jadi membandingkan Recall@{_K_OPERASI}
-  dengan 1,0 di sini masih adil, tapi pemeriksaannya wajib dilakukan &mdash; kalau satu topik
-  punya 6 chunk relevan sedangkan sistem mengirim {_K_OPERASI}, langit-langitnya 50% dan menuntut
-  100% berarti menghukum sistem atas batas yang dibuat desain.</p>
+  <h3>b. Catatan per metrik &mdash; apa yang boleh dan tidak boleh disimpulkan</h3>
+  <div class="peringatan">
+  <ul>
+    <li><b>Precision@k tidak boleh dibandingkan dengan 1,0 di eval set ini.</b>
+        {lg['topik_relevan_kurang_dari_k']} dari {r['n_query']} topik punya <i>kurang</i> dari
+        {_K_OPERASI} chunk relevan, sehingga sebagian slot PASTI terisi chunk tak relevan walau
+        sistem sempurna. Langit-langitnya Precision@{_K_OPERASI} =
+        <b>{lgm[f'precision@{_K_OPERASI}']:.3f}</b> dan Precision@5 =
+        <b>{lgm['precision@5']:.3f}</b>. Jadi membaca P@5 sekitar 0,2 sebagai &ldquo;hanya 20%,
+        buruk&rdquo; adalah salah baca: yang benar adalah membandingkannya dengan 0,311, dan
+        kolom &ldquo;% dari langit&rdquo; di tabel atas sudah melakukannya.</li>
+    <li><b>Hit@k adalah lantai, bukan mutu.</b> Ia hanya menjawab &ldquo;apakah retrieval gagal
+        total&rdquo;. Nilainya naik dengan sendirinya bila k diperbesar &mdash; lantai acaknya
+        pun naik dari {la['hit@1']:.4f} di k=1 menjadi {la['hit@10']:.4f} di k=10. Hit@k tinggi
+        pada k besar <b>bukan</b> bukti sistem bagus; yang menentukan adalah k titik operasi.</li>
+    <li><b>Recall@k dibatasi jumlah label.</b> Langit-langit Recall@{_K_OPERASI} =
+        {lgm[f'recall@{_K_OPERASI}']:.3f} ({lg['topik_relevan_lebih_dari_k']} topik punya lebih
+        dari {_K_OPERASI} chunk relevan), jadi di sini perbandingan dengan 1,0 masih nyaris adil.
+        Tapi pemeriksaan ini wajib diulang setiap eval set berubah: begitu satu topik punya 6
+        chunk relevan sementara sistem mengirim {_K_OPERASI}, langit-langitnya 50%.</li>
+    <li><b>nDCG@k, MRR, dan MAP tidak terkena batas itu</b> &mdash; idealnya ikut dibatasi
+        min(jumlah relevan, k), sehingga 1,0 tetap bisa dicapai. Karena itu nDCG@{_K_OPERASI}
+        dipakai sebagai metrik primer di laporan ini, dan Precision dilaporkan hanya sebagai
+        pelengkap.</li>
+    <li><b>MRR hanya melihat chunk relevan PERTAMA.</b> Ia buta terhadap sisanya, jadi MRR
+        tinggi dengan Recall rendah berarti &ldquo;satu jawaban benar di atas, sisanya tak
+        terambil&rdquo; &mdash; itu justru pola yang terlihat pada poin dampak.</li>
+    <li><b>Seluruh angka di tabel ini tak tertimbang per topik</b>, jadi bukan angka produksi.
+        Jalur produksi berbeda per poin &mdash; lihat bagian 1.</li>
+  </ul>
+  </div>
 
   <h3>c. Rujukan terbitan: berapa skor yang wajar di koleksi nyata</h3>
   <p class="cat">Pada <b>BEIR</b> &mdash; tolok ukur retrieval zero-shot yang paling banyak

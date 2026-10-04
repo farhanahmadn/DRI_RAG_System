@@ -100,26 +100,54 @@
   koleksi ini sendiri, <b>langit-langit</b> yang ditentukan struktur label, dan <b>rujukan
   terbitan</b> sebagai konteks besaran.</p>
 
-  <h3>a. Lantai: berapa skor &ldquo;tanpa kepintaran apa pun&rdquo;</h3>
-  <p class="cat">Harapan nDCG@3 bila sistem mengambil 3 chunk ACAK dari
-  kandidat yang lolos filter topik itu — jadi filternya sama, yang hilang hanya peringkatnya.
-  Besar kandidat per topik: min 423, median 424, maks 484 chunk.</p>
+  <h3>a. Lantai, langit-langit, dan posisi sistem &mdash; tiap metrik</h3>
+  <p class="cat"><b>Lantai</b> = harapan metrik bila sistem mengambil 10 chunk ACAK dari
+  kandidat yang lolos filter topik itu; filternya sama, yang hilang hanya peringkatnya. Besar
+  kandidat per topik: min 423, median 424, maks 484 chunk, jadi
+  menebak bukan hal yang mudah. <b>Langit-langit</b> = nilai tertinggi yang MUNGKIN mengingat
+  struktur label (rata-rata 1.56 chunk relevan per topik). Kolom terakhir
+  sebelum catatan &mdash; <b>% dari langit-langit</b> &mdash; adalah angka yang paling layak
+  dibaca sebagai &ldquo;seberapa dekat ke sempurna&rdquo;.</p>
   <div class="kartu"><table>
-    <thead><tr><th>Jalur</th><th>nDCG@3</th><th>Kelipatan lantai</th>
-      <th>Dasar</th></tr></thead>
-    <tbody><tr><td>Urutan ACAK dari kandidat yang lolos filter (lantai, dihitung)</td><td><b>0.006</b></td><td>1&times;</td><td class='net'>simulasi 2.000x/topik atas korpus ini</td></tr><tr><td>Dense saja (terukur)</td><td><b>0.169</b></td><td>30&times;</td><td class='net'>n=214 topik</td></tr><tr><td>Lexical saja (terukur)</td><td><b>0.014</b></td><td>3&times;</td><td class='net'>n=214 topik</td></tr><tr><td>RRF (tanpa rerank) (terukur)</td><td><b>0.213</b></td><td>38&times;</td><td class='net'>n=214 topik</td></tr><tr><td>Dense + rerank (tanpa lexical) (terukur)</td><td><b>0.473</b></td><td>84&times;</td><td class='net'>n=214 topik</td></tr><tr><td>RRF + rerank (produksi) (terukur)</td><td><b>0.418</b></td><td>75&times;</td><td class='net'>n=214 topik</td></tr></tbody>
+    <thead><tr><th>Metrik</th><th>Lantai acak</th>
+      <th>RRF + rerank (produksi)</th>
+      <th>Dense + rerank (tanpa lexical)</th>
+      <th>Langit-langit</th><th>&divide; lantai</th><th>% dari langit</th>
+      <th>Yang diukurnya</th></tr></thead>
+    <tbody><tr><td><b>hit@1</b></td><td>0.0037</td><td><b>0.364</b></td><td>0.299</td><td>1.000</td><td>99&times;</td><td><b>36%</b></td><td class='net'>apakah chunk benar langsung di peringkat 1</td></tr><tr><td><b>hit@3</b></td><td>0.0110</td><td><b>0.640</b></td><td>0.748</td><td>1.000</td><td>58&times;</td><td><b>64%</b></td><td class='net'>apakah retrieval GAGAL TOTAL pada kedalaman operasi</td></tr><tr><td><b>hit@5</b></td><td>0.0181</td><td><b>0.911</b></td><td>0.790</td><td>1.000</td><td>50&times;</td><td><b>91%</b></td><td class='net'>idem, kedalaman lain (bukan titik operasi)</td></tr><tr><td><b>hit@10</b></td><td>0.0361</td><td><b>0.963</b></td><td>0.916</td><td>1.000</td><td>27&times;</td><td><b>96%</b></td><td class='net'>idem, sejauh daftar dinilai</td></tr><tr><td><b>recall@3</b></td><td>0.0071</td><td><b>0.505</b></td><td>0.600</td><td>0.996</td><td>71&times;</td><td><b>51%</b></td><td class='net'>berapa bagian chunk otoritatif yang sampai ke LLM</td></tr><tr><td><b>recall@5</b></td><td>0.0116</td><td><b>0.760</b></td><td>0.653</td><td>1.000</td><td>65&times;</td><td><b>76%</b></td><td class='net'>idem, kedalaman lain</td></tr><tr><td><b>precision@3</b></td><td>0.0037</td><td><b>0.227</b></td><td>0.266</td><td>0.514</td><td>62&times;</td><td><b>44%</b></td><td class='net'>LANGIT-LANGITNYA RENDAH — lihat catatan di bawah</td></tr><tr><td><b>precision@5</b></td><td>0.0036</td><td><b>0.197</b></td><td>0.176</td><td>0.311</td><td>54&times;</td><td><b>63%</b></td><td class='net'>idem, langit-langitnya lebih rendah lagi</td></tr><tr class="sorot"><td><b>ndcg@3</b></td><td>0.0056</td><td><b>0.418</b></td><td>0.473</td><td>1.000</td><td>75&times;</td><td><b>42%</b></td><td class='net'>metrik primer: jumlah DAN posisi, pada titik operasi</td></tr><tr><td><b>ndcg@5</b></td><td>0.0076</td><td><b>0.529</b></td><td>0.496</td><td>1.000</td><td>69&times;</td><td><b>53%</b></td><td class='net'>idem, kedalaman lain</td></tr><tr><td><b>mrr</b></td><td>0.0106</td><td><b>0.543</b></td><td>0.519</td><td>1.000</td><td>51&times;</td><td><b>54%</b></td><td class='net'>posisi chunk relevan PERTAMA</td></tr><tr><td><b>map</b></td><td>0.0069</td><td><b>0.438</b></td><td>0.440</td><td>1.000</td><td>64&times;</td><td><b>44%</b></td><td class='net'>presisi rata-rata di tiap posisi relevan</td></tr></tbody>
   </table></div>
-  <p class="cat">Inilah satu-satunya pernyataan absolut yang bisa dipertahankan dari tabel ini:
-  jalur produksi berada <b>puluhan kali</b> di atas lantai acak, sementara leg lexical sendirian
-  hanya beberapa kali di atasnya &mdash; itu ukuran kuantitatif bahwa leg tersebut nyaris tak
-  membawa informasi untuk query yang dipakai sistem, bukan kesan.</p>
 
-  <h3>b. Langit-langit: skor 1,0 belum tentu mungkin</h3>
-  <p class="cat">nDCG@3 tetap bisa 1.0 karena idealnya ikut dibatasi k, tapi Recall@3 tidak: 3 topik punya lebih dari 3 chunk relevan, sehingga Recall@3 tertingginya di bawah 100%. Recall@3 tertinggi yang mungkin atas eval set
-  ini: <b>0.996</b>. Jadi membandingkan Recall@3
-  dengan 1,0 di sini masih adil, tapi pemeriksaannya wajib dilakukan &mdash; kalau satu topik
-  punya 6 chunk relevan sedangkan sistem mengirim 3, langit-langitnya 50% dan menuntut
-  100% berarti menghukum sistem atas batas yang dibuat desain.</p>
+  <h3>b. Catatan per metrik &mdash; apa yang boleh dan tidak boleh disimpulkan</h3>
+  <div class="peringatan">
+  <ul>
+    <li><b>Precision@k tidak boleh dibandingkan dengan 1,0 di eval set ini.</b>
+        164 dari 214 topik punya <i>kurang</i> dari
+        3 chunk relevan, sehingga sebagian slot PASTI terisi chunk tak relevan walau
+        sistem sempurna. Langit-langitnya Precision@3 =
+        <b>0.514</b> dan Precision@5 =
+        <b>0.311</b>. Jadi membaca P@5 sekitar 0,2 sebagai &ldquo;hanya 20%,
+        buruk&rdquo; adalah salah baca: yang benar adalah membandingkannya dengan 0,311, dan
+        kolom &ldquo;% dari langit&rdquo; di tabel atas sudah melakukannya.</li>
+    <li><b>Hit@k adalah lantai, bukan mutu.</b> Ia hanya menjawab &ldquo;apakah retrieval gagal
+        total&rdquo;. Nilainya naik dengan sendirinya bila k diperbesar &mdash; lantai acaknya
+        pun naik dari 0.0037 di k=1 menjadi 0.0361 di k=10. Hit@k tinggi
+        pada k besar <b>bukan</b> bukti sistem bagus; yang menentukan adalah k titik operasi.</li>
+    <li><b>Recall@k dibatasi jumlah label.</b> Langit-langit Recall@3 =
+        0.996 (3 topik punya lebih
+        dari 3 chunk relevan), jadi di sini perbandingan dengan 1,0 masih nyaris adil.
+        Tapi pemeriksaan ini wajib diulang setiap eval set berubah: begitu satu topik punya 6
+        chunk relevan sementara sistem mengirim 3, langit-langitnya 50%.</li>
+    <li><b>nDCG@k, MRR, dan MAP tidak terkena batas itu</b> &mdash; idealnya ikut dibatasi
+        min(jumlah relevan, k), sehingga 1,0 tetap bisa dicapai. Karena itu nDCG@3
+        dipakai sebagai metrik primer di laporan ini, dan Precision dilaporkan hanya sebagai
+        pelengkap.</li>
+    <li><b>MRR hanya melihat chunk relevan PERTAMA.</b> Ia buta terhadap sisanya, jadi MRR
+        tinggi dengan Recall rendah berarti &ldquo;satu jawaban benar di atas, sisanya tak
+        terambil&rdquo; &mdash; itu justru pola yang terlihat pada poin dampak.</li>
+    <li><b>Seluruh angka di tabel ini tak tertimbang per topik</b>, jadi bukan angka produksi.
+        Jalur produksi berbeda per poin &mdash; lihat bagian 1.</li>
+  </ul>
+  </div>
 
   <h3>c. Rujukan terbitan: berapa skor yang wajar di koleksi nyata</h3>
   <p class="cat">Pada <b>BEIR</b> &mdash; tolok ukur retrieval zero-shot yang paling banyak

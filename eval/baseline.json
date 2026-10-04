@@ -1,5 +1,5 @@
 {
-  "dibuat": "2026-10-04T18:10:58+00:00",
+  "dibuat": "2026-10-04T18:21:20+00:00",
   "berkas_eval": "eval_set_operasi.jsonl",
   "n_simulasi": 2000,
   "seed": 20261005,
@@ -33,8 +33,29 @@
     }
   },
   "langit_langit": {
-    "recall@3_maks": 0.9964953271028038,
+    "maks": {
+      "recall@1": 0.8056853582554516,
+      "precision@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@3": 0.9964953271028038,
+      "precision@3": 0.514018691588785,
+      "hit@3": 1.0,
+      "ndcg@3": 1.0,
+      "recall@5": 1.0,
+      "precision@5": 0.311214953271028,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "precision@10": 0.155607476635514,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "rr": 1.0,
+      "ap": 1.0
+    },
+    "n_relevan_rata": 1.5560747663551402,
     "topik_relevan_lebih_dari_k": 3,
-    "catatan": "nDCG@3 tetap bisa 1.0 karena idealnya ikut dibatasi k, tapi Recall@3 tidak: 3 topik punya lebih dari 3 chunk relevan, sehingga Recall@3 tertingginya di bawah 100%."
+    "topik_relevan_kurang_dari_k": 164,
+    "catatan": "Recall@3 tertinggi yang mungkin 0.996 — 3 topik punya lebih dari 3 chunk relevan. Precision@3 tertinggi hanya 0.514 — 164 topik punya KURANG dari 3 chunk relevan, sehingga sebagian slot pasti terisi chunk tak relevan walau sistem sempurna. nDCG, MRR, dan MAP tidak terkena batas ini dan tetap bisa mencapai 1.0."
   }
 }
