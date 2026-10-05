@@ -1171,3 +1171,50 @@ class TestCaveatSubzona:
 
         assert "Caveat asli dari back-end." in prompt
         assert "Catatan dari kode." in prompt
+
+
+class TestTopKPerPoin:
+    """Sambungan untuk eksperimen kedalaman konteks. Produksi TIDAK boleh ikut berubah karenanya."""
+
+    def test_default_produksi_tidak_terpengaruh(self):
+        from app.reasoning.generator import _TOP_K_PER_POIN, top_k_utk
+
+        assert _TOP_K_PER_POIN == {}, "dict ini harus KOSONG di produksi"
+        for pid in ("itbx", "intensitas", "dampak"):
+            assert top_k_utk(pid, 3) == 3
+
+    def test_hanya_poin_yang_diatur_yang_berubah(self, monkeypatch):
+        from app.reasoning import generator
+
+        monkeypatch.setattr(generator, "_TOP_K_PER_POIN", {"intensitas": 5})
+
+        assert generator.top_k_utk("intensitas", 3) == 5
+        assert generator.top_k_utk("dampak", 3) == 3, "poin lain tak boleh ikut bergeser"
+
+    def test_kedalaman_diteruskan_ke_retriever(self, monkeypatch):
+        """Yang diuji bukan nilainya saja, tapi bahwa ia benar-benar sampai ke pemanggilan search."""
+        from app.reasoning import generator
+        from app.reasoning.generator import ambil_chunks_pendukung
+
+        monkeypatch.setattr(generator, "_TOP_K_PER_POIN", {"intensitas": 5})
+        terekam = {}
+
+        class _Perekam:
+            def search(self, query, filters, top_k=5, *, tanpa_lexical=False):
+                terekam["top_k"] = top_k
+                return []
+
+            def get_by_reference(self, referensi):
+                return []
+
+            def get_parent(self, chunk_id):
+                return None
+
+        poin = PoinKonteks(
+            poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik", status="MELAMPAUI_BATAS", fakta={}, dasar_hukum=[],
+            zona="Zona Perumahan", zona_subzone=None,
+        )
+        ambil_chunks_pendukung(poin, _Perekam(), top_k_dukungan=3)
+
+        assert terekam["top_k"] == 5

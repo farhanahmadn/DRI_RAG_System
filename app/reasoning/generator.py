@@ -166,6 +166,23 @@ _QUERY_INTENSITAS_TAJAM = "ambang KDB KLB KDH maksimal minimal"
 # get_by_reference dan tak menyentuh fusi.
 _TANPA_LEXICAL_PER_POIN = frozenset({"intensitas"})
 
+# Kedalaman konteks per poin. KOSONG di produksi — seluruh poin memakai `top_k_dukungan`
+# (3). Dict ini ada supaya harness evaluasi bisa menjalankan eksperimen k lain TANPA
+# mengubah perilaku default: ablasi diaktifkan lewat parameter di sisi eksperimen, bukan
+# dengan menggeser produksi lalu lupa menggesernya kembali.
+#
+# Catatan ukuran, supaya keputusan menaikkannya tidak diambil dari metrik retrieval saja:
+# k=5 menaikkan Recall@k dari 63% ke 94% langit-langitnya, tapi menambah ~485-1.042 token
+# per poin, dan tiga poin berjalan paralel. Risiko yang TIDAK terlihat di metrik retrieval
+# adalah membanjiri LLM sampai ia gagal memilih sitasi sama sekali (APP-2026-6191), jadi
+# kenaikan k wajib diuji di sisi generasi lebih dulu — lihat eval/replay_k.py.
+_TOP_K_PER_POIN: dict[str, int] = {}
+
+
+def top_k_utk(poin_id: str, default: int) -> int:
+    """Kedalaman konteks utk satu poin. Produksi selalu memakai `default`."""
+    return _TOP_K_PER_POIN.get(poin_id, default)
+
 # Nama zona INDUK (persis spt `assessment.lokasi.rdtr_zone` dari back-end) -> kode prefix, sesuai
 # Pasal 17 (Zona Lindung) & Pasal 23 (Zona Budi Daya), "RDTR Kawasan Sleman Tengah 2023-2043.md"
 # (data/parsed/v1/) — diverifikasi thd `data/raw/*.pdf` langsung, BUKAN ditebak. Dipakai
@@ -280,7 +297,8 @@ def ambil_chunks_pendukung(
     # ke prompt (lihat build_user_prompt), jadi pembatasan ini TIDAK mengurangi sitasi yang faithful.
     # APP-2026-2428: pemotongan itu TIDAK BOLEH menurut urutan DB — pilih menurut kecocokan zona
     # pemohon dulu (lihat _pilih_chunks_referensi utk bukti & alasan lengkapnya).
-    chunks = _pilih_chunks_referensi(chunks, poin, top_k_dukungan)
+    top_k = top_k_utk(poin.poin_id, top_k_dukungan)
+    chunks = _pilih_chunks_referensi(chunks, poin, top_k)
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
         if poin.poin_id == "intensitas":
@@ -297,7 +315,7 @@ def ambil_chunks_pendukung(
             filters = RetrievalFilters(zona=poin.zona_subzone)
         else:
             filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
-        chunks = retriever.search(query_fallback, filters, top_k=top_k_dukungan,
+        chunks = retriever.search(query_fallback, filters, top_k=top_k,
                                   tanpa_lexical=poin.poin_id in _TANPA_LEXICAL_PER_POIN)
     return chunks
 
