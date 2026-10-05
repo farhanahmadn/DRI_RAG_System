@@ -51,9 +51,58 @@
   </p>
 
 
-  <h2>1. Titik operasi sistem (k=3)</h2>
+
+  <h2>1. Kinerja sistem &mdash; jalur produksi per poin</h2>
   <div class="peringatan" style="margin-bottom:14px">
-  <b>Ini tabel yang menentukan.</b> Sistem mengirim <b>3 chunk</b> ke LLM
+  <b>Inilah satu-satunya tabel di laporan ini yang boleh dibaca sebagai kinerja produksi.</b>
+  Tabel bagian 2 merata-ratakan seluruh topik dengan bobot sama, dan itu sengaja memuat jalur
+  yang produksi TIDAK pakai: 52 topik menguji <code>itbx</code> lewat <code>search</code> yang
+  hampir tak pernah menyala, ditambah puluhan topik kontrafaktual (query pendek
+  <code>kdb</code>, topik dampak warisan berlabel <i>seeded</i>) yang ada untuk membuktikan
+  sebab-akibat, bukan untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang
+  benar-benar dijalankan.
+  </div>
+  <p class="cat">Angka tebal = skor terukur. Angka kecil abu-abu di sebelahnya =
+  <b>persen dari langit-langit</b>, yaitu nilai tertinggi yang MUNGKIN dicapai mengingat
+  struktur label subset itu &mdash; bukan dari 1,0. Inilah angka yang layak dibaca sebagai
+  &ldquo;seberapa dekat ke sempurna&rdquo;; bagian 3 menjelaskan alasannya. Lantai acak dan
+  langit-langit dihitung <b>per subset</b>, bukan dipinjam dari angka global.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>Cabang</th><th>Bobot trafik</th><th>n topik</th>
+      <th>Jalur</th><th>nDCG@3</th><th>Recall@3</th>
+      <th>Hit@3</th><th>MRR</th></tr></thead>
+    <tbody><tr><td><b>itbx</b></td><td>get_by_reference (anchor dari back-end)</td><td>100%</td><td>52</td><td class='net'>Anchor sadar-zona (produksi)</td><td><b>0.855</b> <span class="net">85%</span></td><td><b>0.949</b> <span class="net">95%</span></td><td><b>0.962</b> <span class="net">96%</span></td><td><b>0.828</b> <span class="net">83%</span></td></tr><tr><td><b>intensitas</b></td><td>sub-zona presisi diketahui</td><td>3%</td><td>31</td><td class='net'>Dense + rerank (tanpa lexical)</td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td></tr><tr><td></td><td>tanpa sub-zona (filter keluarga)</td><td>97%</td><td>21</td><td class='net'>Dense + rerank (tanpa lexical)</td><td><b>0.978</b> <span class="net">98%</span></td><td><b>0.960</b> <span class="net">97%</span></td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td></tr><tr><td><b>dampak</b></td><td>sub-zona presisi diketahui</td><td>3%</td><td>32</td><td class='net'>RRF + rerank (produksi)</td><td><b>0.631</b> <span class="net">63%</span></td><td><b>0.734</b> <span class="net">73%</span></td><td><b>0.875</b> <span class="net">88%</span></td><td><b>0.745</b> <span class="net">74%</span></td></tr><tr><td></td><td>tanpa sub-zona (filter keluarga)</td><td>97%</td><td>21</td><td class='net'>RRF + rerank (produksi)</td><td><b>0.647</b> <span class="net">65%</span></td><td><b>0.786</b> <span class="net">79%</span></td><td><b>0.905</b> <span class="net">90%</span></td><td><b>0.730</b> <span class="net">73%</span></td></tr></tbody>
+  </table></div>
+  <p class="cat">Bobot trafik dihitung dari <code>precheck.jsonl, era 3-poin saja</code>
+  (n=483 permohonan): <b>96.7%</b> permohonan tiba TANPA sub-zona
+  presisi, sehingga cabang berfilter keluarga yang dominan &mdash; bukan cabang exact.
+  Poin <code>itbx</code> tidak punya pembagian cabang karena seluruh payload back-end membawa
+  <code>dasar_hukum</code>, jadi ia selalu lewat <code>get_by_reference</code>.</p>
+  <div class="peringatan">
+  <b>Bacaannya.</b> <code>intensitas</code> dan <code>itbx</code> berada di
+  <b>85&ndash;100%</b> dari langit-langitnya; <code>dampak</code> di kisaran <b>63&ndash;65%</b>.
+  <br><br>
+  Angka <code>dampak</code> sempat terbaca jauh lebih rendah (sekitar 33%), dan itu <b>mengukur
+  label, bukan sistem</b>. Label lama memasukkan seluruh ketentuan kebencanaan Pasal 50; buktinya
+  kategoris — ayat kawasan resapan air terambil pada <b>39 dari 39</b> kesempatan, sedangkan ayat
+  gempa bumi dan banjir lahar pada <b>0 dari 95</b>. Query produksi
+  <code>dampak tata guna lahan</code> diperluas retriever menjadi istilah hidrologi saja
+  (limpasan, runoff, sumur resapan, zero delta Q, drainase), sehingga ketentuan kebencanaan memang
+  tak terjangkau olehnya.
+  <br><br>
+  Kriteria label kini <b>kausal</b>, atas keputusan pemilik domain: yang sah disitasi hanya
+  ketentuan atas dampak yang <b>ditimbulkan</b> pembangunan, bukan bahaya alam yang mengancam
+  lokasi. Diterapkan sebagai aturan atas teks ayatnya (kewajiban pengendalian limpasan), bukan
+  daftar nomor pasal. Sisa jaraknya ke 100% adalah kekurangan yang nyata dan belum
+  ditindaklanjuti.
+  </div>
+
+  <h2>2. Titik operasi &amp; ablasi konfigurasi (k=3)</h2>
+  <div class="peringatan" style="margin-bottom:14px">
+  <b>Tabel ini membandingkan KONFIGURASI, bukan melaporkan kinerja.</b> Angka kinerja ada di
+  bagian 1. Di sini tiap lapis retrieval dinilai atas seluruh topik uji &mdash; termasuk lengan
+  kontrafaktual yang sengaja dibuat berskor rendah &mdash; supaya sumbangan tiap komponen
+  terlihat, bukan diasumsikan. Sistem mengirim <b>3 chunk</b> ke LLM
   (<code>generator.top_k_dukungan</code>), jadi hanya kedalaman ini yang mewakili apa yang
   benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 4 &amp; 5) berguna untuk memahami
   perilaku, tapi <b>tidak boleh dipakai sebagai klaim kinerja</b>.
@@ -118,51 +167,6 @@
   hanya menghitung cabang yang benar-benar dijalankan, dengan konfigurasi per-poin seperti di
   produksi. Poin <code>itbx</code> tidak termasuk di sana karena ia tak lewat
   <code>search</code> sama sekali — angkanya ada di bagian ablasi jalur rujukan.
-  </div>
-
-  <h2>2. Kinerja jalur produksi, per poin</h2>
-  <div class="peringatan" style="margin-bottom:14px">
-  <b>Inilah satu-satunya tabel di laporan ini yang boleh dibaca sebagai kinerja produksi.</b>
-  Tabel bagian 1 merata-ratakan seluruh topik dengan bobot sama, dan itu sengaja memuat jalur
-  yang produksi TIDAK pakai: 52 topik menguji <code>itbx</code> lewat <code>search</code> yang
-  hampir tak pernah menyala, ditambah puluhan topik kontrafaktual (query pendek
-  <code>kdb</code>, topik dampak warisan berlabel <i>seeded</i>) yang ada untuk membuktikan
-  sebab-akibat, bukan untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang
-  benar-benar dijalankan.
-  </div>
-  <p class="cat">Angka tebal = skor terukur. Angka kecil abu-abu di sebelahnya =
-  <b>persen dari langit-langit</b>, yaitu nilai tertinggi yang MUNGKIN dicapai mengingat
-  struktur label subset itu &mdash; bukan dari 1,0. Inilah angka yang layak dibaca sebagai
-  &ldquo;seberapa dekat ke sempurna&rdquo;; bagian 3 menjelaskan alasannya. Lantai acak dan
-  langit-langit dihitung <b>per subset</b>, bukan dipinjam dari angka global.</p>
-  <div class="kartu"><table>
-    <thead><tr><th>Poin</th><th>Cabang</th><th>Bobot trafik</th><th>n topik</th>
-      <th>Jalur</th><th>nDCG@3</th><th>Recall@3</th>
-      <th>Hit@3</th><th>MRR</th></tr></thead>
-    <tbody><tr><td><b>itbx</b></td><td>get_by_reference (anchor dari back-end)</td><td>100%</td><td>52</td><td class='net'>Anchor sadar-zona (produksi)</td><td><b>0.855</b> <span class="net">85%</span></td><td><b>0.949</b> <span class="net">95%</span></td><td><b>0.962</b> <span class="net">96%</span></td><td><b>0.828</b> <span class="net">83%</span></td></tr><tr><td><b>intensitas</b></td><td>sub-zona presisi diketahui</td><td>3%</td><td>31</td><td class='net'>Dense + rerank (tanpa lexical)</td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td></tr><tr><td></td><td>tanpa sub-zona (filter keluarga)</td><td>97%</td><td>21</td><td class='net'>Dense + rerank (tanpa lexical)</td><td><b>0.978</b> <span class="net">98%</span></td><td><b>0.960</b> <span class="net">97%</span></td><td><b>1.000</b> <span class="net">100%</span></td><td><b>1.000</b> <span class="net">100%</span></td></tr><tr><td><b>dampak</b></td><td>sub-zona presisi diketahui</td><td>3%</td><td>32</td><td class='net'>RRF + rerank (produksi)</td><td><b>0.631</b> <span class="net">63%</span></td><td><b>0.734</b> <span class="net">73%</span></td><td><b>0.875</b> <span class="net">88%</span></td><td><b>0.745</b> <span class="net">74%</span></td></tr><tr><td></td><td>tanpa sub-zona (filter keluarga)</td><td>97%</td><td>21</td><td class='net'>RRF + rerank (produksi)</td><td><b>0.647</b> <span class="net">65%</span></td><td><b>0.786</b> <span class="net">79%</span></td><td><b>0.905</b> <span class="net">90%</span></td><td><b>0.730</b> <span class="net">73%</span></td></tr></tbody>
-  </table></div>
-  <p class="cat">Bobot trafik dihitung dari <code>precheck.jsonl, era 3-poin saja</code>
-  (n=471 permohonan): <b>96.6%</b> permohonan tiba TANPA sub-zona
-  presisi, sehingga cabang berfilter keluarga yang dominan &mdash; bukan cabang exact.
-  Poin <code>itbx</code> tidak punya pembagian cabang karena seluruh payload back-end membawa
-  <code>dasar_hukum</code>, jadi ia selalu lewat <code>get_by_reference</code>.</p>
-  <div class="peringatan">
-  <b>Bacaannya.</b> <code>intensitas</code> dan <code>itbx</code> berada di
-  <b>85&ndash;100%</b> dari langit-langitnya; <code>dampak</code> di kisaran <b>63&ndash;65%</b>.
-  <br><br>
-  Angka <code>dampak</code> sempat terbaca jauh lebih rendah (sekitar 33%), dan itu <b>mengukur
-  label, bukan sistem</b>. Label lama memasukkan seluruh ketentuan kebencanaan Pasal 50; buktinya
-  kategoris — ayat kawasan resapan air terambil pada <b>39 dari 39</b> kesempatan, sedangkan ayat
-  gempa bumi dan banjir lahar pada <b>0 dari 95</b>. Query produksi
-  <code>dampak tata guna lahan</code> diperluas retriever menjadi istilah hidrologi saja
-  (limpasan, runoff, sumur resapan, zero delta Q, drainase), sehingga ketentuan kebencanaan memang
-  tak terjangkau olehnya.
-  <br><br>
-  Kriteria label kini <b>kausal</b>, atas keputusan pemilik domain: yang sah disitasi hanya
-  ketentuan atas dampak yang <b>ditimbulkan</b> pembangunan, bukan bahaya alam yang mengancam
-  lokasi. Diterapkan sebagai aturan atas teks ayatnya (kewajiban pengendalian limpasan), bukan
-  daftar nomor pasal. Sisa jaraknya ke 100% adalah kekurangan yang nyata dan belum
-  ditindaklanjuti.
   </div>
 
   <h2>3. Cara membaca skor — dan mengapa tidak ada ambang &ldquo;bagus/buruk&rdquo; yang baku</h2>

@@ -177,6 +177,44 @@ def _kartu_topik(d: dict, pq: dict, konfigurasi: list[str], glo: dict, k_op: int
 </article>"""
 
 
+def _baris_produksi(h: dict, k_op: int) -> str:
+    """Baris ringkas jalur produksi utk tabel agregat.
+
+    Tanpa ini pembaca memakai rata-rata seluruh topik sebagai kinerja sistem, padahal separuhnya
+    lengan ablasi yang memang dirancang berskor rendah. Daftar cabangnya diimpor dari eval_rag,
+    jadi tak ada salinan kedua yang bisa menyimpang.
+    """
+    try:
+        from app.reasoning.generator import _TANPA_LEXICAL_PER_POIN
+        from eval.eval_rag import indeks_jalur_produksi
+        from eval.statistik import bootstrap_ci
+    except Exception:
+        return ""
+    detail, skor = h.get("detail_per_query") or [], h.get("skor_per_query") or {}
+    idx = indeks_jalur_produksi(detail)
+    if not idx or not skor:
+        return ""
+    nilai: dict[str, list[float]] = {}
+    for i in idx:
+        poin = str(detail[i]["query"]).split("-")[0]
+        kfg = "dense+rerank" if poin in _TANPA_LEXICAL_PER_POIN else "rrf+rerank"
+        if kfg not in skor:
+            continue
+        for m in (f"ndcg@{k_op}", f"recall@{k_op}", f"hit@{k_op}", "mrr", "map"):
+            nilai.setdefault(m, []).append(skor[kfg][i][m])
+    if not nilai:
+        return ""
+    sel = ""
+    for m in (f"ndcg@{k_op}", f"recall@{k_op}", f"hit@{k_op}", "mrr", "map"):
+        c = bootstrap_ci(nilai[m])
+        sel += (f'<td class="num"><b>{c.rata:.3f}</b>'
+                f'<span class="ci">[{c.bawah:.3f}\u2013{c.atas:.3f}]</span></td>')
+    return (f'<tr class="sorot"><td><b>Jalur produksi saja</b>'
+            f'<span class="ci">{len(idx)} dari {len(detail)} topik, konfigurasi per-poin</span>'
+            f'</td>{sel}<td class="redup">inilah yang dijalankan sistem</td>'
+            f'<td class="num">&mdash;</td></tr>')
+
+
 def bangun(h: dict, rp: dict | None, bl: dict | None, atr: dict | None) -> str:
     k_op = (h.get("metadata") or {}).get("k_operasi", 3)
     kfg = h["konfigurasi"]
@@ -383,11 +421,14 @@ korpus {h['korpus']['chunk']} chunk / {h['korpus']['vektor']} vektor.</p></div>
   <thead><tr><th>Konfigurasi</th>
     {''.join(f'<th class="num">{_e(m)}</th>' for m in metrik_kolom)}
     <th>vs pembanding (nDCG@{k_op})</th><th class="num">Latensi</th></tr></thead>
-  <tbody>{baris_agg}</tbody>
+  <tbody>{baris_agg}{_baris_produksi(h, k_op)}</tbody>
 </table>
-<p class="cat">Rata-rata tak tertimbang atas {n_search} topik. <b>Bukan angka produksi</b> — jalur
-produksi berbeda per poin, dan sebagian topik di sini adalah lengan kontrafaktual yang sengaja
-dibuat untuk ablasi.</p></div>
+<p class="cat">Baris 1&ndash;5 adalah rata-rata tak tertimbang atas {n_search} topik dan
+<b>bukan angka produksi</b>: separuh topik di sini adalah lengan kontrafaktual yang sengaja
+dibuat berskor rendah untuk ablasi, ditambah jalur <code>itbx</code> lewat <code>search</code>
+yang hampir tak pernah menyala. <b>Baris terakhir yang disorot</b> hanya menghitung cabang yang
+benar-benar dijalankan, dengan konfigurasi per-poin. Poin <code>itbx</code> tak termasuk di sana
+karena ia lewat <code>get_by_reference</code> &mdash; buktinya ada di bagian E.</p></div>
 
 <h2 id="c">C. Lantai acak &amp; langit-langit</h2>
 <div class="blok">{blok_baseline or '<p class="cat">eval/baseline.json belum ada.</p>'}</div>

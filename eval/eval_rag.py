@@ -1042,15 +1042,14 @@ def bangun_html(r: dict) -> str:
                 + sel(f"ndcg@{_K_OPERASI}") + sel(f"recall@{_K_OPERASI}")
                 + sel(f"hit@{_K_OPERASI}") + sel("mrr") + "</tr>")
         blok_produksi = f"""
-  <h2>2. Kinerja jalur produksi, per poin</h2>
+  <h2>1. Kinerja sistem &mdash; jalur produksi per poin</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Inilah satu-satunya tabel di laporan ini yang boleh dibaca sebagai kinerja produksi.</b>
-  Tabel bagian 1 merata-ratakan seluruh topik dengan bobot sama, dan itu sengaja memuat jalur
+  Tabel bagian 2 merata-ratakan seluruh topik dengan bobot sama, dan itu sengaja memuat jalur
   yang produksi TIDAK pakai: 52 topik menguji <code>itbx</code> lewat <code>search</code> yang
-  hampir tak pernah menyala, ditambah puluhan topik kontrafaktual (query pendek
-  <code>kdb</code>, topik dampak warisan berlabel <i>seeded</i>) yang ada untuk membuktikan
-  sebab-akibat, bukan untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang
-  benar-benar dijalankan.
+  hampir tak pernah menyala, dan 52 lagi memakai query lama <code>kdb</code> sebagai lengan
+  &ldquo;sebelum&rdquo; dalam ablasi &mdash; keduanya ada untuk membuktikan sebab-akibat, bukan
+  untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang benar-benar dijalankan.
   </div>
   <p class="cat">Angka tebal = skor terukur. Angka kecil abu-abu di sebelahnya =
   <b>persen dari langit-langit</b>, yaitu nilai tertinggi yang MUNGKIN dicapai mengingat
@@ -1500,9 +1499,14 @@ def bangun_html(r: dict) -> str:
   </p>
 
 {blok_basi}
-  <h2>1. Titik operasi sistem (k={_K_OPERASI})</h2>
+{blok_produksi}
+
+  <h2>2. Titik operasi &amp; ablasi konfigurasi (k={_K_OPERASI})</h2>
   <div class="peringatan" style="margin-bottom:14px">
-  <b>Ini tabel yang menentukan.</b> Sistem mengirim <b>{_K_OPERASI} chunk</b> ke LLM
+  <b>Tabel ini membandingkan KONFIGURASI, bukan melaporkan kinerja.</b> Angka kinerja ada di
+  bagian 1. Di sini tiap lapis retrieval dinilai atas seluruh topik uji &mdash; termasuk lengan
+  kontrafaktual yang sengaja dibuat berskor rendah &mdash; supaya sumbangan tiap komponen
+  terlihat, bukan diasumsikan. Sistem mengirim <b>{_K_OPERASI} chunk</b> ke LLM
   (<code>generator.top_k_dukungan</code>), jadi hanya kedalaman ini yang mewakili apa yang
   benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 4 &amp; 5) berguna untuk memahami
   perilaku, tapi <b>tidak boleh dipakai sebagai klaim kinerja</b>.
@@ -1568,7 +1572,6 @@ def bangun_html(r: dict) -> str:
   produksi. Poin <code>itbx</code> tidak termasuk di sana karena ia tak lewat
   <code>search</code> sama sekali — angkanya ada di bagian ablasi jalur rujukan.
   </div>
-{blok_produksi}
 {blok_tafsir}
 
   <h2>4. Ringkasan metrik &amp; ablasi per lapis</h2>
