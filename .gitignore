@@ -222,3 +222,6 @@ data/raw/
 CLAUDE.md
 # checkpoint mentah evaluasi RAG — hasil akhirnya (laporan_rag.json/html) yang di-commit
 eval/_checkpoint_*.json
+
+# log replay — jalan percobaan, BUKAN trafik produksi; jangan ikut dibaca metrik atribusi
+eval/_replay_precheck.jsonl

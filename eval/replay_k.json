@@ -1,0 +1,44 @@
+{
+  "dibuat": "2026-10-05T08:19:20+00:00",
+  "n_payload": 10,
+  "n_jalan": 3,
+  "poin_diubah": [
+    "intensitas",
+    "dampak"
+  ],
+  "k_diuji": 5,
+  "ringkasan": {
+    "k=3 (produksi)": {
+      "n_jalan_permohonan": 30,
+      "gagal_total": 0,
+      "sitasi_total": 71,
+      "sitasi_per_permohonan": 2.3666666666666667,
+      "sitasi_terverifikasi": 1.0,
+      "groundedness_kutipan": 1.0,
+      "kutipan_dinilai": 59,
+      "recall_zona": 1.0,
+      "poin_berzona_dinilai": 20,
+      "low_confidence_per_poin": {
+        "intensitas": 22,
+        "dampak": 19,
+        "itbx": 18
+      }
+    },
+    "k=5 (intensitas, dampak)": {
+      "n_jalan_permohonan": 30,
+      "gagal_total": 0,
+      "sitasi_total": 0,
+      "sitasi_per_permohonan": 0.0,
+      "sitasi_terverifikasi": null,
+      "groundedness_kutipan": null,
+      "kutipan_dinilai": 0,
+      "recall_zona": null,
+      "poin_berzona_dinilai": 0,
+      "low_confidence_per_poin": {
+        "itbx": 30,
+        "intensitas": 30,
+        "dampak": 30
+      }
+    }
+  }
+}

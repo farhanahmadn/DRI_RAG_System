@@ -136,6 +136,26 @@ def jalankan(payloads: list[dict], k_map: dict[str, int], n_jalan: int,
     from app.retrieval.retriever import RetrieverAsli
     from app.schemas import L2Assessment
 
+    # `jalankan_precheck` menulis ke logs/precheck.jsonl. Itu BERKAS DATA PRODUKSI, dan
+    # metrik atribusi membacanya — replay yang ikut menulis ke sana akan mencemari sumber
+    # metrik dengan jalan percobaan yang konfigurasinya sengaja diubah. Dialihkan ke berkas
+    # terpisah: datanya tidak hilang, tapi tidak tercampur.
+    log_replay = Path(__file__).parent / "_replay_precheck.jsonl"
+
+    def _log_terpisah(assessment, output, **kw):
+        try:
+            with log_replay.open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "replay": True, "k_map": k_map,
+                                    "application_number": getattr(assessment, "application_number", None)},
+                                   ensure_ascii=False) + chr(10))
+        except Exception:
+            pass
+
+    import app.reasoning.assemble as _asm
+    log_asli = _asm.log_precheck
+    _asm.log_precheck = _log_terpisah
+
     asli = dict(generator._TOP_K_PER_POIN)
     generator._TOP_K_PER_POIN.clear()
     generator._TOP_K_PER_POIN.update(k_map)
@@ -171,6 +191,7 @@ def jalankan(payloads: list[dict], k_map: dict[str, int], n_jalan: int,
     finally:
         generator._TOP_K_PER_POIN.clear()
         generator._TOP_K_PER_POIN.update(asli)
+        _asm.log_precheck = log_asli
     return keluar
 
 
@@ -184,8 +205,15 @@ def ringkas(hasil: list[dict]) -> dict:
     sitasi = sum(h["sitasi"] for h in hasil)
     kd = sum(h["kutipan_dinilai"] for h in hasil)
     bz = sum(h["poin_berzona_dinilai"] for h in hasil)
+    semua_poin = sum(len(h["poin"]) for h in hasil) or 1
+    low_total = sum(1 for h in hasil for v in h["poin"].values() if v["low_confidence"])
     return {
         "n_jalan_permohonan": len(hasil),
+        # Ambang ini bukan penilaian mutu — ia pendeteksi RUN YANG RUSAK. Pada jalan sehat
+        # low_confidence berada di kisaran persen; kalau mayoritas poin jatuh ke sana,
+        # yang terukur hampir pasti kegagalan panggilan (kuota/jaringan), bukan efek k.
+        "rasio_low_confidence": low_total / semua_poin,
+        "mencurigakan": (low_total / semua_poin) > 0.5,
         "gagal_total": sum(1 for h in hasil if h.get("gagal_total")),
         "sitasi_total": sitasi,
         "sitasi_per_permohonan": sitasi / n,
@@ -220,16 +248,27 @@ def main() -> None:
     print(f"perkiraan panggilan LLM: {len(payloads) * 3 * args.jalan * len(kfg)}\n")
 
     hasil = {}
+    rusak_awal = False
     for nama, k_map in kfg.items():
         print(f"=== {nama} ===")
         hasil[nama] = ringkas(jalankan(payloads, k_map, args.jalan, teks_chunk, args.jeda))
+        rusak_awal = rusak_awal or hasil[nama].get("mencurigakan", False)
         print()
 
-    keluaran = {"dibuat": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    keluaran = {"sah": not rusak_awal, "dibuat": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "n_payload": len(payloads), "n_jalan": args.jalan,
                 "poin_diubah": args.poin, "k_diuji": args.k, "ringkasan": hasil}
     args.out.write_text(json.dumps(keluaran, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    rusak = [n for n, v in hasil.items() if v.get("mencurigakan")]
+    if rusak:
+        print("!" * 78)
+        print("HASIL TIDAK SAH — mayoritas poin jatuh ke low_confidence pada konfigurasi: "
+              + ", ".join(rusak))
+        print("Itu pola kegagalan PANGGILAN (kuota/jaringan), bukan efek k. "
+              "Tabel di bawah TIDAK boleh dibaca sebagai perbandingan k. "
+              "Periksa kuota lalu ulangi.")
+        print("!" * 78 + chr(10))
     print(f"{'metrik':28s} " + " ".join(f"{n[:22]:>24s}" for n in hasil))
     for m in ("gagal_total", "sitasi_per_permohonan", "sitasi_terverifikasi",
               "groundedness_kutipan", "recall_zona"):
