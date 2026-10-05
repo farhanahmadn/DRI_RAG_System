@@ -32,6 +32,9 @@ load_dotenv()
 
 _DIR = Path(__file__).parent
 _OUT = _DIR / "laporan_bukti.html"
+# Berapa chunk ditampilkan per konfigurasi. Berkas hasil merekam lebih dalam (lihat
+# eval_rag._BUKTI_TERATAS); yang ditampilkan dibatasi agar kartunya tetap terbaca.
+_TAMPIL = 5
 
 # Definisi metrik: rumus singkat + arti + perilaku langit-langitnya. Ditaruh di laporan supaya
 # pembaca tak perlu menebak apa yang diukur, dan supaya batas tiap metrik ikut terbaca.
@@ -136,7 +139,7 @@ def _kartu_topik(d: dict, pq: dict, konfigurasi: list[str], glo: dict, k_op: int
         peringkat = d.get(kfg)
         baris += (
             f'<tr><td class="kfg">{_e(label_kfg.get(kfg, kfg))}</td>'
-            f'<td class="hasil">{_sel_terambil(terambil.get(kfg) or [], relevan, glo)}</td>'
+            f'<td class="hasil">{_sel_terambil((terambil.get(kfg) or [])[:_TAMPIL], relevan, glo)}</td>'
             f'<td class="num">{m.get(f"ndcg@{k_op}", 0):.3f}</td>'
             f'<td class="num">{m.get(f"recall@{k_op}", 0):.3f}</td>'
             f'<td class="num">{m.get(f"hit@{k_op}", 0):.0f}</td>'
@@ -392,7 +395,8 @@ dibuat untuk ablasi.</p></div>
 <h2 id="d">D. Bukti per-query — jalur <code>search</code> ({n_search} topik)</h2>
 <p class="cat">Tiap kartu memuat query yang benar-benar diterbitkan, filternya, label yang benar,
 dan <b>chunk yang benar-benar terambil</b> di tiap konfigurasi. Chunk yang cocok label ditandai
-hijau. Lima teratas ditampilkan; titik operasi ada di tiga teratas.</p>
+hijau. {_TAMPIL} teratas ditampilkan (berkas hasil merekam lebih dalam); titik operasi ada
+di tiga teratas.</p>
 <div class="alat">
   <input id="cari" type="search" placeholder="Cari id topik atau teks query…">
   <select id="f-poin"><option value="">Semua poin</option>

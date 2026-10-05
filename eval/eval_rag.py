@@ -75,7 +75,11 @@ _KANDIDAT = 30       # sejajar dgn candidate_k/rerank_pool retriever produksi
 # kedalaman LAIN berguna untuk memahami perilaku, tapi hanya k=3 yang mewakili apa yang benar-benar
 # diterima sistem — laporan menyorotnya secara terpisah supaya tak terbaca dari kedalaman yang salah.
 _K_OPERASI = 3
-_BUKTI_TERATAS = 5
+# Sepanjang daftar yang DINILAI, bukan sekadar sepanjang titik operasi. Dengan begitu pelabelan
+# ulang (mis. saat kriteria relevansi berubah) bisa dihitung ulang dari bukti ini tanpa memanggil
+# API retrieval lagi — menyimpan hanya 5 akan membuat metrik pada kedalaman >5 mustahil dihitung
+# ulang, dan itu persis yang memaksa satu run penuh terbuang saat kriteria dampak direvisi.
+_BUKTI_TERATAS = 10
 # Metrik yang dipakai untuk klaim & uji signifikansi. Sengaja dibatasi: menguji SEMUA metrik x SEMUA
 # pasangan konfigurasi menaikkan peluang temuan palsu tanpa menambah informasi.
 _METRIK_KLAIM = (f"ndcg@{_K_OPERASI}", f"recall@{_K_OPERASI}", f"hit@{_K_OPERASI}", "mrr", "map")
@@ -421,6 +425,7 @@ def jalankan_evaluasi(pakai_rerank: bool = True, jeda_s: float = 0.0,
                            for k in konfigurasi},
         "metadata": _metadata_reproduksi(),
         "berkas_eval": berkas_eval.name,
+        "sidik_eval_set": _sidik_eval_set(berkas_eval),
         "sumber_label": dict(Counter(x["sumber_label"] for x in semua_topik)),
         "anchor": hasil_anchor,
         "ablasi_query": ablasi_string_query(detail, per_query, konfigurasi),
@@ -585,6 +590,22 @@ def ablasi_string_query(detail: list[dict], per_query: dict[str, list[dict]],
     return {"n_keluarga": len(keluarga), "keluarga": keluarga, "per_konfigurasi": hasil,
             "query_tajam": _QUERY_INTENSITAS_TAJAM,
             "query_kdb": _QUERY_FALLBACK_PER_POIN["intensitas"]}
+
+
+def _sidik_eval_set(berkas: Path) -> str | None:
+    """Sidik jari isi eval set, direkam bersama hasilnya.
+
+    Label bisa berubah tanpa mengubah nama berkas — dan saat itu terjadi, berkas hasil lama
+    tetap terlihat sah padahal skornya dinilai atas label yang sudah tidak berlaku. Pernah
+    terjadi: kriteria relevansi `dampak` direvisi, eval set diperbarui, tapi hasil lama masih
+    di tempatnya. Sidik jari ini membuat ketidakcocokan itu terdeteksi, bukan terlewat.
+    """
+    try:
+        import hashlib
+
+        return hashlib.sha256(berkas.read_bytes()).hexdigest()[:16]
+    except Exception:
+        return None
 
 
 def _metadata_reproduksi() -> dict:
@@ -1335,6 +1356,26 @@ def bangun_html(r: dict) -> str:
     lvl = ", ".join(f"{v} {k}" for k, v in sorted(korpus["per_level"].items()))
 
     md = r.get("metadata") or {}
+    # Eval set bisa berubah setelah hasil ini diukur; kalau ya, seluruh angka di bawah dinilai
+    # atas label yang sudah tidak berlaku dan laporan HARUS mengatakannya.
+    _sidik_kini = _sidik_eval_set(_EVAL_SET.parent / (r.get("berkas_eval") or ""))
+    _sidik_ukur = r.get("sidik_eval_set")
+    blok_basi = ""
+    if _sidik_kini and not _sidik_ukur:
+        # Hasil dari versi harness sebelum sidik jari direkam. Tak bisa dipastikan masih sepadan
+        # dgn eval set sekarang — dan diam soal itu persis yang membuat hasil basi terlihat sah.
+        blok_basi = ('<div class="peringatan"><b>Kesesuaian hasil ini dgn eval set sekarang tidak '
+                     'dapat dipastikan.</b> Ia diukur oleh versi harness sebelum sidik jari eval '
+                     'set direkam, sehingga perubahan label setelahnya tidak akan terdeteksi. '
+                     'Jalankan ulang <code>python -m eval.eval_rag</code> untuk memastikan.</div>')
+    if _sidik_ukur and _sidik_kini and _sidik_ukur != _sidik_kini:
+        blok_basi = (
+            '<div class="peringatan"><b>PERINGATAN: hasil ini BASI.</b> Eval set '
+            f'<code>{_esc(r.get("berkas_eval"))}</code> sudah berubah sejak pengukuran ini '
+            f'(sidik saat diukur <code>{_esc(_sidik_ukur)}</code>, sekarang '
+            f'<code>{_esc(_sidik_kini)}</code>). Seluruh angka di bawah dinilai atas label '
+            'yang sudah tidak berlaku. Jalankan ulang <code>python -m eval.eval_rag</code> '
+            'sebelum angka mana pun dikutip.</div>')
     if md:
         kotor = ' <b>(working tree kotor — ada perubahan belum ter-commit)</b>' if md.get("commit_kotor") else ""
         meta_txt = _esc(
@@ -1397,6 +1438,7 @@ def bangun_html(r: dict) -> str:
     <span class="pil">vektor: {korpus['vektor']}</span>
   </p>
 
+{blok_basi}
   <h2>1. Titik operasi sistem (k={_K_OPERASI})</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Ini tabel yang menentukan.</b> Sistem mengirim <b>{_K_OPERASI} chunk</b> ke LLM

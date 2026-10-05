@@ -56,15 +56,26 @@ from app.reasoning.generator import (  # noqa: E402
 # Rujukan generik yang SELALU dikirim BE utk poin itbx (terhitung 349/349 payload di log).
 _RUJUKAN_ITBX = "RDTR Sleman Matriks ITBX"
 
-# Pasal yang mengatur poin `dampak`, DIBATASI dua ini secara sadar. Keduanya "ketentuan khusus"
-# yang menyebut kode zona eksplisit di dalam teksnya, sehingga label bisa diturunkan dari aturan:
-#   Pasal 53 — kawasan resapan air (langsung soal infiltrasi/limpasan, inti poin dampak)
-#   Pasal 50 — kawasan rawan bencana (gempa, gunung api, banjir lahar, kekeringan, longsor)
-# Pasal lain TIDAK diikutkan walau teksnya mengandung kata "resapan"/"sempadan": penyaringan
-# kata kunci saja ikut menjaring Pasal 44 (luas minimal bidang tanah -> itu poin intensitas),
-# Pasal 1 (definisi istilah), dan Pasal 58. Yang menentukan di sini adalah pasal apa yang
-# MENGATUR dampak, bukan pasal apa yang menyebut katanya.
-_PASAL_DAMPAK = ("50", "53")
+# Apa yang SAH disitasi poin `dampak`. Kriteria dari pemilik domain (2026-10-05): poin dampak
+# TIDAK menyitasi ketentuan kebencanaan alam — gempa bumi, banjir lahar, tanah longsor — karena
+# itu bahaya yang MENGANCAM lokasi, bukan yang DITIMBULKAN pembangunan yang diajukan. Yang
+# disitasi hanya ketentuan yang mewajibkan pemohon mengendalikan dampak bangunannya sendiri.
+#
+# Kriteria itu bisa diturunkan dari TEKS ayatnya, bukan dari nomor pasalnya: ayat yang memuat
+# kewajiban pengendalian limpasan ("zero delta Q", "tidak melimpas") persis adalah ayat yang
+# mengatur dampak hidrologis pembangunan. Diperiksa atas korpus, pola ini memilih:
+#   Pasal 53 ayat 2 & 3 — ketentuan kawasan resapan air, menyebut kode zona -> label per-zona
+#   Pasal 50 ayat 11    — kekeringan, isinya zero delta Q + sumur + tampungan air; TIDAK
+#                         menyebut kode zona -> label umum utk seluruh topik dampak
+# dan TIDAK memilih Pasal 50 ayat 3/4/8/9 (gempa, lahar) maupun ayat 13 (longsor), yang isinya
+# kesiapsiagaan menghadapi bahaya alam — bukan pengendalian dampak pembangunan.
+#
+# Versi sebelumnya memakai daftar-putih pasal ("50" dan "53" apa adanya). Itu keliru: ia ikut
+# melabeli ketentuan gempa dan lahar sebagai jawaban benar, padahal query produksi hanya
+# menjangkau tema hidrologi — terbukti dari bukti per-query, ayat Pasal 53 terambil 39/39 kali
+# sedangkan ayat kebencanaan 0/95. Metrik dampak karena itu mengukur label yang salah sasaran,
+# bukan retrieval yang lemah.
+_RE_KEWAJIBAN_LIMPASAN = re.compile(r"zero delta|melimpas", re.I)
 
 # "... pada Zona Badan Jalan dengan kode BJ, Sub-zona Tanaman Pangan dengan kode P-1, ..."
 _RE_KODE_ZONA = re.compile(r"dengan kode ([A-Z]{1,4}(?:-\d+)?)")
@@ -99,23 +110,30 @@ def _muat_zona_korpus(conn, wilayah: str) -> dict[str, dict[str, list[str]]]:
     return dict(per_zona)
 
 
-def _muat_ayat_dampak(conn, wilayah: str) -> dict[str, list[str]]:
-    """kode zona -> ayat Pasal 50/53 yang menyebut kode itu eksplisit.
+def _muat_ayat_dampak(conn, wilayah: str) -> tuple[dict[str, list[str]], list[str]]:
+    """Ayat yang mengatur dampak pembangunan: (per kode zona, berlaku umum).
 
-    Inilah yang membuat label `dampak` bisa diturunkan dari aturan, bukan dari penilaian:
-    ayatnya sendiri yang menyatakan berlaku untuk zona mana. Terhitung 6 ayat memuat kode zona
-    (Pasal 50 ayat 3/4/8/9, Pasal 53 ayat 2/3), mencakup 31 dari 32 zona ber-tag di korpus.
+    Inilah yang membuat label `dampak` bisa diturunkan dari aturan, bukan dari penilaian: ayat
+    yang memuat kewajiban pengendalian limpasan adalah ayat yang mengatur dampak pembangunan,
+    dan sebagian menyatakan sendiri berlaku untuk zona mana. Yang tidak menyebut kode zona
+    berlaku umum — kewajibannya tak bergantung zona.
     """
     per_zona: dict[str, set[str]] = defaultdict(set)
+    umum: list[str] = []
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, teks FROM chunks WHERE dokumen ILIKE %s AND level = 'ayat' "
-            "AND pasal = ANY(%s) ORDER BY id",
-            [f"%{wilayah}%", list(_PASAL_DAMPAK)])
+            "SELECT id, teks FROM chunks WHERE dokumen ILIKE %s AND level = 'ayat' ORDER BY id",
+            [f"%{wilayah}%"])
         for cid, teks in cur.fetchall():
-            for kode in {k.upper() for k in _RE_KODE_ZONA.findall(teks or "")}:
-                per_zona[kode].add(cid)
-    return {z: sorted(ids) for z, ids in per_zona.items()}
+            if not _RE_KEWAJIBAN_LIMPASAN.search(teks or ""):
+                continue
+            kode = {k.upper() for k in _RE_KODE_ZONA.findall(teks or "")}
+            if kode:
+                for k in kode:
+                    per_zona[k].add(cid)
+            else:
+                umum.append(cid)
+    return {z: sorted(ids) for z, ids in per_zona.items()}, sorted(umum)
 
 
 def _kode_dasar(zona: str) -> str:
@@ -230,16 +248,16 @@ def bangun(conn, wilayah: str) -> list[dict]:
     # selisihnya mengisolasi sumbangan filter itu sendiri. Labelnya kini diturunkan dari aturan
     # (ayat Pasal 53 yang menyebut kode zona), bukan diwarisi, sehingga eval set tak lagi
     # bergantung pada berkas lama sama sekali.
-    ayat_resapan = sorted({c for z, ids in _muat_ayat_dampak(conn, wilayah).items()
-                           for c in ids if "-p53-" in c})
-    if ayat_resapan:
+    ayat_dampak_zona, ayat_dampak_umum = _muat_ayat_dampak(conn, wilayah)
+    semua_ayat_dampak = sorted({c for ids in ayat_dampak_zona.values() for c in ids}
+                               | set(ayat_dampak_umum))
+    if semua_ayat_dampak:
         topik.append(_topik(
             "dampak-query-produksi", "search", "dampak",
-            _QUERY_FALLBACK_PER_POIN["dampak"], {}, ayat_resapan, "aturan",
+            _QUERY_FALLBACK_PER_POIN["dampak"], {}, semua_ayat_dampak, "aturan",
             "KONTROL: query dampak produksi TANPA filter zona. Pasangannya dampak-zona-* dan "
             "dampak-keluarga-* memakai query sama dengan filter, jadi selisihnya mengukur "
-            "sumbangan filter. Label = ayat Pasal 53 (ketentuan kawasan resapan air), yaitu tema "
-            "yang memang dijangkau query ini.", 0))
+            "sumbangan filter. Tanpa filter, seluruh ayat pengendalian limpasan sah.", 0))
 
     # ---- D. KONTRAFAKTUAL: filter keluarga + query TAJAM ----
     # Produksi tidak pernah menerbitkan kombinasi ini: query tajam dipakai HANYA saat sub-zona
@@ -269,15 +287,15 @@ def bangun(conn, wilayah: str) -> list[dict]:
     # rawan bencana, inilah ayat yang mengatur" — bersyarat, lebih lemah daripada label
     # intensitas/itbx yang tabelnya tanpa syarat milik pemohon. Dinyatakan di `catatan` tiap
     # topik, bukan cuma di komentar kode, supaya batas itu ikut pindah bersama datanya.
-    ayat_dampak = _muat_ayat_dampak(conn, wilayah)
     _CATATAN_DAMPAK = (
-        "Label turunan aturan: Pasal 50/53 menyebut kode zona ini eksplisit. BERSYARAT — "
-        "Pasal 53 ayat (1) membatasi keberlakuan ke SWP/Blok tertentu dan itu tak bisa "
-        "ditentukan dari kode zona, jadi ayat ini otoritatif HANYA bila lokasi memang berada "
-        "di kawasan resapan air/rawan bencana."
+        "Label turunan aturan: ayat yang mewajibkan pengendalian limpasan (dampak yang "
+        "DITIMBULKAN pembangunan), bukan kesiapsiagaan terhadap bencana alam. BERSYARAT — "
+        "ayat (1) tiap pasal membatasi keberlakuan ke SWP/Blok tertentu dan itu tak bisa "
+        "ditentukan dari kode zona, jadi otoritatif HANYA bila lokasi memang berada di "
+        "kawasan yang dimaksud."
     )
     for zona in sorted(per_zona):
-        relevan = ayat_dampak.get(_kode_dasar(zona)) or []
+        relevan = sorted(set(ayat_dampak_zona.get(_kode_dasar(zona)) or []) | set(ayat_dampak_umum))
         if not relevan:
             continue
         topik.append(_topik(
@@ -290,7 +308,8 @@ def bangun(conn, wilayah: str) -> list[dict]:
     # anggota keluarga itu sah (sejalan dgn perlakuan Lampiran VI/V.B di bagian B).
     kel_dampak: dict[str, set[str]] = defaultdict(set)
     for zona in per_zona:
-        kel_dampak[_keluarga(zona)] |= set(ayat_dampak.get(_kode_dasar(zona)) or [])
+        kel_dampak[_keluarga(zona)] |= (set(ayat_dampak_zona.get(_kode_dasar(zona)) or [])
+                                        | set(ayat_dampak_umum))
     for k, relevan in sorted(kel_dampak.items()):
         if not relevan:
             continue
