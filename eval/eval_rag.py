@@ -1007,23 +1007,22 @@ def bangun_html(r: dict) -> str:
   Poin <code>itbx</code> tidak punya pembagian cabang karena seluruh payload back-end membawa
   <code>dasar_hukum</code>, jadi ia selalu lewat <code>get_by_reference</code>.</p>
   <div class="peringatan">
-  <b>Bacaannya.</b> Dua dari tiga poin berada di <b>85&ndash;100%</b> dari langit-langitnya.
-  Angka <code>dampak</code> yang rendah <b>bukan menunjukkan retrieval yang lemah</b> &mdash;
-  ia menunjukkan label yang mencakup dua tema sementara produksi menerbitkan satu query.
+  <b>Bacaannya.</b> <code>intensitas</code> dan <code>itbx</code> berada di
+  <b>85&ndash;100%</b> dari langit-langitnya; <code>dampak</code> di kisaran <b>63&ndash;65%</b>.
   <br><br>
-  Buktinya kategoris, bukan soal peringkat: ayat Pasal 53 (ketentuan kawasan resapan air)
-  terambil di {_K_OPERASI} teratas pada <b>39 dari 39</b> kesempatan, sedangkan ayat Pasal 50
-  (gempa bumi, banjir lahar) terambil pada <b>0 dari 95</b>. Query produksi
-  <code>dampak tata guna lahan</code> diperluas retriever menjadi istilah hidrologi &mdash;
-  limpasan, runoff, sumur resapan, kolam retensi, zero delta Q, drainase &mdash; sehingga
-  ketentuan kebencanaan secara semantik memang tak terjangkau olehnya. Dengan label dibatasi
-  ke tema yang sesuai querinya, nDCG@{_K_OPERASI} naik ke <b>0,924</b> dan
-  Recall@{_K_OPERASI} ke <b>100%</b>.
+  Angka <code>dampak</code> sempat terbaca jauh lebih rendah (sekitar 33%), dan itu <b>mengukur
+  label, bukan sistem</b>. Label lama memasukkan seluruh ketentuan kebencanaan Pasal 50; buktinya
+  kategoris — ayat kawasan resapan air terambil pada <b>39 dari 39</b> kesempatan, sedangkan ayat
+  gempa bumi dan banjir lahar pada <b>0 dari 95</b>. Query produksi
+  <code>dampak tata guna lahan</code> diperluas retriever menjadi istilah hidrologi saja
+  (limpasan, runoff, sumur resapan, zero delta Q, drainase), sehingga ketentuan kebencanaan memang
+  tak terjangkau olehnya.
   <br><br>
-  Jadi yang perlu diputuskan: <b>apakah poin dampak memang harus menyitasi ketentuan
-  kebencanaan.</b> Kalau ya, sistem kurang satu query untuk tema itu &mdash; dan pemohon di
-  zona rawan lahar sekarang memang tidak diberi tahu. Kalau tidak, labelnya yang perlu
-  dipersempit. Keduanya pertimbangan tata ruang, bukan statistik.
+  Kriteria label kini <b>kausal</b>, atas keputusan pemilik domain: yang sah disitasi hanya
+  ketentuan atas dampak yang <b>ditimbulkan</b> pembangunan, bukan bahaya alam yang mengancam
+  lokasi. Diterapkan sebagai aturan atas teks ayatnya (kewajiban pengendalian limpasan), bukan
+  daftar nomor pasal. Sisa jaraknya ke 100% adalah kekurangan yang nyata dan belum
+  ditindaklanjuti.
   </div>"""
 
     # --- Cara membaca skor: lantai, langit-langit, rujukan terbitan ----------------------
@@ -1462,13 +1461,17 @@ def bangun_html(r: dict) -> str:
     <thead><tr><th>Poin</th><th>Jalur produksi</th></tr></thead>
     <tbody>{baris_peta}</tbody>
   </table>
-  Karena itu <code>dense+rerank</code> yang unggul di tabel ini <b>bukan</b> temuan yang belum
-  ditindaklanjuti: ia sudah menjadi jalur produksi untuk <code>intensitas</code>. Ia TIDAK
-  diterapkan ke <code>dampak</code>, dan itu kini <b>terbukti benar</b> — bukan lagi sikap
-  hati-hati: atas 53 topik dampak berlabel aturan, dense-saja <b>kalah</b> (nDCG@3 0.251 vs
-  0.330, p&lt;0.001, efek −0.66), dan ayat yang benar sampai peringkat 1 hanya pada 8/53 topik
-  lawan 31/53. Dan ia tidak relevan bagi <code>itbx</code>, yang di produksi tak menyentuh
-  fusi sama sekali.
+  Tabel ini menyatakan <code>dense+rerank</code> dan <code>rrf+rerank</code> <b>setara</b>
+  (selisih +0,006, p=0,49) — dan itu justru contoh terbaik mengapa rata-rata tak tertimbang
+  menyesatkan. Per poin, keduanya berbeda secara signifikan ke arah yang <b>berlawanan</b>, lalu
+  saling meniadakan di rata-rata:
+  <ul>
+    <li><code>intensitas</code>: dense+rerank <b>unggul</b> +0,077 (p=0,001, efek +1,00)</li>
+    <li><code>dampak</code>: dense+rerank <b>kalah</b> −0,289 (p&lt;0,001, efek −0,86)</li>
+  </ul>
+  Itulah sebabnya fusi dibuat per-poin: menyimpulkan &ldquo;keduanya setara, pilih mana saja&rdquo;
+  dari tabel ini akan salah untuk kedua poin sekaligus. Bagi <code>itbx</code> pilihan fusi tak
+  relevan — di produksi ia tak menyentuh fusi sama sekali.
   <br><br>Kolom pembanding memakai <b>{_esc(_LABEL.get(produksi, produksi))}</b> — konfigurasi
   yang berlaku saat angka ini diukur. Rata-rata tak tertimbang di tabel ini juga bukan angka
   produksi: 52 dari {r['n_query']} topik menguji jalur <code>itbx</code> lewat

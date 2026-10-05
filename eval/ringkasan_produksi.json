@@ -1,11 +1,11 @@
 {
-  "dibuat": "2026-10-04T21:05:36+00:00",
+  "dibuat": "2026-10-05T06:03:04+00:00",
   "berkas_eval": "eval_set_operasi.jsonl",
   "n_simulasi_lantai": 400,
   "bobot_trafik": {
-    "ada_subzona": 0.03418803418803419,
-    "tanpa_subzona": 0.9658119658119658,
-    "n": 468,
+    "ada_subzona": 0.03397027600849257,
+    "tanpa_subzona": 0.9660297239915074,
+    "n": 471,
     "sumber": "precheck.jsonl, era 3-poin saja"
   },
   "baris": [
@@ -56,7 +56,7 @@
       "bobot": "ada_subzona",
       "konfigurasi": "dense+rerank",
       "n": 31,
-      "bobot_nilai": 0.03418803418803419,
+      "bobot_nilai": 0.03397027600849257,
       "metrik": {
         "ndcg@3": {
           "ukur": 1.0,
@@ -96,7 +96,7 @@
       "bobot": "tanpa_subzona",
       "konfigurasi": "dense+rerank",
       "n": 21,
-      "bobot_nilai": 0.9658119658119658,
+      "bobot_nilai": 0.9660297239915074,
       "metrik": {
         "ndcg@3": {
           "ukur": 0.9776533939989163,
@@ -136,37 +136,37 @@
       "bobot": "ada_subzona",
       "konfigurasi": "rrf+rerank",
       "n": 32,
-      "bobot_nilai": 0.03418803418803419,
+      "bobot_nilai": 0.03397027600849257,
       "metrik": {
         "ndcg@3": {
-          "ukur": 0.33838471092155636,
-          "lantai": 0.005771178954012582,
+          "ukur": 0.6307082701392923,
+          "lantai": 0.005714366172554482,
           "langit": 1.0,
-          "dari_langit": 0.33838471092155636
+          "dari_langit": 0.6307082701392923
         },
         "recall@3": {
-          "ukur": 0.265625,
-          "lantai": 0.0062890624999999995,
+          "ukur": 0.734375,
+          "lantai": 0.0069140625,
           "langit": 1.0,
-          "dari_langit": 0.265625
+          "dari_langit": 0.734375
         },
         "hit@3": {
-          "ukur": 0.75,
-          "lantai": 0.016484375,
+          "ukur": 0.875,
+          "lantai": 0.01203125,
           "langit": 1.0,
-          "dari_langit": 0.75
+          "dari_langit": 0.875
         },
         "mrr": {
-          "ukur": 0.6893229166666667,
-          "lantai": 0.01629935515873016,
+          "ukur": 0.7447916666666666,
+          "lantai": 0.01185360863095238,
           "langit": 1.0,
-          "dari_langit": 0.6893229166666667
+          "dari_langit": 0.7447916666666666
         },
         "map": {
-          "ukur": 0.30717799272486773,
-          "lantai": 0.0063967478918650796,
+          "ukur": 0.6354166666666666,
+          "lantai": 0.007039434523809523,
           "langit": 1.0,
-          "dari_langit": 0.30717799272486773
+          "dari_langit": 0.6354166666666666
         }
       }
     },
@@ -176,37 +176,37 @@
       "bobot": "tanpa_subzona",
       "konfigurasi": "rrf+rerank",
       "n": 21,
-      "bobot_nilai": 0.9658119658119658,
+      "bobot_nilai": 0.9660297239915074,
       "metrik": {
         "ndcg@3": {
-          "ukur": 0.31730756723397024,
-          "lantai": 0.006237707601549458,
+          "ukur": 0.6468600332722103,
+          "lantai": 0.006345446225083648,
           "langit": 1.0,
-          "dari_langit": 0.31730756723397024
+          "dari_langit": 0.6468600332722103
         },
         "recall@3": {
-          "ukur": 0.246031746031746,
-          "lantai": 0.006567460317460317,
+          "ukur": 0.7857142857142857,
+          "lantai": 0.007559523809523809,
           "langit": 1.0,
-          "dari_langit": 0.246031746031746
+          "dari_langit": 0.7857142857142857
         },
         "hit@3": {
-          "ukur": 0.7142857142857143,
-          "lantai": 0.01738095238095238,
+          "ukur": 0.9047619047619048,
+          "lantai": 0.013333333333333334,
           "langit": 1.0,
-          "dari_langit": 0.7142857142857143
+          "dari_langit": 0.9047619047619048
         },
         "mrr": {
-          "ukur": 0.6646825396825398,
-          "lantai": 0.016982473544973547,
+          "ukur": 0.7301587301587302,
+          "lantai": 0.012624811035525322,
           "langit": 1.0,
-          "dari_langit": 0.6646825396825398
+          "dari_langit": 0.7301587301587302
         },
         "map": {
-          "ukur": 0.2802626606198035,
-          "lantai": 0.0065561303224993695,
+          "ukur": 0.626984126984127,
+          "lantai": 0.007492465041572184,
           "langit": 1.0,
-          "dari_langit": 0.2802626606198035
+          "dari_langit": 0.626984126984127
         }
       }
     }
