@@ -1,13 +1,13 @@
 {
-  "dibuat": "2026-10-05T06:03:11+00:00",
+  "dibuat": "2026-10-05T08:40:24+00:00",
   "cakupan": {
     "rentang_tanggal_dinilai": [
       "2026-07-30T07:22:09",
       "2026-10-02T06:44:22"
     ],
-    "permohonan_era_sekarang": 471,
+    "permohonan_era_sekarang": 480,
     "permohonan_retriever_nyata": 109,
-    "permohonan_dari_mock": 362,
+    "permohonan_dari_mock": 371,
     "sitasi_dinilai": 289,
     "sitasi_per_jenis_id": {
       "korpus": 238,

@@ -1442,11 +1442,34 @@ def bangun_html(r: dict) -> str:
   <div class="peringatan" style="margin-bottom:14px">
   <b>Ini tabel yang menentukan.</b> Sistem mengirim <b>{_K_OPERASI} chunk</b> ke LLM
   (<code>generator.top_k_dukungan</code>), jadi hanya kedalaman ini yang mewakili apa yang
-  benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 2 &amp; 3) berguna untuk memahami
+  benar-benar diterima sistem. Metrik pada kedalaman lain (bagian 4 &amp; 5) berguna untuk memahami
   perilaku, tapi <b>tidak boleh dipakai sebagai klaim kinerja</b>.
   Tiap angka disertai selang kepercayaan 95% (bootstrap atas topik, n={r['n_query']}); kolom
   terakhir menguji apakah selisihnya nyata (Wilcoxon signed-rank berpasangan).
   <b>Selisih yang dinyatakan "setara" tidak boleh diklaim sebagai keunggulan.</b>
+
+  <div class="peringatan" style="margin-top:14px">
+  <b>&ldquo;Hit@5 dan Recall@5 lebih tinggi &mdash; kenapa produksi tidak memakai k=5 saja?&rdquo;</b>
+  Pertanyaan yang wajar, dan jawabannya <b>kapasitas, bukan mutu</b>.
+  <br><br>
+  Pada metrik, k=5 memang lebih baik: Recall naik dari <b>63%</b> ke <b>94%</b> dari
+  langit-langitnya. Tapi biayanya diukur, bukan ditaksir &mdash; dari pesan batas provider yang
+  tercatat saat replay dijalankan pada konfigurasi produksi (k={_K_OPERASI}):
+  <code>Limit 8000, Used 1800, Requested 6707</code>. Satu panggilan poin <b>sudah meminta
+  4.661&ndash;6.707 token</b> (rata-rata 5.804) dari batas 8.000 token/menit.
+  <br><br>
+  Sebabnya bukan ukuran prompt semata: provider menghitung <b>anggaran keluaran yang dicadangkan</b>
+  (<code>max_tokens=2048</code>) ke dalam kuota yang sama. Jadi biaya nyata = prompt + cadangan
+  keluaran. Menaikkan ke k=5 menambah 485&ndash;1.042 token per poin, sehingga satu panggilan
+  menyentuh <b>~7.700 dari 8.000</b> &mdash; sementara <b>tiga poin berjalan paralel</b>. Batas
+  harian ikut mengikat: <code>tokens per day: Limit 200000</code> per kunci.
+  <br><br>
+  Jadi k={_K_OPERASI} adalah batas yang dipaksakan kapasitas, dan angka di tabel ini harus dibaca
+  dengan itu. <b>Sisi mutunya belum terjawab:</b> apakah LLM memakai 5 chunk lebih baik daripada 3
+  &mdash; atau justru tersesat, seperti pernah terjadi saat prompt membanjirinya &mdash; hanya bisa
+  diuji dengan menjalankan generasi sungguhan (<code>eval/replay_k.py</code>). Percobaan pertama
+  gagal karena kuota harian habis di tengah jalan, dan hasilnya <b>tidak dipakai</b>.
+  </div>
   </div>
   <div class="kartu"><table>
     <thead><tr><th>Konfigurasi</th><th>nDCG@{_K_OPERASI}</th><th>Recall@{_K_OPERASI}</th>
