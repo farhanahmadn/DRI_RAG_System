@@ -87,19 +87,14 @@ def _cabang_produksi() -> list[dict]:
       * `itbx-kegiatan-*`       — jalur search `itbx`, cadangan yang hampir tak pernah menyala
     """
     from app.reasoning.generator import _TANPA_LEXICAL_PER_POIN
+    from eval.eval_rag import _CABANG_PRODUKSI
 
-    kfg_intensitas = "dense+rerank" if "intensitas" in _TANPA_LEXICAL_PER_POIN else "rrf+rerank"
-    kfg_dampak = "dense+rerank" if "dampak" in _TANPA_LEXICAL_PER_POIN else "rrf+rerank"
-    return [
-        {"poin": "intensitas", "cabang": "sub-zona presisi diketahui", "bobot": "ada_subzona",
-         "konfigurasi": kfg_intensitas, "awalan": "intensitas-ambang-"},
-        {"poin": "intensitas", "cabang": "tanpa sub-zona (filter keluarga)", "bobot": "tanpa_subzona",
-         "konfigurasi": kfg_intensitas, "awalan": "intensitas-tajam-keluarga-"},
-        {"poin": "dampak", "cabang": "sub-zona presisi diketahui", "bobot": "ada_subzona",
-         "konfigurasi": kfg_dampak, "awalan": "dampak-zona-"},
-        {"poin": "dampak", "cabang": "tanpa sub-zona (filter keluarga)", "bobot": "tanpa_subzona",
-         "konfigurasi": kfg_dampak, "awalan": "dampak-keluarga-"},
-    ]
+    def _kfg(poin: str) -> str:
+        return "dense+rerank" if poin in _TANPA_LEXICAL_PER_POIN else "rrf+rerank"
+
+    return [{"poin": poin, "cabang": cabang, "bobot": bobot,
+             "konfigurasi": _kfg(poin), "awalan": awalan}
+            for awalan, poin, cabang, bobot in _CABANG_PRODUKSI]
 
 
 def susun(hasil: dict, eval_set: Path, log: Path, n_simulasi: int) -> dict:

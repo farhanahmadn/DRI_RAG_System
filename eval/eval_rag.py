@@ -75,6 +75,30 @@ _KANDIDAT = 30       # sejajar dgn candidate_k/rerank_pool retriever produksi
 # kedalaman LAIN berguna untuk memahami perilaku, tapi hanya k=3 yang mewakili apa yang benar-benar
 # diterima sistem — laporan menyorotnya secara terpisah supaya tak terbaca dari kedalaman yang salah.
 _K_OPERASI = 3
+
+# Cabang yang BENAR-BENAR dijalankan produksi, menurut awalan id topik (konvensi penamaan
+# eval/bangun_eval_set_operasi.py). Ditaruh di sini, bukan di modul laporan, supaya hanya ada
+# SATU daftar: eval/ringkasan_produksi.py mengimpornya, jadi tabel per-poin dan baris ringkas
+# di tabel titik operasi mustahil menyimpang satu sama lain.
+#
+# Yang SENGAJA di luar daftar, beserta alasannya:
+#   intensitas-kdb-*   — query lama; lengan "sebelum" dalam ablasi string query
+#   itbx-kegiatan-*    — jalur search utk itbx; cadangan yang hampir tak pernah menyala,
+#                        karena setiap payload back-end membawa dasar_hukum
+#   dampak-query-produksi — kontrol tanpa filter zona; produksi selalu memakai filter
+_CABANG_PRODUKSI = (
+    ("intensitas-ambang-", "intensitas", "sub-zona presisi diketahui", "ada_subzona"),
+    ("intensitas-tajam-keluarga-", "intensitas", "tanpa sub-zona (filter keluarga)",
+     "tanpa_subzona"),
+    ("dampak-zona-", "dampak", "sub-zona presisi diketahui", "ada_subzona"),
+    ("dampak-keluarga-", "dampak", "tanpa sub-zona (filter keluarga)", "tanpa_subzona"),
+)
+
+
+def indeks_jalur_produksi(detail: list[dict]) -> list[int]:
+    """Indeks topik yang mewakili jalur produksi (jalur `search` saja)."""
+    awalan = tuple(a for a, _p, _c, _b in _CABANG_PRODUKSI)
+    return [i for i, d in enumerate(detail) if str(d.get("query", "")).startswith(awalan)]
 # Sepanjang daftar yang DINILAI, bukan sekadar sepanjang titik operasi. Dengan begitu pelabelan
 # ulang (mis. saat kriteria relevansi berubah) bisa dihitung ulang dari bukti ini tanpa memanggil
 # API retrieval lagi — menyimpan hanya 5 akan membuat metrik pada kedalaman >5 mustahil dihitung
@@ -913,6 +937,44 @@ def bangun_html(r: dict) -> str:
 
     stat = r.get("statistik") or {}
     ci_all, uji_all = stat.get("ci", {}), stat.get("uji_vs_produksi", {})
+
+    # Baris ringkas jalur produksi. Ditaruh DI DALAM tabel yang sama, bukan menunggu pembaca
+    # menggulir ke bagian 2: keterangan di bawah tabel sudah menyatakan "bukan angka produksi",
+    # dan ternyata itu tidak cukup — pembaca tetap membaca rata-rata 210 topik sebagai kinerja
+    # sistem. Kalau keterangan saja tak cukup, yang kurang desain tabelnya.
+    baris_produksi_ringkas = ""
+    try:
+        from app.reasoning.generator import _TANPA_LEXICAL_PER_POIN
+
+        idx_prod = indeks_jalur_produksi(r["detail_per_query"])
+        skor = r.get("skor_per_query") or {}
+        if idx_prod and skor:
+            nilai: dict[str, list[float]] = {}
+            for i in idx_prod:
+                poin = str(r["detail_per_query"][i]["query"]).split("-")[0]
+                # Konfigurasi yang dipakai poin ini di produksi, diturunkan dari kode.
+                k = "dense+rerank" if poin in _TANPA_LEXICAL_PER_POIN else "rrf+rerank"
+                if k not in skor:
+                    continue
+                for m in _METRIK_KLAIM:
+                    nilai.setdefault(m, []).append(skor[k][i][m])
+            if nilai:
+                sel = ""
+                for m in (f"ndcg@{_K_OPERASI}", f"recall@{_K_OPERASI}",
+                          f"hit@{_K_OPERASI}", "mrr"):
+                    c = bootstrap_ci(nilai[m])
+                    persen = m.startswith(("recall", "hit"))
+                    sel += ("<td>" + _fmt_ci({"rata": c.rata, "bawah": c.bawah,
+                                              "atas": c.atas, "n": c.n}, persen=persen)
+                            + "</td>")
+                baris_produksi_ringkas = (
+                    f'<tr class="sorot"><td><b>Jalur produksi saja</b>'
+                    f'<span class="ci">{len(idx_prod)} dari {r["n_query"]} topik, '
+                    f'konfigurasi per-poin</span></td>{sel}'
+                    f'<td class="net">inilah yang dijalankan sistem</td></tr>')
+    except Exception:
+        baris_produksi_ringkas = ""
+
     baris_operasi = ""
     for k in kfg:
         c = ci_all.get(k, {})
@@ -1475,11 +1537,12 @@ def bangun_html(r: dict) -> str:
     <thead><tr><th>Konfigurasi</th><th>nDCG@{_K_OPERASI}</th><th>Recall@{_K_OPERASI}</th>
       <th>Hit@{_K_OPERASI}</th><th>MRR</th>
       <th>vs {_esc(_LABEL.get(produksi, produksi))} (nDCG@{_K_OPERASI})</th></tr></thead>
-    <tbody>{baris_operasi}</tbody>
+    <tbody>{baris_operasi}{baris_produksi_ringkas}</tbody>
   </table></div>
   <div class="peringatan">
-  <b>Satu baris tabel di atas BUKAN "jalur produksi".</b> Sejak fusi retrieval dibuat per-poin,
-  tiap poin memakai jalur yang berbeda — justru karena tabel inilah. Yang mana untuk apa:
+  <b>Tiap poin memakai jalur yang berbeda.</b> Sejak fusi retrieval dibuat per-poin, tak ada
+  satu baris konfigurasi pun yang mewakili seluruh sistem — baris "Jalur produksi saja" di
+  tabel atas sudah menggabungkannya menurut poin. Rinciannya:
   <table style="margin:10px 0">
     <thead><tr><th>Poin</th><th>Jalur produksi</th></tr></thead>
     <tbody>{baris_peta}</tbody>
@@ -1496,9 +1559,14 @@ def bangun_html(r: dict) -> str:
   dari tabel ini akan salah untuk kedua poin sekaligus. Bagi <code>itbx</code> pilihan fusi tak
   relevan — di produksi ia tak menyentuh fusi sama sekali.
   <br><br>Kolom pembanding memakai <b>{_esc(_LABEL.get(produksi, produksi))}</b> — konfigurasi
-  yang berlaku saat angka ini diukur. Rata-rata tak tertimbang di tabel ini juga bukan angka
-  produksi: 52 dari {r['n_query']} topik menguji jalur <code>itbx</code> lewat
-  <code>search</code>, yang di produksi hampir tak pernah menyala.
+  yang berlaku saat angka ini diukur. Empat baris pertama adalah rata-rata tak tertimbang atas
+  SELURUH {r['n_query']} topik, dan itu <b>bukan angka produksi</b>: separuhnya menguji jalur
+  yang produksi tidak pakai — 52 topik memakai query lama sebagai lengan &ldquo;sebelum&rdquo;
+  dalam ablasi (karena itu skornya memang rendah) dan 52 lagi menguji jalur <code>itbx</code>
+  lewat <code>search</code> yang hampir tak pernah menyala. <b>Baris terakhir yang disorot</b>
+  hanya menghitung cabang yang benar-benar dijalankan, dengan konfigurasi per-poin seperti di
+  produksi. Poin <code>itbx</code> tidak termasuk di sana karena ia tak lewat
+  <code>search</code> sama sekali — angkanya ada di bagian ablasi jalur rujukan.
   </div>
 {blok_produksi}
 {blok_tafsir}

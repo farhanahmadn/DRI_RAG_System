@@ -88,11 +88,12 @@
     <thead><tr><th>Konfigurasi</th><th>nDCG@3</th><th>Recall@3</th>
       <th>Hit@3</th><th>MRR</th>
       <th>vs RRF + rerank (produksi) (nDCG@3)</th></tr></thead>
-    <tbody><tr><td><b>Dense saja</b></td><td>0.270 <span class="ci">[0.220–0.321]</span></td><td>36% <span class="ci">[29%–42%]</span></td><td>38% <span class="ci">[31%–44%]</span></td><td>0.326 <span class="ci">[0.279–0.374]</span></td><td><span class="buruk">lebih buruk -0.218</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>Lexical saja</b></td><td>0.012 <span class="ci">[0.003–0.024]</span></td><td>2% <span class="ci">[0%–3%]</span></td><td>2% <span class="ci">[0%–5%]</span></td><td>0.062 <span class="ci">[0.047–0.078]</span></td><td><span class="buruk">lebih buruk -0.476</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>RRF (tanpa rerank)</b></td><td>0.207 <span class="ci">[0.155–0.259]</span></td><td>22% <span class="ci">[17%–28%]</span></td><td>23% <span class="ci">[18%–29%]</span></td><td>0.342 <span class="ci">[0.300–0.385]</span></td><td><span class="buruk">lebih buruk -0.281</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>Dense + rerank (tanpa lexical)</b></td><td>0.494 <span class="ci">[0.445–0.542]</span></td><td>64% <span class="ci">[58%–70%]</span></td><td>74% <span class="ci">[68%–80%]</span></td><td>0.529 <span class="ci">[0.485–0.573]</span></td><td><span class="net">setara</span> <span class="ci">(p=0.49)</span></td></tr><tr class="sorot"><td><b>RRF + rerank (produksi)</b></td><td>0.488 <span class="ci">[0.435–0.541]</span></td><td>62% <span class="ci">[56%–68%]</span></td><td>67% <span class="ci">[60%–73%]</span></td><td>0.552 <span class="ci">[0.506–0.598]</span></td><td><span class="net">— (pembanding)</span></td></tr></tbody>
+    <tbody><tr><td><b>Dense saja</b></td><td>0.270 <span class="ci">[0.220–0.321]</span></td><td>36% <span class="ci">[29%–42%]</span></td><td>38% <span class="ci">[31%–44%]</span></td><td>0.326 <span class="ci">[0.279–0.374]</span></td><td><span class="buruk">lebih buruk -0.218</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>Lexical saja</b></td><td>0.012 <span class="ci">[0.003–0.024]</span></td><td>2% <span class="ci">[0%–3%]</span></td><td>2% <span class="ci">[0%–5%]</span></td><td>0.062 <span class="ci">[0.047–0.078]</span></td><td><span class="buruk">lebih buruk -0.476</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>RRF (tanpa rerank)</b></td><td>0.207 <span class="ci">[0.155–0.259]</span></td><td>22% <span class="ci">[17%–28%]</span></td><td>23% <span class="ci">[18%–29%]</span></td><td>0.342 <span class="ci">[0.300–0.385]</span></td><td><span class="buruk">lebih buruk -0.281</span> <span class="ci">(p=0.000)</span></td></tr><tr><td><b>Dense + rerank (tanpa lexical)</b></td><td>0.494 <span class="ci">[0.445–0.542]</span></td><td>64% <span class="ci">[58%–70%]</span></td><td>74% <span class="ci">[68%–80%]</span></td><td>0.529 <span class="ci">[0.485–0.573]</span></td><td><span class="net">setara</span> <span class="ci">(p=0.49)</span></td></tr><tr class="sorot"><td><b>RRF + rerank (produksi)</b></td><td>0.488 <span class="ci">[0.435–0.541]</span></td><td>62% <span class="ci">[56%–68%]</span></td><td>67% <span class="ci">[60%–73%]</span></td><td>0.552 <span class="ci">[0.506–0.598]</span></td><td><span class="net">— (pembanding)</span></td></tr><tr class="sorot"><td><b>Jalur produksi saja</b><span class="ci">105 dari 210 topik, konfigurasi per-poin</span></td><td>0.812 <span class="ci">[0.757–0.864]</span></td><td>87% <span class="ci">[81%–92%]</span></td><td>94% <span class="ci">[90%–98%]</span></td><td>0.868 <span class="ci">[0.817–0.916]</span></td><td class="net">inilah yang dijalankan sistem</td></tr></tbody>
   </table></div>
   <div class="peringatan">
-  <b>Satu baris tabel di atas BUKAN "jalur produksi".</b> Sejak fusi retrieval dibuat per-poin,
-  tiap poin memakai jalur yang berbeda — justru karena tabel inilah. Yang mana untuk apa:
+  <b>Tiap poin memakai jalur yang berbeda.</b> Sejak fusi retrieval dibuat per-poin, tak ada
+  satu baris konfigurasi pun yang mewakili seluruh sistem — baris "Jalur produksi saja" di
+  tabel atas sudah menggabungkannya menurut poin. Rinciannya:
   <table style="margin:10px 0">
     <thead><tr><th>Poin</th><th>Jalur produksi</th></tr></thead>
     <tbody><tr><td><b>itbx</b></td><td>get_by_reference (lihat bagian ablasi jalur rujukan)</td></tr><tr><td><b>intensitas</b></td><td>dense+rerank</td></tr><tr><td><b>dampak</b></td><td>rrf+rerank</td></tr></tbody>
@@ -109,9 +110,14 @@
   dari tabel ini akan salah untuk kedua poin sekaligus. Bagi <code>itbx</code> pilihan fusi tak
   relevan — di produksi ia tak menyentuh fusi sama sekali.
   <br><br>Kolom pembanding memakai <b>RRF + rerank (produksi)</b> — konfigurasi
-  yang berlaku saat angka ini diukur. Rata-rata tak tertimbang di tabel ini juga bukan angka
-  produksi: 52 dari 210 topik menguji jalur <code>itbx</code> lewat
-  <code>search</code>, yang di produksi hampir tak pernah menyala.
+  yang berlaku saat angka ini diukur. Empat baris pertama adalah rata-rata tak tertimbang atas
+  SELURUH 210 topik, dan itu <b>bukan angka produksi</b>: separuhnya menguji jalur
+  yang produksi tidak pakai — 52 topik memakai query lama sebagai lengan &ldquo;sebelum&rdquo;
+  dalam ablasi (karena itu skornya memang rendah) dan 52 lagi menguji jalur <code>itbx</code>
+  lewat <code>search</code> yang hampir tak pernah menyala. <b>Baris terakhir yang disorot</b>
+  hanya menghitung cabang yang benar-benar dijalankan, dengan konfigurasi per-poin seperti di
+  produksi. Poin <code>itbx</code> tidak termasuk di sana karena ia tak lewat
+  <code>search</code> sama sekali — angkanya ada di bagian ablasi jalur rujukan.
   </div>
 
   <h2>2. Kinerja jalur produksi, per poin</h2>
