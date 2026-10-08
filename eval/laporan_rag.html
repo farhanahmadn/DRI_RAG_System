@@ -57,10 +57,9 @@
   <b>Inilah satu-satunya tabel di laporan ini yang boleh dibaca sebagai kinerja produksi.</b>
   Tabel bagian 2 merata-ratakan seluruh topik dengan bobot sama, dan itu sengaja memuat jalur
   yang produksi TIDAK pakai: 52 topik menguji <code>itbx</code> lewat <code>search</code> yang
-  hampir tak pernah menyala, ditambah puluhan topik kontrafaktual (query pendek
-  <code>kdb</code>, topik dampak warisan berlabel <i>seeded</i>) yang ada untuk membuktikan
-  sebab-akibat, bukan untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang
-  benar-benar dijalankan.
+  hampir tak pernah menyala, dan 52 lagi memakai query lama <code>kdb</code> sebagai lengan
+  &ldquo;sebelum&rdquo; dalam ablasi &mdash; keduanya ada untuk membuktikan sebab-akibat, bukan
+  untuk mewakili perilaku nyata. Tabel ini hanya memuat cabang yang benar-benar dijalankan.
   </div>
   <p class="cat">Angka tebal = skor terukur. Angka kecil abu-abu di sebelahnya =
   <b>persen dari langit-langit</b>, yaitu nilai tertinggi yang MUNGKIN dicapai mengingat
@@ -374,7 +373,60 @@
   </table></div>
   <div class="peringatan"><br><br><b>Mode gagal yang tertangkap:</b> 2 kutipan berisi <b>judul dokumen</b>, bukan isi pasal — formalnya bersitasi dan <code>terverifikasi</code> tetap true, substansinya tidak menjelaskan apa pun.</div>
 
-  <h2>10. Sisi generasi — data operasional historis</h2>
+  <h2>10. Mutu narasi &mdash; faithfulness &amp; answer relevance</h2>
+  <p class="cat">Bagian sebelumnya menjawab apakah <b>rujukannya</b> nyata. Bagian ini
+  menjawab dua pertanyaan yang paling sering diajukan tentang RAG: apakah LLM <b>patuh pada
+  konteks</b> (faithfulness) dan apakah jawabannya <b>relevan dengan permohonan yang
+  ditanyakan</b> (answer relevance). Keempat metrik di bawah <b>mekanis</b> &mdash; tidak ada
+  model yang menilai model, tidak ada anotator, tidak ada panggilan API. Seluruhnya dihitung
+  ulang dari <code>request</code> + <code>response</code> yang tersimpan di
+  <code>logs/precheck.jsonl</code> oleh <code>eval/metrik_generasi.py</code>.</p>
+  <div class="peringatan">
+  <b>Penyebutnya kecil, dan itu bagian dari hasilnya.</b> Dari seluruh log, hanya
+  <b>20 permohonan</b> era 3-poin yang memakai retriever nyata dan
+  bukan baris stub pytest. Log juga bukan trafik unik: satu permohonan di-replay sampai 30
+  kali selama pengembangan, jadi tiap (permohonan, poin) dipotong ke <b>satu narasi terbaru</b>
+  &mdash; tanpa itu, permohonan yang paling sering bermasalah justru dapat bobot terbesar.
+  Dari 60 narasi tersisa, <b>40</b> benar-benar
+  keluaran LLM; sisanya teks template deterministik (lihat tabel jalur).
+  Rentang tanggal: <b>2026-08-03 .. 2026-10-02</b>.
+  <b>TIDAK disaring per tanggal</b>, jadi angkanya mencampur beberapa versi kode &mdash; pakai <code>--sejak</code> sebelum mengutipnya.
+  </div>
+
+  <h3>Jalur narasi &mdash; penyebut bagi metrik di bawahnya</h3>
+  <p class="cat"><code>app/reasoning/templates.py</code> menghasilkan dua teks
+  <b>deterministik tanpa memanggil model</b>: satu untuk poin yang jelas lolos (hemat kuota),
+  satu saat retry guardrail habis. Keduanya identik lintas permohonan dan tak pernah menyebut
+  partikular apa pun, jadi memasukkannya ke metrik mutu akan mengukur <b>template</b>, bukan
+  model &mdash; terbukti saat modul ini pertama dijalankan: satu teks template muncul di 11
+  permohonan berbeda dan menarik kekhususan poin dampak ke 0,0%. Deteksinya membangkitkan
+  ulang template dari konteks yang sama, bukan mencocokkan string salinan.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
+    <tbody><tr><td><code>dampak</code></td><td><b>95.0%</b> <span class="net">(n=20, 19)</span></td><td class='net'>1 jatuh ke template low-confidence, 0 ke template aman</td></tr><tr><td><code>intensitas</code></td><td><b>50.0%</b> <span class="net">(n=20, 10)</span></td><td class='net'>10 jatuh ke template low-confidence, 0 ke template aman</td></tr><tr><td><code>itbx</code></td><td><b>55.0%</b> <span class="net">(n=20, 11)</span></td><td class='net'>9 jatuh ke template low-confidence, 0 ke template aman</td></tr></tbody>
+  </table></div>
+
+  <h3>Faithfulness, kekhususan, dan ketepatan arah</h3>
+  <div class="kartu"><table>
+    <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang dijamin</th></tr></thead>
+    <tbody><tr><td><b>Faithfulness numerik</b> &mdash; per narasi</td><td><b>100.0%</b> <span class="net">(n=40, 40)</span></td><td class='net'>replay cek provenance produksi; satu angka tak terlacak sudah cukup menggagalkan narasi, persis seperti keputusan guardrail</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per angka</td><td><b>100.0%</b> <span class="net">(n=149, 149)</span></td><td class='net'>tiap angka &ge;2 digit di narasi dinilai sendiri</td></tr><tr><td><b>Kekhususan</b> &mdash; seluruh jangkar tersebut</td><td><b>82.5%</b> <span class="net">(n=40, 33)</span></td><td class='net'>answer relevance: narasi menyebut zona, kegiatan, atau parameter yang benar-benar milik permohonan ini</td></tr><tr><td><b>Ketepatan arah</b> &mdash; gabungan</td><td><b>96.0%</b> <span class="net">(n=25, 24)</span></td><td class='net'>klaim arah di narasi vs fakta boolean back-end</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per parameter intensitas</td><td><b>100.0%</b> <span class="net">(n=18, 18)</span></td><td class='net'>5 kasus ambigu TIDAK masuk penyebut &mdash; &ldquo;tak bisa dinilai&rdquo; bukan &ldquo;salah&rdquo;</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;kebutuhan mitigasi dampak</td><td><b>75.0%</b> <span class="net">(n=4, 3)</span></td><td class='net'><code>mitigasi.perlu_mitigasi</code> hanya True utk Tinggi/Sangat Tinggi</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;klaim kategori ITBX</td><td><b>100.0%</b> <span class="net">(n=3, 3)</span></td><td class='net'>huruf yang diklaim narasi harus sama dgn <code>status</code></td></tr></tbody>
+  </table></div>
+  <div class="peringatan"><b>Penyimpangan arah yang tercatat:</b><ul><li><code>APP-2026-INNER-01</code> &mdash; dampak/mitigasi: ['fakta=tak perlu, narasi=perlu']</li></ul></div>
+
+  <h3>Boilerplate &mdash; apakah jawabannya khas permohonan?</h3>
+  <p class="cat">Narasi yang nyaris identik untuk dua permohonan <b>berbeda</b> bukan jawaban
+  tentang permohonannya. Diukur sebagai kemiripan 5-gram kata ke tetangga
+  terdekat, dalam poin yang sama, antar permohonan berbeda. Dipilah menurut status: kemiripan
+  tinggi antar status <b>berbeda</b> adalah cacat; antar status <b>sama</b> wajar, karena dua
+  pemohon dengan verdict sama memang pantas dijelaskan dengan cara mirip. Ambang
+  <b>0.5</b> ditetapkan sebelum sebarannya dilihat.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
+    <th>&ge;0.5</th><th>median (status sama)</th></tr></thead>
+    <tbody><tr><td><code>itbx</code></td><td>11</td><td><b>0.024</b></td><td>0.045</td><td>0/11</td><td class='net'>0.043</td></tr><tr><td><code>intensitas</code></td><td>10</td><td><b>0.016</b></td><td>0.030</td><td>0/10</td><td class='net'>0.017</td></tr><tr><td><code>dampak</code></td><td>19</td><td><b>0.129</b></td><td>0.722</td><td>7/19</td><td class='net'>0.207</td></tr></tbody>
+  </table></div>
+
+  <h2>11. Sisi generasi — data operasional historis</h2>
   <div class="peringatan" style="margin-bottom:14px">
   <b>Baca dengan hati-hati — ini BUKAN tingkat kegagalan produksi.</b> Rekap ini diambil dari kunci
   <code>diagnostik</code> yang sudah terkumpul di <code>logs/precheck.jsonl</code>
@@ -391,11 +443,13 @@
   "terverifikasi" berarti <i>citation_id</i> memang ada di daftar kandidat yang disodorkan
   (anti-halusinasi) — bukan jaminan kandidatnya relevan secara hukum.</p>
 
-  <h2>11. Batas pembacaan</h2>
+  <h2>12. Batas pembacaan</h2>
   <div class="peringatan">
   <ul>
-    <li><b>Ground truth diseed developer, belum divalidasi ahli tata ruang.</b> Angka di sini
-        mengukur konsistensi sistem terhadap label kami sendiri — bukan kebenaran hukum.</li>
+    <li><b>Label diturunkan dari struktur peraturan, belum divalidasi ahli tata ruang.</b>
+        Seluruh label eval set berlabel <code>aturan</code> (dibangkitkan deterministik dari
+        <code>chunks.zona</code>, bukan diketik), tetapi yang terukur tetap konsistensi
+        terhadap struktur regulasi — <b>bukan kebenaran hukum</b>.</li>
     <li><b>210 query itu sampel kecil.</b> Satu query berpindah peringkat menggeser
         rata-rata secara kasat mata. Perlakukan selisih kecil antar-konfigurasi sebagai setara.</li>
     <li><b>Satu wilayah saja</b> (Sleman Tengah). Wilayah lain belum punya eval set, dan
@@ -404,6 +458,12 @@
         jadi nDCG di sini lebih kasar daripada nDCG bergradasi.</li>
     <li><b>Latensi diukur di mesin dev</b> terhadap Postgres lokal dan API eksternal — bukan angka
         produksi, hanya untuk membandingkan biaya antar-lapis.</li>
+    <li><b>Entailment tingkat-klaim TIDAK terukur.</b> Metrik mutu narasi menjangkau angka,
+        arah verdict, dan kekhususan — tetapi tidak menguji apakah kalimat penafsiran di
+        <code>reasoning_panjang</code> benar-benar tersirat dari ayat yang disitasi. Model
+        bisa mengutip Pasal 53 dengan benar lalu menyimpulkan sesuatu yang ayat itu tidak
+        katakan, dan seluruh metrik di laporan ini akan tetap hijau. Menutupnya butuh
+        penilai manusia atau LLM-as-judge yang <b>angka kesepakatannya ikut dilaporkan</b>.</li>
   </ul>
   </div>
 

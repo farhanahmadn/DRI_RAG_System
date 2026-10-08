@@ -1,0 +1,380 @@
+{
+  "dibuat": "2026-10-08T20:41:19+00:00",
+  "cakupan": {
+    "rentang_tanggal_dinilai": [
+      "2026-08-03T07:06:47",
+      "2026-10-02T06:44:22"
+    ],
+    "narasi_dimuat": 60,
+    "narasi_jalur_llm": 40,
+    "permohonan_dinilai": 20,
+    "narasi_per_poin": {
+      "dampak": 19,
+      "intensitas": 10,
+      "itbx": 11
+    },
+    "status_per_poin": {
+      "itbx": {
+        "X": 2,
+        "I": 7,
+        "B": 2
+      },
+      "intensitas": {
+        "Tidak Dinilai": 1,
+        "MELAMPAUI_BATAS": 6,
+        "MEMENUHI_SYARAT": 3
+      },
+      "dampak": {
+        "Tidak Dinilai": 7,
+        "Tinggi": 2,
+        "Rendah": 5,
+        "Sedang": 5
+      }
+    },
+    "chunk_disitasi_tersedia": 14
+  },
+  "sebaran_jalur": {
+    "n": 60,
+    "total": {
+      "llm": 40,
+      "template_low_confidence": 20
+    },
+    "proporsi_llm": 0.6666666666666666,
+    "per_poin": {
+      "dampak": {
+        "n": 20,
+        "llm": 19,
+        "template_aman": 0,
+        "template_low_confidence": 1,
+        "proporsi_llm": 0.95
+      },
+      "intensitas": {
+        "n": 20,
+        "llm": 10,
+        "template_aman": 0,
+        "template_low_confidence": 10,
+        "proporsi_llm": 0.5
+      },
+      "itbx": {
+        "n": 20,
+        "llm": 11,
+        "template_aman": 0,
+        "template_low_confidence": 9,
+        "proporsi_llm": 0.55
+      }
+    }
+  },
+  "faithfulness_numerik": {
+    "terukur": true,
+    "per_angka": {
+      "n": 149,
+      "kena": 149,
+      "nilai": 1.0
+    },
+    "per_narasi": {
+      "n": 40,
+      "kena": 40,
+      "nilai": 1.0
+    },
+    "per_poin": {
+      "itbx": {
+        "angka": {
+          "n": 9,
+          "kena": 9,
+          "nilai": 1.0
+        },
+        "narasi": {
+          "n": 11,
+          "kena": 11,
+          "nilai": 1.0
+        }
+      },
+      "intensitas": {
+        "angka": {
+          "n": 102,
+          "kena": 102,
+          "nilai": 1.0
+        },
+        "narasi": {
+          "n": 10,
+          "kena": 10,
+          "nilai": 1.0
+        }
+      },
+      "dampak": {
+        "angka": {
+          "n": 38,
+          "kena": 38,
+          "nilai": 1.0
+        },
+        "narasi": {
+          "n": 19,
+          "kena": 19,
+          "nilai": 1.0
+        }
+      }
+    },
+    "contoh_gagal": []
+  },
+  "kekhususan": {
+    "semua_jangkar": {
+      "n": 40,
+      "kena": 33,
+      "nilai": 0.825
+    },
+    "per_poin": {
+      "itbx": {
+        "n": 11,
+        "kena": 11,
+        "nilai": 1.0,
+        "tak_ada_jangkar": 0
+      },
+      "intensitas": {
+        "n": 10,
+        "kena": 3,
+        "nilai": 0.3,
+        "tak_ada_jangkar": 0
+      },
+      "dampak": {
+        "n": 19,
+        "kena": 19,
+        "nilai": 1.0,
+        "tak_ada_jangkar": 0
+      }
+    },
+    "per_jangkar": {
+      "dampak/kategori_dampak": {
+        "n": 12,
+        "kena": 12,
+        "nilai": 1.0
+      },
+      "dampak/zona_pemohon (informasional)": {
+        "n": 19,
+        "kena": 0,
+        "nilai": 0.0
+      },
+      "intensitas/parameter_kdb_gagal": {
+        "n": 5,
+        "kena": 5,
+        "nilai": 1.0
+      },
+      "intensitas/parameter_kdb_lolos": {
+        "n": 4,
+        "kena": 4,
+        "nilai": 1.0
+      },
+      "intensitas/parameter_kdh_gagal": {
+        "n": 5,
+        "kena": 5,
+        "nilai": 1.0
+      },
+      "intensitas/parameter_kdh_lolos": {
+        "n": 4,
+        "kena": 4,
+        "nilai": 1.0
+      },
+      "intensitas/parameter_klb_gagal": {
+        "n": 1,
+        "kena": 1,
+        "nilai": 1.0
+      },
+      "intensitas/parameter_klb_lolos": {
+        "n": 4,
+        "kena": 4,
+        "nilai": 1.0
+      },
+      "intensitas/zona_pemohon": {
+        "n": 10,
+        "kena": 3,
+        "nilai": 0.3
+      },
+      "itbx/kbli_diusulkan (informasional)": {
+        "n": 11,
+        "kena": 6,
+        "nilai": 0.5454545454545454
+      },
+      "itbx/kegiatan_diusulkan": {
+        "n": 11,
+        "kena": 11,
+        "nilai": 1.0
+      },
+      "itbx/zona_pemohon": {
+        "n": 11,
+        "kena": 11,
+        "nilai": 1.0
+      }
+    },
+    "contoh_generik": [
+      {
+        "permohonan": "APP-2026-003",
+        "timestamp": "2026-08-13T08:23:02",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "Dalam penentuan intensitas bangunan, perlu mempertimbangkan beberapa faktor seperti Koefisien Dasar Bangunan (KDB), Koefisien Lantai Bangunan (KLB), dan ketinggian bangunan. Namun, karena STATUS_INTEN"
+      },
+      {
+        "permohonan": "APP-2026-2850",
+        "timestamp": "2026-08-11T10:10:37",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "Pemohon tidak memenuhi syarat intensitas bangunan karena Koefisien Dasar Bangunan (KDB) yang diusulkan sebesar 40% melampaui batas maksimum 10% yang ditentukan. Selain itu, Koefisien Daerah Hijau (KDH"
+      },
+      {
+        "permohonan": "APP-2026-3335",
+        "timestamp": "2026-08-03T07:10:25",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "Pemohon telah memenuhi syarat intensitas bangunan dengan KDB usulan sebesar 47.05882352941176 persen, yang masih di bawah ambang maksimum 60 persen. Selain itu, KLB usulan sebesar 0.9411764705882353 r"
+      },
+      {
+        "permohonan": "APP-2026-3468",
+        "timestamp": "2026-08-03T07:06:47",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "Pemohon telah memenuhi syarat intensitas bangunan dengan KDB usulan sebesar 47.05882352941176 persen, yang berada di bawah ambang maksimum 60.0 persen. Selain itu, KLB usulan sebesar 0.941176470588235"
+      },
+      {
+        "permohonan": "APP-2026-5067",
+        "timestamp": "2026-09-21T16:38:46",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "**Memenuhi** intensitas bangunan karena KDB 11.76% berada di bawah ambang maksimal 60%, KLB 0.24 berada di bawah ambang maksimal 8, dan KDH 88.19% berada di atas ambang minimal 30% sebagaimana diatur "
+      },
+      {
+        "permohonan": "APP-2026-8376",
+        "timestamp": "2026-08-11T10:32:21",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "Pemohon tidak memenuhi syarat intensitas bangunan karena Koefisien Dasar Bangunan (KDB) yang diusulkan sebesar 40% melampaui batas maksimum 10% yang ditentukan. Selain itu, Koefisien Daerah Hijau (KDH"
+      },
+      {
+        "permohonan": "APP-2026-8913",
+        "timestamp": "2026-08-17T18:33:09",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "Berdasarkan data yang diberikan, KDB usulan sebesar 40.0% melampaui ambang maksimal 0.0% yang tercantum dalam data, sehingga tidak memenuhi batas KDB. Begitu pula KLB usulan 0.4 rasio melebihi ambang "
+      }
+    ]
+  },
+  "ketepatan_arah": {
+    "gabungan": {
+      "n": 25,
+      "kena": 24,
+      "nilai": 0.96
+    },
+    "parameter_intensitas": {
+      "n": 18,
+      "kena": 18,
+      "nilai": 1.0,
+      "ambigu_dilewati": 5
+    },
+    "mitigasi_dampak": {
+      "n": 4,
+      "kena": 3,
+      "nilai": 0.75
+    },
+    "kategori_itbx": {
+      "n": 3,
+      "kena": 3,
+      "nilai": 1.0
+    },
+    "contoh_menyimpang": [
+      {
+        "permohonan": "APP-2026-INNER-01",
+        "timestamp": "2026-10-02T06:44:22",
+        "poin": "dampak",
+        "sub": "mitigasi",
+        "temuan": [
+          "fakta=tak perlu, narasi=perlu"
+        ],
+        "kutipan_narasi": "**Sedang** menandakan bahwa kegiatan ini dapat menimbulkan perubahan aliran air, pencemaran, atau kerusakan fungsi kawasan resapan air. **Potensi dampak signifikan** terlihat dari ketentuan Pasal 53 ayat 3 yang menegaska"
+      }
+    ]
+  },
+  "boilerplate": {
+    "ambang": 0.5,
+    "n_gram": 5,
+    "per_poin": {
+      "itbx": {
+        "n": 11,
+        "status_berbeda": {
+          "median": 0.023809523809523808,
+          "p90": 0.045454545454545456,
+          "maks": 0.045454545454545456,
+          "n_di_atas_0.5": 0,
+          "proporsi_di_atas_ambang": 0.0
+        },
+        "status_sama": {
+          "median": 0.04285714285714286,
+          "maks": 0.25225225225225223
+        }
+      },
+      "intensitas": {
+        "n": 10,
+        "status_berbeda": {
+          "median": 0.015566323440339189,
+          "p90": 0.029629629629629627,
+          "maks": 0.02962962962962963,
+          "n_di_atas_0.5": 0,
+          "proporsi_di_atas_ambang": 0.0
+        },
+        "status_sama": {
+          "median": 0.01694915254237288,
+          "maks": 0.8035714285714286
+        }
+      },
+      "dampak": {
+        "n": 19,
+        "status_berbeda": {
+          "median": 0.12886597938144329,
+          "p90": 0.7222222222222222,
+          "maks": 0.7222222222222222,
+          "n_di_atas_0.5": 7,
+          "proporsi_di_atas_ambang": 0.3684210526315789
+        },
+        "status_sama": {
+          "median": 0.20689655172413793,
+          "maks": 1.0
+        }
+      }
+    },
+    "contoh_paling_mirip": [
+      {
+        "poin": "dampak",
+        "kemiripan": 0.722,
+        "a": {
+          "permohonan": "904",
+          "status": "Tinggi",
+          "kutipan": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Tata Guna Lahan' (dampak) setelah beberapa kali percobaan. Status (Tinggi) tetap ber"
+        },
+        "b": {
+          "permohonan": "906",
+          "status": "Rendah",
+          "kutipan": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Tata Guna Lahan' (dampak) setelah beberapa kali percobaan. Status (Rendah) tetap ber"
+        }
+      }
+    ]
+  },
+  "berkas_log": "precheck.jsonl",
+  "sejak": null,
+  "dilewati": {
+    "era 8-indikator lama": 309,
+    "MockRetriever (replay/test lokal)": 34,
+    "narasi stub (pytest/fixture)": 349,
+    "jalan ulang permohonan yg sama (dedup)": 258
+  }
+}

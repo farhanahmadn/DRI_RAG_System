@@ -140,8 +140,52 @@ def _poin_terangkum(rp: dict) -> list[dict]:
     return sorted(keluar, key=lambda s: urut.get(s["poin"], 9))
 
 
-def bangun(h: dict, rp: dict, bl: dict | None, atr: dict | None) -> str:
+def _blok_kepatuhan(gm: dict | None) -> tuple[str, int, int]:
+    """(blok HTML, nomor bagian "TIDAK katakan", nomor bagian "Catatan operasional").
+
+    Tanpa eval/generasi.json, bagian ini tidak dicetak dan penomoran lama dipakai apa adanya.
+    """
+    if not gm or not (gm.get("cakupan") or {}).get("narasi_jalur_llm"):
+        return "", 6, 7
+    c = gm["cakupan"]
+    fn, ks, ar = gm["faithfulness_numerik"], gm["kekhususan"], gm["ketepatan_arah"]
+
+    def baris(judul, e, ket):
+        n = (e or {}).get("nilai")
+        nilai = "belum terukur" if n is None else f"{n:.0%}"
+        jml = "" if n is None else f' <span class="ket">dari {e["n"]} jawaban</span>'
+        return (f'<tr><td>{judul}</td><td class="ang"><b>{nilai}</b>{jml}</td>'
+                f'<td class="ket">{ket}</td></tr>')
+
+    isi = (
+        baris("Tidak mengarang angka",
+              fn.get("per_narasi") if fn.get("terukur") else None,
+              "setiap angka dalam penjelasan dilacak ke data permohonan, pasal yang dikutip, atau hasil hitungan sistem &mdash; angka yang tak punya sumber ditolak")
+        + baris("Menjawab permohonan ini, bukan jawaban umum", ks.get("semua_jangkar"),
+                "penjelasan menyebut zona, kegiatan, atau parameter milik pemohon ini")
+        + baris("Arah kesimpulan sesuai data", ar.get("gabungan"),
+                "kalau data menyatakan melampaui batas, penjelasannya tidak boleh berbunyi memenuhi &mdash; dan sebaliknya")
+    )
+    blok = f"""
+<h2><span class="no">6</span>Kepatuhan jawaban pada dokumen</h2>
+<p class="lead">Menemukan pasal yang tepat belum cukup. Jawaban juga harus <b>setia pada
+dokumen itu</b>: tidak mengarang angka, tidak membalik arah kesimpulan, dan benar-benar
+membahas permohonan yang ditanyakan &mdash; bukan kalimat umum yang cocok untuk siapa
+saja. Ketiganya diperiksa <b>secara otomatis</b> dari jawaban yang sudah pernah
+dikeluarkan sistem, tanpa penilaian manusia dan tanpa meminta mesin lain menilai.</p>
+<div class="blok"><table>
+<tbody>{isi}</tbody></table>
+<p class="ket">Diperiksa pada <b>{c['narasi_jalur_llm']} jawaban</b> dari
+<b>{c['permohonan_dinilai']} permohonan</b> yang tercatat. Jumlah ini kecil karena catatan
+sistem sebagian besar berisi pengujian internal, dan jawaban yang dihasilkan template
+cadangan (bukan mesin penjawab) sengaja tidak ikut dinilai.</p></div>"""
+    return blok, 7, 8
+
+
+def bangun(h: dict, rp: dict, bl: dict | None, atr: dict | None,
+           gm: dict | None = None) -> str:
     md = h.get("metadata") or {}
+    blok_kepatuhan, _no_tidak, _no_ops = _blok_kepatuhan(gm)
     korpus = h["korpus"]
     bt = rp["bobot_trafik"]
     poin_ringkas = _poin_terangkum(rp)
@@ -434,7 +478,9 @@ berpengaruh besar.</p>
 Ini diperiksa langsung dari jawaban yang sudah pernah dikeluarkan sistem.</p>
 <div class="blok">{blok_sitasi}</div>
 
-<h2><span class="no">6</span>Apa yang angka-angka ini TIDAK katakan</h2>
+{blok_kepatuhan}
+
+<h2><span class="no">{_no_tidak}</span>Apa yang angka-angka ini TIDAK katakan</h2>
 <div class="catat">
 <ul>
   <li><b>Ini bukan ukuran kebenaran hukum.</b> Yang diuji adalah apakah sistem menemukan pasal
@@ -444,15 +490,20 @@ Ini diperiksa langsung dari jawaban yang sudah pernah dikeluarkan sistem.</p>
       khusus (persen dari yang mungkin dicapai) dan tidak sama dengan akurasi.</li>
   <li><b>Hanya satu wilayah.</b> Seluruh pengujian memakai korpus {_e(h['wilayah'])}. Wilayah lain
       belum punya bahan uji yang setara.</li>
-  <li><b>Mutu bahasa jawaban tidak diuji di sini.</b> Yang diukur adalah pencarian pasal dan
-      kejujuran kutipan, bukan apakah kalimat penjelasannya enak dibaca atau mudah dipahami.</li>
+  <li><b>Mutu bahasa jawaban tidak diuji di sini.</b> Yang diperiksa adalah pencarian pasal,
+      kejujuran kutipan, kepatuhan angka, dan apakah jawaban membahas permohonannya &mdash;
+      bukan apakah kalimat penjelasannya enak dibaca.</li>
+  <li><b>Penalaran isi pasal belum diuji.</b> Sistem terbukti mengutip pasal yang benar dan
+      tidak mengarang angka, tetapi belum ada pemeriksaan apakah <b>kesimpulan</b> yang
+      ditarik dari pasal itu memang benar menurut pasal tersebut. Itu masih memerlukan
+      pembacaan manusia.</li>
   <li><b>Sisi kecerdasan buatan bergantung pada layanan pihak ketiga</b> yang modelnya bisa
       berubah tanpa pemberitahuan. Karena itu angka apa pun selalu terikat tanggal
       pengukuran.</li>
 </ul>
 </div>
 
-<h2><span class="no">7</span>Catatan operasional</h2>
+<h2><span class="no">{_no_ops}</span>Catatan operasional</h2>
 <div class="blok">
 <p class="ket">Catatan sistem mencatat <b>{gen.get('n_permohonan', 0)} permohonan</b>
 ({gen.get('n_poin', 0)} jawaban) sejak instrumentasi dipasang. Dari jumlah itu,
@@ -492,7 +543,8 @@ def main() -> None:
     if not rp:
         raise SystemExit("eval/ringkasan_produksi.json tidak ada — jalankan ringkasan_produksi dulu")
 
-    args.out.write_text(bangun(h, rp, _muat("baseline.json"), _muat("atribusi.json")),
+    args.out.write_text(bangun(h, rp, _muat("baseline.json"), _muat("atribusi.json"),
+                               _muat("generasi.json")),
                         encoding="utf-8")
     print(f"[laporan-awam] -> {args.out}  ({args.out.stat().st_size:,} byte)")
 

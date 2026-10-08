@@ -201,7 +201,21 @@ Ini diperiksa langsung dari jawaban yang sudah pernah dikeluarkan sistem.</p>
       (289 sitasi). 371 permohonan lain di catatan
       sistem berasal dari pengujian internal, bukan pemohon sungguhan, dan sengaja tidak dihitung.</p></div>
 
-<h2><span class="no">6</span>Apa yang angka-angka ini TIDAK katakan</h2>
+
+<h2><span class="no">6</span>Kepatuhan jawaban pada dokumen</h2>
+<p class="lead">Menemukan pasal yang tepat belum cukup. Jawaban juga harus <b>setia pada
+dokumen itu</b>: tidak mengarang angka, tidak membalik arah kesimpulan, dan benar-benar
+membahas permohonan yang ditanyakan &mdash; bukan kalimat umum yang cocok untuk siapa
+saja. Ketiganya diperiksa <b>secara otomatis</b> dari jawaban yang sudah pernah
+dikeluarkan sistem, tanpa penilaian manusia dan tanpa meminta mesin lain menilai.</p>
+<div class="blok"><table>
+<tbody><tr><td>Tidak mengarang angka</td><td class="ang"><b>100%</b> <span class="ket">dari 40 jawaban</span></td><td class="ket">setiap angka dalam penjelasan dilacak ke data permohonan, pasal yang dikutip, atau hasil hitungan sistem &mdash; angka yang tak punya sumber ditolak</td></tr><tr><td>Menjawab permohonan ini, bukan jawaban umum</td><td class="ang"><b>82%</b> <span class="ket">dari 40 jawaban</span></td><td class="ket">penjelasan menyebut zona, kegiatan, atau parameter milik pemohon ini</td></tr><tr><td>Arah kesimpulan sesuai data</td><td class="ang"><b>96%</b> <span class="ket">dari 25 jawaban</span></td><td class="ket">kalau data menyatakan melampaui batas, penjelasannya tidak boleh berbunyi memenuhi &mdash; dan sebaliknya</td></tr></tbody></table>
+<p class="ket">Diperiksa pada <b>40 jawaban</b> dari
+<b>20 permohonan</b> yang tercatat. Jumlah ini kecil karena catatan
+sistem sebagian besar berisi pengujian internal, dan jawaban yang dihasilkan template
+cadangan (bukan mesin penjawab) sengaja tidak ikut dinilai.</p></div>
+
+<h2><span class="no">7</span>Apa yang angka-angka ini TIDAK katakan</h2>
 <div class="catat">
 <ul>
   <li><b>Ini bukan ukuran kebenaran hukum.</b> Yang diuji adalah apakah sistem menemukan pasal
@@ -211,15 +225,20 @@ Ini diperiksa langsung dari jawaban yang sudah pernah dikeluarkan sistem.</p>
       khusus (persen dari yang mungkin dicapai) dan tidak sama dengan akurasi.</li>
   <li><b>Hanya satu wilayah.</b> Seluruh pengujian memakai korpus Sleman Tengah. Wilayah lain
       belum punya bahan uji yang setara.</li>
-  <li><b>Mutu bahasa jawaban tidak diuji di sini.</b> Yang diukur adalah pencarian pasal dan
-      kejujuran kutipan, bukan apakah kalimat penjelasannya enak dibaca atau mudah dipahami.</li>
+  <li><b>Mutu bahasa jawaban tidak diuji di sini.</b> Yang diperiksa adalah pencarian pasal,
+      kejujuran kutipan, kepatuhan angka, dan apakah jawaban membahas permohonannya &mdash;
+      bukan apakah kalimat penjelasannya enak dibaca.</li>
+  <li><b>Penalaran isi pasal belum diuji.</b> Sistem terbukti mengutip pasal yang benar dan
+      tidak mengarang angka, tetapi belum ada pemeriksaan apakah <b>kesimpulan</b> yang
+      ditarik dari pasal itu memang benar menurut pasal tersebut. Itu masih memerlukan
+      pembacaan manusia.</li>
   <li><b>Sisi kecerdasan buatan bergantung pada layanan pihak ketiga</b> yang modelnya bisa
       berubah tanpa pemberitahuan. Karena itu angka apa pun selalu terikat tanggal
       pengukuran.</li>
 </ul>
 </div>
 
-<h2><span class="no">7</span>Catatan operasional</h2>
+<h2><span class="no">8</span>Catatan operasional</h2>
 <div class="blok">
 <p class="ket">Catatan sistem mencatat <b>148 permohonan</b>
 (444 jawaban) sejak instrumentasi dipasang. Dari jumlah itu,
@@ -240,7 +259,7 @@ model pencari: jina-embeddings-v3 &middot;
 model pemeringkat: jina-reranker-v3 &middot;
 model penjawab: openai/gpt-oss-20b<br>
 Bobot penggunaan dihitung dari 483 permohonan tercatat.
-Dokumen dibuat 2026-10-05 15:54.
+Dokumen dibuat 2026-10-09 03:47.
 </div>
 
 </div></body></html>

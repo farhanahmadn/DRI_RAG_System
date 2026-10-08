@@ -215,8 +215,112 @@ def _baris_produksi(h: dict, k_op: int) -> str:
             f'<td class="num">&mdash;</td></tr>')
 
 
-def bangun(h: dict, rp: dict | None, bl: dict | None, atr: dict | None) -> str:
+def _blok_generasi(gm: dict | None) -> tuple[str, str]:
+    """(nav, bagian) untuk mutu narasi. Kosong kalau eval/generasi.json belum ada —
+    bagian tanpa data lebih jujur daripada bagian berisi angka basi.
+    """
+    if not gm or not (gm.get("cakupan") or {}).get("narasi_jalur_llm"):
+        return "", ""
+    c, jl = gm["cakupan"], gm["sebaran_jalur"]
+    fn, ks, ar = gm["faithfulness_numerik"], gm["kekhususan"], gm["ketepatan_arah"]
+    bp = gm["boilerplate"]
+
+    def sel(e):
+        n = (e or {}).get("nilai")
+        if n is None:
+            return "<td><span class='cat'>tak terukur</span></td>"
+        return (f'<td><b>{n:.1%}</b> <span class="ci">n={e["n"]}</span></td>')
+
+    baris = ""
+    for label, e, ket in (
+        ("Faithfulness numerik (per narasi)",
+         fn.get("per_narasi") if fn.get("terukur") else None,
+         "tiap angka &ge;2 digit harus terlacak ke fakta sumber, pasal yang disitasi, atau teks chunk yang disitasi &mdash; replay cek provenance produksi"),
+        ("Kekhususan (answer relevance)", ks.get("semua_jangkar"),
+         "narasi menyebut zona, kegiatan, atau parameter yang benar-benar milik permohonan ini, bukan boilerplate yang cocok untuk semua"),
+        ("Ketepatan arah (gabungan)", ar.get("gabungan"),
+         "klaim arah di narasi vs fakta boolean back-end"),
+        ("&nbsp;&nbsp;per parameter intensitas", ar.get("parameter_intensitas"),
+         f"{ar['parameter_intensitas']['ambigu_dilewati']} kasus ambigu TIDAK masuk penyebut"),
+        ("&nbsp;&nbsp;kebutuhan mitigasi dampak", ar.get("mitigasi_dampak"),
+         "<code>perlu_mitigasi</code> hanya True utk Tinggi/Sangat Tinggi"),
+        ("&nbsp;&nbsp;klaim kategori ITBX", ar.get("kategori_itbx"),
+         "huruf yang diklaim narasi harus sama dgn <code>status</code>"),
+    ):
+        baris += f"<tr><td>{label}</td>{sel(e)}<td class='cat'>{ket}</td></tr>"
+
+    baris_jl = "".join(
+        f"<tr><td><code>{_e(pid)}</code></td>"
+        f"<td><b>{e['proporsi_llm']:.0%}</b> <span class='ci'>{e['llm']}/{e['n']}</span></td>"
+        f"<td class='cat'>{e['template_low_confidence']} template low-confidence, "
+        f"{e['template_aman']} template aman</td></tr>"
+        for pid, e in jl["per_poin"].items())
+
+    kunci = f"n_di_atas_{bp['ambang']}"
+    baris_bp = ""
+    for pid, e in bp["per_poin"].items():
+        if "catatan" in e:
+            baris_bp += (f"<tr><td><code>{_e(pid)}</code></td><td colspan=4 class='cat'>"
+                         f"{_e(e['catatan'])}</td></tr>")
+            continue
+        sb, ss = e["status_berbeda"], e["status_sama"]
+        baris_bp += (f"<tr><td><code>{_e(pid)}</code></td><td>{e['n']}</td>"
+                     f"<td><b>{sb['median']:.3f}</b></td><td>{sb['maks']:.3f}</td>"
+                     f"<td>{sb[kunci]}/{e['n']}</td>"
+                     f"<td class='cat'>{ss['median']:.3f}</td></tr>")
+
+    simpang = "".join(
+        f"<li><code>{_e(x['permohonan'])}</code> {_e(x['poin'])}/{_e(x['sub'])}: "
+        f"{_e(str(x['temuan']))}</li>" for x in (ar.get("contoh_menyimpang") or [])[:5])
+
+    nav = '  <a href="#g">G. Mutu narasi</a>\n'
+    bagian = f"""
+<h2 id="g">G. Mutu narasi &mdash; faithfulness &amp; answer relevance</h2>
+<p class="cat">Bagian A&ndash;F menilai <b>retrieval</b>: apakah chunk yang benar masuk
+top-k. Bagian ini menilai <b>narasi yang akhirnya keluar</b> &mdash; apakah LLM patuh pada
+konteks dan apakah jawabannya khas permohonan yang ditanyakan. Seluruhnya mekanis, dihitung
+ulang dari <code>logs/precheck.jsonl</code> oleh <code>eval/metrik_generasi.py</code>:
+tidak ada model yang menilai model, tidak ada anotator, tidak ada panggilan API.</p>
+<div class="catat">
+<b>Penyebutnya kecil, dan itu bagian dari hasilnya.</b> Hanya
+<b>{c['permohonan_dinilai']} permohonan</b> era 3-poin di log yang memakai retriever nyata
+dan bukan baris stub pytest. Log juga bukan trafik unik &mdash; satu permohonan di-replay
+sampai 30 kali selama pengembangan &mdash; jadi tiap (permohonan, poin) dipotong ke satu
+narasi terbaru. Dari {c['narasi_dimuat']} narasi tersisa,
+<b>{c['narasi_jalur_llm']}</b> benar-benar keluaran LLM.
+</div>
+<h3>Jalur narasi</h3>
+<p class="cat"><code>app/reasoning/templates.py</code> menghasilkan dua teks deterministik
+tanpa memanggil model: satu untuk poin yang jelas lolos, satu saat retry guardrail habis.
+Keduanya identik lintas permohonan, jadi menilainya sebagai keluaran LLM berarti mengukur
+template &mdash; terbukti saat metrik ini pertama dijalankan: satu teks template muncul di
+11 permohonan dan menarik kekhususan poin dampak ke 0,0%.</p>
+<div class="blok"><table>
+<thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
+<tbody>{baris_jl}</tbody></table></div>
+<h3>Metrik mutu (hanya narasi jalur LLM)</h3>
+<div class="blok"><table>
+<thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang dijamin</th></tr></thead>
+<tbody>{baris}</tbody></table></div>
+{f'<div class="catat"><b>Penyimpangan arah yang tercatat:</b><ul>{simpang}</ul></div>'
+  if simpang else ""}
+<h3>Boilerplate</h3>
+<p class="cat">Narasi yang nyaris identik untuk dua permohonan <b>berbeda</b> bukan
+jawaban tentang permohonannya. Kemiripan {bp['n_gram']}-gram kata ke tetangga terdekat,
+dalam poin yang sama, antar permohonan berbeda. Kemiripan tinggi antar status <b>berbeda</b>
+adalah cacat; antar status <b>sama</b> wajar. Ambang <b>{bp['ambang']}</b> ditetapkan
+sebelum sebarannya dilihat.</p>
+<div class="blok"><table>
+<thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
+<th>&ge;{bp['ambang']}</th><th>median (status sama)</th></tr></thead>
+<tbody>{baris_bp}</tbody></table></div>"""
+    return nav, bagian
+
+
+def bangun(h: dict, rp: dict | None, bl: dict | None, atr: dict | None,
+           gm: dict | None = None) -> str:
     k_op = (h.get("metadata") or {}).get("k_operasi", 3)
+    nav_generasi, bagian_generasi = _blok_generasi(gm)
     kfg = h["konfigurasi"]
     label_kfg = {"dense": "Dense saja", "lexical": "Lexical saja", "rrf": "RRF (tanpa rerank)",
                  "dense+rerank": "Dense + rerank", "rrf+rerank": "RRF + rerank"}
@@ -383,7 +487,7 @@ diukur {_e(h.get('dibuat', '')[:10])}</p>
   <a href="#d">D. Bukti per-query — jalur search</a>
   <a href="#e">E. Bukti per-query — jalur rujukan</a>
   <a href="#f">F. Ablasi</a>
-  <a href="#g">G. Batas keabsahan</a>
+{nav_generasi}  <a href="#h">H. Batas keabsahan</a>
 </nav>
 {peringatan_bukti}
 
@@ -462,7 +566,9 @@ selang kepercayaan dan uji berpasangannya — ada di <code>laporan_rag.html</cod
 Bukti per-topiknya ada di bagian D dan E di atas: bandingkan baris konfigurasi di dalam kartu yang
 sama, karena seluruh konfigurasi dinilai atas topik dan label yang identik.</p></div>
 
-<h2 id="g">G. Batas keabsahan</h2>
+{bagian_generasi}
+
+<h2 id="h">H. Batas keabsahan</h2>
 <div class="catat">
 <ul>
   <li><b>Label belum divalidasi ahli tata ruang.</b> Yang terukur adalah konsistensi terhadap
@@ -473,6 +579,11 @@ sama, karena seluruh konfigurasi dinilai atas topik dan label yang identik.</p><
   <li><b>Satu wilayah</b> ({_e(h['wilayah'])}).</li>
   <li><b>Latensi diukur di mesin pengembang</b> terhadap Postgres lokal dan API eksternal — untuk
       membandingkan biaya antar-lapis, bukan angka produksi.</li>
+  <li><b>Entailment tingkat-klaim tidak terukur.</b> Bagian G menjangkau angka, arah
+      verdict, dan kekhususan — tetapi tidak menguji apakah kalimat penafsiran benar-benar
+      tersirat dari ayat yang disitasi. Model bisa mengutip pasal dengan benar lalu
+      menyimpulkan sesuatu yang pasal itu tidak katakan, dan seluruh metrik di dokumen ini
+      akan tetap hijau.</li>
 </ul>
 </div>
 
@@ -518,7 +629,8 @@ def main() -> None:
     if not h:
         raise SystemExit(f"{args.hasil} tidak ada — jalankan eval_rag dulu")
     args.out.write_text(bangun(h, _muat("ringkasan_produksi.json"), _muat("baseline.json"),
-                               _muat("atribusi.json")), encoding="utf-8")
+                               _muat("atribusi.json"), _muat("generasi.json")),
+                        encoding="utf-8")
     print(f"[bukti] -> {args.out}  ({args.out.stat().st_size:,} byte)")
 
 

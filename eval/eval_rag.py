@@ -876,6 +876,21 @@ def muat_atribusi(berkas: Path | None = None) -> dict | None:
         return None
 
 
+def muat_generasi(berkas: Path | None = None) -> dict | None:
+    """Baca hasil eval/metrik_generasi.py kalau sudah pernah dijalankan.
+
+    Sama seperti `muat_atribusi`: dihitung dari log keluaran nyata, siklus hidupnya terpisah
+    dari evaluasi retrieval, dan kalau belum ada bagiannya TIDAK dicetak.
+    """
+    berkas = berkas or (Path(__file__).parent / "generasi.json")
+    if not berkas.exists():
+        return None
+    try:
+        return json.loads(berkas.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 def _fmt_atribusi(e: dict) -> str:
     """Penyebut nol -> "tak terukur", bukan 0%. 0% terbaca sebagai gagal total."""
     nilai = e.get("nilai")
@@ -1003,10 +1018,13 @@ def bangun_html(r: dict) -> str:
     _ada_abq = bool((r.get("ablasi_query") or {}).get("n_keluarga"))
     _ada_gen = bool((r.get("generasi") or {}).get("n_poin"))
     _ada_atr = bool(r.get("atribusi") or muat_atribusi())
+    _genm = r.get("generasi_metrik") or muat_generasi()
+    _ada_genm = bool((_genm or {}).get("cakupan", {}).get("narasi_jalur_llm"))
     _nomor_anchor = 7
     _nomor_abq = _nomor_anchor + (1 if _ada_anchor else 0)
     _nomor_atr = _nomor_abq + (1 if _ada_abq else 0)
-    _nomor_gen = _nomor_atr + (1 if _ada_atr else 0)
+    _nomor_genm = _nomor_atr + (1 if _ada_atr else 0)
+    _nomor_gen = _nomor_genm + (1 if _ada_genm else 0)
     _nomor_batas = _nomor_gen + (1 if _ada_gen else 0)
 
     # --- Ringkasan kinerja per-poin pada jalur produksi -----------------------------------
@@ -1386,6 +1404,128 @@ def bangun_html(r: dict) -> str:
   </table></div>
   <div class="peringatan">{catatan_judul}</div>"""
 
+    # --- Metrik sisi generasi (faithfulness numerik, kekhususan, arah, boilerplate) ------
+    blok_genm = ""
+    if _ada_genm:
+        cg = _genm["cakupan"]
+        rtg = cg.get("rentang_tanggal_dinilai")
+        jl, fn = _genm["sebaran_jalur"], _genm["faithfulness_numerik"]
+        ks, ar, bp = _genm["kekhususan"], _genm["ketepatan_arah"], _genm["boilerplate"]
+        baris_jalur = "".join(
+            f"<tr><td><code>{_esc(pid)}</code></td>"
+            f'<td>{_fmt_atribusi({"nilai": e["proporsi_llm"], "n": e["n"], "kena": e["llm"]})}</td>'
+            f"<td class='net'>{e['template_low_confidence']} jatuh ke template "
+            f"low-confidence, {e['template_aman']} ke template aman</td></tr>"
+            for pid, e in jl["per_poin"].items())
+        baris_mutu = ""
+        if fn.get("terukur"):
+            baris_mutu += (
+                f"<tr><td><b>Faithfulness numerik</b> &mdash; per narasi</td>"
+                f"<td>{_fmt_atribusi(fn['per_narasi'])}</td>"
+                "<td class='net'>replay cek provenance produksi; satu angka tak terlacak "
+                "sudah cukup menggagalkan narasi, persis seperti keputusan guardrail</td></tr>"
+                f"<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per angka</td>"
+                f"<td>{_fmt_atribusi(fn['per_angka'])}</td>"
+                "<td class='net'>tiap angka &ge;2 digit di narasi dinilai sendiri</td></tr>")
+        else:
+            baris_mutu += ("<tr><td><b>Faithfulness numerik</b></td>"
+                           "<td><span class='net'>tak terukur</span></td>"
+                           f"<td class='net'>{_esc(str(fn.get('alasan')))}</td></tr>")
+        baris_mutu += (
+            f"<tr><td><b>Kekhususan</b> &mdash; seluruh jangkar tersebut</td>"
+            f"<td>{_fmt_atribusi(ks['semua_jangkar'])}</td>"
+            "<td class='net'>answer relevance: narasi menyebut zona, kegiatan, atau "
+            "parameter yang benar-benar milik permohonan ini</td></tr>"
+            f"<tr><td><b>Ketepatan arah</b> &mdash; gabungan</td>"
+            f"<td>{_fmt_atribusi(ar['gabungan'])}</td>"
+            "<td class='net'>klaim arah di narasi vs fakta boolean back-end</td></tr>"
+            f"<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per parameter intensitas</td>"
+            f"<td>{_fmt_atribusi(ar['parameter_intensitas'])}</td>"
+            f"<td class='net'>{ar['parameter_intensitas']['ambigu_dilewati']} kasus "
+            "ambigu TIDAK masuk penyebut &mdash; &ldquo;tak bisa dinilai&rdquo; bukan "
+            "&ldquo;salah&rdquo;</td></tr>"
+            f"<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;kebutuhan mitigasi dampak</td>"
+            f"<td>{_fmt_atribusi(ar['mitigasi_dampak'])}</td>"
+            "<td class='net'><code>mitigasi.perlu_mitigasi</code> hanya True utk Tinggi/"
+            "Sangat Tinggi</td></tr>"
+            f"<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;klaim kategori ITBX</td>"
+            f"<td>{_fmt_atribusi(ar['kategori_itbx'])}</td>"
+            "<td class='net'>huruf yang diklaim narasi harus sama dgn "
+            "<code>status</code></td></tr>")
+        baris_bp = ""
+        kunci_amb = f"n_di_atas_{bp['ambang']}"
+        for pid, e in bp["per_poin"].items():
+            if "catatan" in e:
+                baris_bp += (f"<tr><td><code>{_esc(pid)}</code></td>"
+                             f"<td colspan=4 class='net'>{_esc(e['catatan'])}</td></tr>")
+                continue
+            sb, ss = e["status_berbeda"], e["status_sama"]
+            baris_bp += (
+                f"<tr><td><code>{_esc(pid)}</code></td><td>{e['n']}</td>"
+                f"<td><b>{sb['median']:.3f}</b></td><td>{sb['maks']:.3f}</td>"
+                f"<td>{sb[kunci_amb]}/{e['n']}</td>"
+                f"<td class='net'>{ss['median']:.3f}</td></tr>")
+        simpang = ar.get("contoh_menyimpang") or []
+        daftar_simpang = "".join(
+            f"<li><code>{_esc(e['permohonan'])}</code> &mdash; {_esc(e['poin'])}/"
+            f"{_esc(e['sub'])}: {_esc(str(e['temuan']))}</li>" for e in simpang[:5])
+        blok_genm = f"""
+  <h2>{_nomor_genm}. Mutu narasi &mdash; faithfulness &amp; answer relevance</h2>
+  <p class="cat">Bagian sebelumnya menjawab apakah <b>rujukannya</b> nyata. Bagian ini
+  menjawab dua pertanyaan yang paling sering diajukan tentang RAG: apakah LLM <b>patuh pada
+  konteks</b> (faithfulness) dan apakah jawabannya <b>relevan dengan permohonan yang
+  ditanyakan</b> (answer relevance). Keempat metrik di bawah <b>mekanis</b> &mdash; tidak ada
+  model yang menilai model, tidak ada anotator, tidak ada panggilan API. Seluruhnya dihitung
+  ulang dari <code>request</code> + <code>response</code> yang tersimpan di
+  <code>logs/precheck.jsonl</code> oleh <code>eval/metrik_generasi.py</code>.</p>
+  <div class="peringatan">
+  <b>Penyebutnya kecil, dan itu bagian dari hasilnya.</b> Dari seluruh log, hanya
+  <b>{cg['permohonan_dinilai']} permohonan</b> era 3-poin yang memakai retriever nyata dan
+  bukan baris stub pytest. Log juga bukan trafik unik: satu permohonan di-replay sampai 30
+  kali selama pengembangan, jadi tiap (permohonan, poin) dipotong ke <b>satu narasi terbaru</b>
+  &mdash; tanpa itu, permohonan yang paling sering bermasalah justru dapat bobot terbesar.
+  Dari {cg['narasi_dimuat']} narasi tersisa, <b>{cg['narasi_jalur_llm']}</b> benar-benar
+  keluaran LLM; sisanya teks template deterministik (lihat tabel jalur).
+  {f"Rentang tanggal: <b>{rtg[0][:10]} .. {rtg[1][:10]}</b>." if rtg else ""}
+  {f"Disaring sejak <b>{_esc(_genm['sejak'])}</b>." if _genm.get("sejak") else
+   "<b>TIDAK disaring per tanggal</b>, jadi angkanya mencampur beberapa versi kode &mdash; "
+   "pakai <code>--sejak</code> sebelum mengutipnya."}
+  </div>
+
+  <h3>Jalur narasi &mdash; penyebut bagi metrik di bawahnya</h3>
+  <p class="cat"><code>app/reasoning/templates.py</code> menghasilkan dua teks
+  <b>deterministik tanpa memanggil model</b>: satu untuk poin yang jelas lolos (hemat kuota),
+  satu saat retry guardrail habis. Keduanya identik lintas permohonan dan tak pernah menyebut
+  partikular apa pun, jadi memasukkannya ke metrik mutu akan mengukur <b>template</b>, bukan
+  model &mdash; terbukti saat modul ini pertama dijalankan: satu teks template muncul di 11
+  permohonan berbeda dan menarik kekhususan poin dampak ke 0,0%. Deteksinya membangkitkan
+  ulang template dari konteks yang sama, bukan mencocokkan string salinan.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
+    <tbody>{baris_jalur}</tbody>
+  </table></div>
+
+  <h3>Faithfulness, kekhususan, dan ketepatan arah</h3>
+  <div class="kartu"><table>
+    <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang dijamin</th></tr></thead>
+    <tbody>{baris_mutu}</tbody>
+  </table></div>
+  {f'<div class="peringatan"><b>Penyimpangan arah yang tercatat:</b><ul>{daftar_simpang}'
+   f'</ul></div>' if daftar_simpang else ""}
+
+  <h3>Boilerplate &mdash; apakah jawabannya khas permohonan?</h3>
+  <p class="cat">Narasi yang nyaris identik untuk dua permohonan <b>berbeda</b> bukan jawaban
+  tentang permohonannya. Diukur sebagai kemiripan {bp['n_gram']}-gram kata ke tetangga
+  terdekat, dalam poin yang sama, antar permohonan berbeda. Dipilah menurut status: kemiripan
+  tinggi antar status <b>berbeda</b> adalah cacat; antar status <b>sama</b> wajar, karena dua
+  pemohon dengan verdict sama memang pantas dijelaskan dengan cara mirip. Ambang
+  <b>{bp['ambang']}</b> ditetapkan sebelum sebarannya dilihat.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
+    <th>&ge;{bp['ambang']}</th><th>median (status sama)</th></tr></thead>
+    <tbody>{baris_bp}</tbody>
+  </table></div>"""
+
     gen = r.get("generasi") or {}
     blok_gen = ""
     if gen.get("n_poin"):
@@ -1601,13 +1741,16 @@ def bangun_html(r: dict) -> str:
 {blok_anchor}
 {blok_abq}
 {blok_atr}
+{blok_genm}
 {blok_gen}
 
   <h2>{_nomor_batas}. Batas pembacaan</h2>
   <div class="peringatan">
   <ul>
-    <li><b>Ground truth diseed developer, belum divalidasi ahli tata ruang.</b> Angka di sini
-        mengukur konsistensi sistem terhadap label kami sendiri — bukan kebenaran hukum.</li>
+    <li><b>Label diturunkan dari struktur peraturan, belum divalidasi ahli tata ruang.</b>
+        Seluruh label eval set berlabel <code>aturan</code> (dibangkitkan deterministik dari
+        <code>chunks.zona</code>, bukan diketik), tetapi yang terukur tetap konsistensi
+        terhadap struktur regulasi — <b>bukan kebenaran hukum</b>.</li>
     <li><b>{r['n_query']} query itu sampel kecil.</b> Satu query berpindah peringkat menggeser
         rata-rata secara kasat mata. Perlakukan selisih kecil antar-konfigurasi sebagai setara.</li>
     <li><b>Satu wilayah saja</b> ({_esc(r['wilayah'])}). Wilayah lain belum punya eval set, dan
@@ -1616,6 +1759,12 @@ def bangun_html(r: dict) -> str:
         jadi nDCG di sini lebih kasar daripada nDCG bergradasi.</li>
     <li><b>Latensi diukur di mesin dev</b> terhadap Postgres lokal dan API eksternal — bukan angka
         produksi, hanya untuk membandingkan biaya antar-lapis.</li>
+    <li><b>Entailment tingkat-klaim TIDAK terukur.</b> Metrik mutu narasi menjangkau angka,
+        arah verdict, dan kekhususan — tetapi tidak menguji apakah kalimat penafsiran di
+        <code>reasoning_panjang</code> benar-benar tersirat dari ayat yang disitasi. Model
+        bisa mengutip Pasal 53 dengan benar lalu menyimpulkan sesuatu yang ayat itu tidak
+        katakan, dan seluruh metrik di laporan ini akan tetap hijau. Menutupnya butuh
+        penilai manusia atau LLM-as-judge yang <b>angka kesepakatannya ikut dilaporkan</b>.</li>
   </ul>
   </div>
 

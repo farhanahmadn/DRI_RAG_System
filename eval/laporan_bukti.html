@@ -78,7 +78,8 @@ diukur 2026-10-05</p>
   <a href="#d">D. Bukti per-query — jalur search</a>
   <a href="#e">E. Bukti per-query — jalur rujukan</a>
   <a href="#f">F. Ablasi</a>
-  <a href="#g">G. Batas keabsahan</a>
+  <a href="#g">G. Mutu narasi</a>
+  <a href="#h">H. Batas keabsahan</a>
 </nav>
 
 
@@ -5928,7 +5929,47 @@ selang kepercayaan dan uji berpasangannya — ada di <code>laporan_rag.html</cod
 Bukti per-topiknya ada di bagian D dan E di atas: bandingkan baris konfigurasi di dalam kartu yang
 sama, karena seluruh konfigurasi dinilai atas topik dan label yang identik.</p></div>
 
-<h2 id="g">G. Batas keabsahan</h2>
+
+<h2 id="g">G. Mutu narasi &mdash; faithfulness &amp; answer relevance</h2>
+<p class="cat">Bagian A&ndash;F menilai <b>retrieval</b>: apakah chunk yang benar masuk
+top-k. Bagian ini menilai <b>narasi yang akhirnya keluar</b> &mdash; apakah LLM patuh pada
+konteks dan apakah jawabannya khas permohonan yang ditanyakan. Seluruhnya mekanis, dihitung
+ulang dari <code>logs/precheck.jsonl</code> oleh <code>eval/metrik_generasi.py</code>:
+tidak ada model yang menilai model, tidak ada anotator, tidak ada panggilan API.</p>
+<div class="catat">
+<b>Penyebutnya kecil, dan itu bagian dari hasilnya.</b> Hanya
+<b>20 permohonan</b> era 3-poin di log yang memakai retriever nyata
+dan bukan baris stub pytest. Log juga bukan trafik unik &mdash; satu permohonan di-replay
+sampai 30 kali selama pengembangan &mdash; jadi tiap (permohonan, poin) dipotong ke satu
+narasi terbaru. Dari 60 narasi tersisa,
+<b>40</b> benar-benar keluaran LLM.
+</div>
+<h3>Jalur narasi</h3>
+<p class="cat"><code>app/reasoning/templates.py</code> menghasilkan dua teks deterministik
+tanpa memanggil model: satu untuk poin yang jelas lolos, satu saat retry guardrail habis.
+Keduanya identik lintas permohonan, jadi menilainya sebagai keluaran LLM berarti mengukur
+template &mdash; terbukti saat metrik ini pertama dijalankan: satu teks template muncul di
+11 permohonan dan menarik kekhususan poin dampak ke 0,0%.</p>
+<div class="blok"><table>
+<thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
+<tbody><tr><td><code>dampak</code></td><td><b>95%</b> <span class='ci'>19/20</span></td><td class='cat'>1 template low-confidence, 0 template aman</td></tr><tr><td><code>intensitas</code></td><td><b>50%</b> <span class='ci'>10/20</span></td><td class='cat'>10 template low-confidence, 0 template aman</td></tr><tr><td><code>itbx</code></td><td><b>55%</b> <span class='ci'>11/20</span></td><td class='cat'>9 template low-confidence, 0 template aman</td></tr></tbody></table></div>
+<h3>Metrik mutu (hanya narasi jalur LLM)</h3>
+<div class="blok"><table>
+<thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang dijamin</th></tr></thead>
+<tbody><tr><td>Faithfulness numerik (per narasi)</td><td><b>100.0%</b> <span class="ci">n=40</span></td><td class='cat'>tiap angka &ge;2 digit harus terlacak ke fakta sumber, pasal yang disitasi, atau teks chunk yang disitasi &mdash; replay cek provenance produksi</td></tr><tr><td>Kekhususan (answer relevance)</td><td><b>82.5%</b> <span class="ci">n=40</span></td><td class='cat'>narasi menyebut zona, kegiatan, atau parameter yang benar-benar milik permohonan ini, bukan boilerplate yang cocok untuk semua</td></tr><tr><td>Ketepatan arah (gabungan)</td><td><b>96.0%</b> <span class="ci">n=25</span></td><td class='cat'>klaim arah di narasi vs fakta boolean back-end</td></tr><tr><td>&nbsp;&nbsp;per parameter intensitas</td><td><b>100.0%</b> <span class="ci">n=18</span></td><td class='cat'>5 kasus ambigu TIDAK masuk penyebut</td></tr><tr><td>&nbsp;&nbsp;kebutuhan mitigasi dampak</td><td><b>75.0%</b> <span class="ci">n=4</span></td><td class='cat'><code>perlu_mitigasi</code> hanya True utk Tinggi/Sangat Tinggi</td></tr><tr><td>&nbsp;&nbsp;klaim kategori ITBX</td><td><b>100.0%</b> <span class="ci">n=3</span></td><td class='cat'>huruf yang diklaim narasi harus sama dgn <code>status</code></td></tr></tbody></table></div>
+<div class="catat"><b>Penyimpangan arah yang tercatat:</b><ul><li><code>APP-2026-INNER-01</code> dampak/mitigasi: [&#x27;fakta=tak perlu, narasi=perlu&#x27;]</li></ul></div>
+<h3>Boilerplate</h3>
+<p class="cat">Narasi yang nyaris identik untuk dua permohonan <b>berbeda</b> bukan
+jawaban tentang permohonannya. Kemiripan 5-gram kata ke tetangga terdekat,
+dalam poin yang sama, antar permohonan berbeda. Kemiripan tinggi antar status <b>berbeda</b>
+adalah cacat; antar status <b>sama</b> wajar. Ambang <b>0.5</b> ditetapkan
+sebelum sebarannya dilihat.</p>
+<div class="blok"><table>
+<thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
+<th>&ge;0.5</th><th>median (status sama)</th></tr></thead>
+<tbody><tr><td><code>itbx</code></td><td>11</td><td><b>0.024</b></td><td>0.045</td><td>0/11</td><td class='cat'>0.043</td></tr><tr><td><code>intensitas</code></td><td>10</td><td><b>0.016</b></td><td>0.030</td><td>0/10</td><td class='cat'>0.017</td></tr><tr><td><code>dampak</code></td><td>19</td><td><b>0.129</b></td><td>0.722</td><td>7/19</td><td class='cat'>0.207</td></tr></tbody></table></div>
+
+<h2 id="h">H. Batas keabsahan</h2>
 <div class="catat">
 <ul>
   <li><b>Label belum divalidasi ahli tata ruang.</b> Yang terukur adalah konsistensi terhadap
@@ -5939,13 +5980,18 @@ sama, karena seluruh konfigurasi dinilai atas topik dan label yang identik.</p><
   <li><b>Satu wilayah</b> (Sleman Tengah).</li>
   <li><b>Latensi diukur di mesin pengembang</b> terhadap Postgres lokal dan API eksternal — untuk
       membandingkan biaya antar-lapis, bukan angka produksi.</li>
+  <li><b>Entailment tingkat-klaim tidak terukur.</b> Bagian G menjangkau angka, arah
+      verdict, dan kekhususan — tetapi tidak menguji apakah kalimat penafsiran benar-benar
+      tersirat dari ayat yang disitasi. Model bisa mengutip pasal dengan benar lalu
+      menyimpulkan sesuatu yang pasal itu tidak katakan, dan seluruh metrik di dokumen ini
+      akan tetap hijau.</li>
 </ul>
 </div>
 
 <div class="meta">
 Disusun oleh <code>eval/laporan_bukti.py</code> dari <code>laporan_rag.json</code> (hasil
 pengukuran) + keterangan chunk dari basis data. Tidak ada angka yang dihitung ulang di sini.
-Dokumen dibuat 2026-10-05 16:11.
+Dokumen dibuat 2026-10-09 03:47.
 </div>
 
 <script>
