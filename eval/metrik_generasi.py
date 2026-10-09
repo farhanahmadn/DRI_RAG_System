@@ -5,12 +5,12 @@ Kenapa modul ini ada. `eval/eval_rag.py` mengukur leg retrieval (apakah chunk be
 soal dua pertanyaan yang paling sering ditanyakan tentang RAG: apakah LLM PATUH pada konteks
 (faithfulness), dan apakah jawabannya RELEVAN dengan permohonan yang ditanyakan (answer relevance).
 
-Yang membedakan modul ini dari kerangka LLM-as-judge: seluruh empat metrik di bawah **mekanis** —
+Yang membedakan modul ini dari kerangka LLM-as-judge: seluruh lima metrik di bawah **mekanis** —
 tidak ada model yang menilai model, tidak ada anotator, tidak ada panggilan API. Semuanya dihitung
 ulang dari `request` + `response` yang sudah tersimpan di log, sehingga bisa dijalankan kapan pun
 tanpa kuota dan hasilnya identik tiap kali dijalankan atas log yang sama.
 
-EMPAT METRIK
+LIMA METRIK
 
 1. `faithfulness_numerik` — setiap angka >=2 digit di narasi harus terlacak ke fakta sumber poin itu,
    ke pasal/dokumen yang benar-benar disitasi, atau ke teks chunk yang benar-benar disitasi. Ini
@@ -49,6 +49,15 @@ EMPAT METRIK
    adalah cacat nyata) vs ber-status SAMA (kemiripan wajar — dua pemohon dengan verdict & zona sama
    memang pantas dijelaskan dengan cara mirip). Tanpa label, tanpa ambang yang disetel ke data:
    `_AMBANG_MIRIP` ditetapkan dari konvensi deteksi near-duplicate sebelum angkanya dilihat.
+
+5. `laju_tolak_guardrail` — satu-satunya metrik di sini yang menilai keluaran LLM **sebelum**
+   dikoreksi. Metrik 1-4 menilai narasi yang akhirnya keluar, yaitu yang sudah lolos guardrail;
+   dengan sendirinya angkanya bagus, dan karena itu tak satu pun dari keempatnya bisa menjawab
+   "apa gunanya guardrail". Yang ini membaca `diagnostik[].riwayat_percobaan` di log: berapa
+   bagian percobaan PERTAMA yang ditolak, label temuannya apa saja, dan berapa yang akhirnya
+   lolos setelah retry terarah. Penyebutnya dibatasi ke percobaan yang benar-benar sampai ke
+   guardrail — kegagalan panggilan LLM & retrieval dikeluarkan, kalau tidak, kegagalan
+   infrastruktur akan terhitung sebagai kepatuhan model.
 
 CARA MEMBACA ANGKANYA
 
@@ -291,6 +300,22 @@ class Kasus:
     zona: str | None
     zona_subzone: str | None
     jalur: str = "llm"
+    # Entri `diagnostik` baris log untuk poin INI (`guardrail.DiagnosaPoin` terserialisasi), atau
+    # None kalau barisnya lebih tua dari instrumentasinya. Data operasional, bukan bagian narasi —
+    # hanya `laju_tolak_guardrail` yang memakainya.
+    diagnosa: dict | None = None
+
+    @property
+    def riwayat_percobaan(self) -> list[dict]:
+        """Riwayat per-percobaan, atau [] kalau tak terekam.
+
+        [] punya DUA sebab yang sama-sama berarti "tak terukur", bukan "nol penolakan": baris log
+        lebih tua dari field ini (seluruh log sebelum 2026-10-09), atau retrieval gagal sebelum
+        LLM sempat dipanggil sekali pun (`sebab` = retrieval_kosong/retrieval_provider_gagal).
+        Keduanya dibuang dari penyebut di `laju_tolak_guardrail`, tidak dihitung sebagai lolos.
+        """
+        r = (self.diagnosa or {}).get("riwayat_percobaan")
+        return [e for e in r if isinstance(e, dict)] if isinstance(r, list) else []
 
     @property
     def teks_narasi(self) -> str:
@@ -355,6 +380,11 @@ def muat_kasus(path: Path, sejak: str | None = None,
         lok = req.get("lokasi") or {}
         pid_permohonan = str(req.get("application_number") or req.get("application_id") or "?")
         tstamp = str(d.get("timestamp") or "")[:19]
+        # Diagnostik dibawa ikut per poin (bukan dimuat lewat jalur kedua) supaya dedup
+        # "satu narasi terbaru per (permohonan, poin)" dan seluruh filter di atas berlaku sama
+        # untuk `laju_tolak_guardrail`. Baris era lama tak punya kunci ini -> diagnosa None.
+        diag = {str(e.get("poin_id")): e
+                for e in (d.get("diagnostik") or []) if isinstance(e, dict)}
         for p in poin:
             pid = p.get("poin_id")
             if pid not in _POIN_SEKARANG or pid not in konteks:
@@ -372,6 +402,7 @@ def muat_kasus(path: Path, sejak: str | None = None,
                 konteks=konteks[pid], keluaran=keluaran,
                 zona=lok.get("rdtr_zone"), zona_subzone=lok.get("rdtr_subzone"),
                 jalur=_jalur_narasi(konteks[pid], keluaran),
+                diagnosa=diag.get(pid),
             ))
 
     if not dok_mock:
@@ -839,6 +870,140 @@ def boilerplate(kasus: list[Kasus]) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 5. Laju tolak guardrail
+# ---------------------------------------------------------------------------
+
+# Angka & isi tanda kutip dinormalkan supaya LABEL temuan bisa dikelompokkan. Pesan guardrail
+# menyisipkan nilai konkret ke dalam tanda kutip (`f"...angka {angka!r}..."`,
+# `f"...('{frasa}') padahal kategori aktual '{kategori}'"`, `f"...citation_id mentah {bocor!r}"`),
+# jadi tanpa normalisasi tiap kejadian jadi label unik dan sebarannya cuma daftar satu-satu.
+_RE_ISI_KUTIP = re.compile(r"'[^']*'")
+# `(?<![#\w])`: nomor aturan SYSTEM_PROMPT ("aturan #8" vs "aturan #17") DIPERTAHANKAN — itu
+# penanda cek mana yang menggigit, bukan nilai data. Yang dinormalkan angka data spt
+# "runoff_change_index=0.42".
+_RE_ANGKA_LABEL = re.compile(r"(?<![#\w])\d[\d.,]*")
+# Label dipotong supaya kunci sebaran tetap terbaca di terminal & tabel HTML. 160 char cukup
+# memuat bagian yang membedakan kelima template pesan guardrail (prefiksnya berbeda semua).
+_MAKS_LABEL_MASALAH = 160
+
+
+def _label_masalah(m: str) -> str:
+    """Satu temuan guardrail -> label yang bisa dihitung agregat."""
+    t = _RE_ISI_KUTIP.sub("'X'", str(m or "").strip())
+    t = _RE_ANGKA_LABEL.sub("N", t)
+    return _RE_SPASI.sub(" ", t)[:_MAKS_LABEL_MASALAH]
+
+
+def laju_tolak_guardrail(kasus: list[Kasus]) -> dict:
+    """Berapa bagian keluaran LLM MENTAH yang ditolak guardrail, dan karena apa.
+
+    KENAPA METRIK INI BEDA DARI EMPAT DI ATASNYA. Metrik 1-4 menilai narasi yang AKHIRNYA keluar —
+    yaitu yang sudah lolos guardrail. Dengan sendirinya angkanya bagus, dan karena itu ia tidak
+    bisa menjawab pertanyaan "apa gunanya guardrail". Metrik ini menilai percobaan PERTAMA: apa
+    yang model hasilkan sebelum ada yang mengoreksinya. Itulah faithfulness mentahnya, dan
+    selisih antara keduanya adalah efek teknis guardrail — terukur, bukan diklaim.
+
+    Dihitung pada SELURUH kasus, bukan hanya jalur LLM. Narasi `template_low_confidence` justru
+    kasus di mana guardrail menolak SEMUA percobaan; membuangnya (seperti metrik 1-4 yang memang
+    harus membuangnya, karena template bukan keluaran model) akan menyisakan hanya yang berhasil
+    dan membuat laju tolaknya terlalu rendah secara sistematis.
+
+    PENYEBUTNYA adalah poin yang percobaan pertamanya BENAR-BENAR sampai ke guardrail. Poin yang
+    percobaan pertamanya gagal di panggilan LLM (rate limit/timeout) atau yang retrievalnya gagal
+    sebelum LLM dipanggil TIDAK masuk — guardrail tak pernah menilai apa pun di sana, jadi
+    memasukkannya akan menghitung kegagalan infrastruktur sebagai kepatuhan model.
+
+    Baris log sebelum 2026-10-09 tak punya `riwayat_percobaan` sama sekali (lihat
+    `logging_util.log_precheck` & `DiagnosaPoin.riwayat_percobaan`), jadi atas log lama metrik ini
+    melaporkan TAK TERUKUR — itu jawaban yang benar, bukan kegagalan. Termasuk 8 baris 2026-09-08
+    yang memuat `TypeError: build_user_prompt() ... 'konteks_induk'`: itu bug pengembangan yang
+    sudah diperbaiki, dan ia ada di jalur EXCEPTION — jadi walau log-nya kelak punya riwayat,
+    baris seperti itu tetap di luar penyebut. `--sejak` tetap alat yang benar untuk memisahkan
+    versi kode.
+    """
+    punya = [k for k in kasus if k.riwayat_percobaan]
+    if not punya:
+        return {
+            "terukur": False,
+            "alasan": ("tak ada baris log dgn `diagnostik[].riwayat_percobaan` — instrumentasinya "
+                       "baru (2026-10-09); jalankan precheck sekali lagi lalu ulangi"),
+            "n_kasus_dimuat": len(kasus),
+            "n_tanpa_riwayat": len(kasus),
+        }
+
+    def _sampai_guardrail(e: dict) -> bool:
+        """Percobaan ini menghasilkan jawaban yang BENAR-BENAR dinilai guardrail."""
+        return e.get("sebab") in ("berhasil", "guardrail_menolak")
+
+    n = ditolak = 0
+    per_poin: dict[str, Counter] = {}
+    per_percobaan: dict[int, Counter] = {}
+    sebaran: Counter = Counter()
+    n_temuan = 0
+    pulih = n_pulih_penyebut = 0
+    contoh: list[dict] = []
+
+    for k in punya:
+        riwayat = k.riwayat_percobaan
+        # Sebaran per indeks percobaan: laju tolak seharusnya turun di percobaan ke-2/ke-3 kalau
+        # `catatan_perbaikan` yang terarah memang bekerja. Dihitung di sini, tidak diasumsikan.
+        for e in riwayat:
+            if not _sampai_guardrail(e):
+                continue
+            c = per_percobaan.setdefault(int(e.get("percobaan") or 0), Counter())
+            c["n"] += 1
+            c["ditolak"] += int(e.get("sebab") == "guardrail_menolak")
+
+        pertama = riwayat[0]
+        if not _sampai_guardrail(pertama):
+            continue
+        n += 1
+        pp = per_poin.setdefault(k.poin_id, Counter())
+        pp["n"] += 1
+        if pertama.get("sebab") != "guardrail_menolak":
+            continue
+
+        ditolak += 1
+        pp["ditolak"] += 1
+        label = [_label_masalah(m) for m in (pertama.get("masalah") or []) if str(m).strip()]
+        sebaran.update(label)
+        n_temuan += len(label)
+        # Pemulihan: ditolak di percobaan pertama TAPI akhirnya lolos. Inilah efek guardrail yang
+        # bisa ditunjukkan; sisanya jatuh ke `template_low_confidence` (tak ada narasi LLM keluar).
+        n_pulih_penyebut += 1
+        pulih += int(any(e.get("sebab") == "berhasil" for e in riwayat))
+        if len(contoh) < 15:
+            contoh.append({
+                "permohonan": k.permohonan, "timestamp": k.timestamp, "poin": k.poin_id,
+                "percobaan_terpakai": len(riwayat),
+                "akhirnya_lolos": any(e.get("sebab") == "berhasil" for e in riwayat),
+                "masalah_percobaan_pertama": label,
+            })
+
+    return {
+        "terukur": True,
+        "n_kasus_dimuat": len(kasus),
+        "n_tanpa_riwayat": len(kasus) - len(punya),
+        "percobaan_pertama": {"n": n, "ditolak": ditolak, "nilai": _proporsi(ditolak, n)},
+        "per_poin": {
+            p: {"n": c["n"], "ditolak": c["ditolak"], "nilai": _proporsi(c["ditolak"], c["n"])}
+            for p, c in sorted(per_poin.items())
+        },
+        "per_percobaan": {
+            str(i): {"n": c["n"], "ditolak": c["ditolak"], "nilai": _proporsi(c["ditolak"], c["n"])}
+            for i, c in sorted(per_percobaan.items())
+        },
+        # "kena" = akhirnya lolos: dinamai begitu supaya seragam dgn metrik lain (tinggi = baik)
+        # dan bisa dipakai pemformat laporan yang sama.
+        "pulih_setelah_tolak": {"n": n_pulih_penyebut, "kena": pulih,
+                                "nilai": _proporsi(pulih, n_pulih_penyebut)},
+        "n_temuan": n_temuan,
+        "sebaran_masalah": dict(sebaran.most_common()),
+        "contoh": contoh,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Perakitan & pelaporan
 # ---------------------------------------------------------------------------
 
@@ -891,6 +1056,9 @@ def hitung(kasus: list[Kasus], chunks: dict[str, Chunk]) -> dict:
         "kekhususan": kekhususan(llm),
         "ketepatan_arah": ketepatan_arah(llm),
         "boilerplate": boilerplate(llm),
+        # SELURUH kasus, bukan `llm`: lihat docstring — poin yang guardrail-nya menolak semua
+        # percobaan berakhir sbg template_low_confidence, dan itu justru data yang dicari.
+        "laju_tolak_guardrail": laju_tolak_guardrail(kasus),
     }
 
 
@@ -978,11 +1146,38 @@ def cetak(h: dict, lewat: dict) -> None:
         print(f"              status SAMA: median {ss['median']:.3f} maks {ss['maks']:.3f} "
               "(kemiripan di sini wajar)")
 
+    g = h["laju_tolak_guardrail"]
+    print("\n=== 5. LAJU TOLAK GUARDRAIL (faithfulness MENTAH, sebelum koreksi) ===")
+    if not g.get("terukur"):
+        print(f"  TAK TERUKUR — {g.get('alasan')}")
+        print(f"  kasus dimuat {g.get('n_kasus_dimuat', 0)}, "
+              f"tanpa riwayat percobaan {g.get('n_tanpa_riwayat', 0)}")
+    else:
+        pp = g["percobaan_pertama"]
+        print(f"  percobaan PERTAMA ditolak {_pct(pp):>10s}   (n={pp['n']}, "
+              f"ditolak={pp['ditolak']})  <- keluaran LLM mentah")
+        print(f"  dari yang ditolak, akhirnya lolos setelah retry terarah "
+              f"{_pct(g['pulih_setelah_tolak']):>8s}  "
+              f"(n={g['pulih_setelah_tolak']['n']}, kena={g['pulih_setelah_tolak']['kena']})")
+        print(f"  kasus tanpa riwayat percobaan (log era lama / retrieval gagal): "
+              f"{g['n_tanpa_riwayat']}/{g['n_kasus_dimuat']}")
+        for p, e in g["per_poin"].items():
+            print(f"    {p:11s} {_pct(e):>10s}  (n={e['n']}, ditolak={e['ditolak']})")
+        if g["per_percobaan"]:
+            print("  laju tolak per indeks percobaan (turun = catatan_perbaikan bekerja):")
+            for i, e in g["per_percobaan"].items():
+                print(f"    percobaan {i:3s} {_pct(e):>10s}  (n={e['n']}, ditolak={e['ditolak']})")
+        if g["sebaran_masalah"]:
+            print(f"  sebaran temuan di percobaan pertama ({g['n_temuan']} temuan):")
+            for label, jml in list(g["sebaran_masalah"].items())[:10]:
+                print(f"    {jml:4d}x {label}")
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Metrik sisi generasi (faithfulness numerik, kekhususan, ketepatan arah, "
-                    "boilerplate) — offline dari log precheck + korpus, tanpa panggilan API.")
+                    "boilerplate, laju tolak guardrail) — offline dari log precheck + korpus, "
+                    "tanpa panggilan API.")
     ap.add_argument("--log", type=Path, default=_LOG)
     ap.add_argument("--out", type=Path, default=_OUT)
     ap.add_argument("--sejak", default=None,

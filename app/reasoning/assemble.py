@@ -92,6 +92,26 @@ def _generate_poin_defensif(
         return template_low_confidence(poin), diagnosa
 
 
+def _serialisasi_diagnostik(diagnostik: list[DiagnosaPoin]) -> list[dict]:
+    """`DiagnosaPoin` -> dict siap-JSON, satu per poin, dgn label `sebab` ikut dihitung.
+
+    Dipisah dari pemanggilan `log_precheck` supaya kegagalan pada SATU poin tidak menjatuhkan
+    seluruh baris log. Sebelumnya perakitan ini jadi ekspresi argumen di dalam `try` pemanggil:
+    satu `d.sebab()` yang raise (mis. `exception_terakhir` bertipe aneh) membuang request +
+    response sekalian — padahal keduanya justru bukti yang paling sulit dikumpulkan ulang.
+    Diagnostik adalah data operasional; ia boleh degradasi, log utamanya tidak.
+    """
+    keluar: list[dict] = []
+    for d in diagnostik:
+        try:
+            keluar.append(vars(d) | {"sebab": d.sebab()})
+        except Exception:
+            logger.exception("Gagal menyerialkan diagnostik poin %r — dicatat sbg rusak.",
+                             getattr(d, "poin_id", "?"))
+            keluar.append({"poin_id": getattr(d, "poin_id", None), "sebab": "diagnostik_rusak"})
+    return keluar
+
+
 _KALIMAT_FALLBACK_ITBX = (
     "klasifikasi kegiatan (ITBX) lolos secara otomatis karena data matriks RDTR belum tersedia — "
     "status ini belum terverifikasi dan perlu ditinjau manual"
@@ -344,7 +364,7 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     )
 
     try:
-        log_precheck(assessment, output, diagnostik=[vars(d) | {"sebab": d.sebab()} for d in diagnostik])
+        log_precheck(assessment, output, diagnostik=_serialisasi_diagnostik(diagnostik))
     except Exception:
         logger.exception("Gagal menulis log precheck — melanjutkan tanpa menggagalkan respons.")
 

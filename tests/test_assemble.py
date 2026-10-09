@@ -577,6 +577,68 @@ class TestJalankanPrecheckEndToEnd:
         assert "diagnostik" not in serialisasi
         assert all("diagnostik" not in p for p in serialisasi["poin"])
 
+    def test_riwayat_percobaan_ikut_ke_log(self, monkeypatch):
+        """Alasan penolakan percobaan pertama harus sampai ke log, bukan berhenti di dataclass —
+        itu penyebut bagi `eval/metrik_generasi.py::laju_tolak_guardrail`."""
+        def _stub(poin, retriever, assessment, *, max_retry=2):
+            d = _diagnosa_stub(poin.poin_id)
+            d.percobaan = 2
+            d.riwayat_percobaan = [
+                {"percobaan": 1, "sebab": "guardrail_menolak", "masalah": ["x kosong."],
+                 "exception": None},
+                {"percobaan": 2, "sebab": "berhasil", "masalah": [], "exception": None},
+            ]
+            return _poin_output(poin_id=poin.poin_id, kategori=poin.kategori), d
+
+        monkeypatch.setattr(assemble_module, "generate_poin_terdiagnosis", _stub)
+        _patch_kesimpulan_llm(monkeypatch, hasil_dict={"langkah_berdampak": [], "catatan_lokasi": None})
+        panggilan = _patch_log(monkeypatch)
+
+        jalankan_precheck(_muat_assessment("l2_sample_lolos.json"), MockRetriever())
+
+        diagnostik = panggilan[0][2]["diagnostik"]
+        assert all(len(d["riwayat_percobaan"]) == 2 for d in diagnostik)
+        assert all(d["riwayat_percobaan"][0]["masalah"] == ["x kosong."] for d in diagnostik)
+
+
+class TestSerialisasiDiagnostik:
+    """`_serialisasi_diagnostik` — diagnostik boleh degradasi, baris lognya tidak.
+
+    Perakitan ini dulu jadi ekspresi argumen di dalam `try` pemanggil, jadi satu `d.sebab()` yang
+    raise membuang request + response sekalian — padahal keduanya justru bukti yang paling sulit
+    dikumpulkan ulang (butuh payload back-end nyata + kuota LLM).
+    """
+
+    def test_memuat_sebab_dan_seluruh_field(self):
+        d = _diagnosa_stub("itbx")
+        d.riwayat_percobaan = [{"percobaan": 1, "sebab": "berhasil", "masalah": [],
+                                "exception": None}]
+
+        hasil = assemble_module._serialisasi_diagnostik([d])
+
+        assert hasil[0]["poin_id"] == "itbx"
+        assert hasil[0]["sebab"] == "berhasil"
+        assert hasil[0]["riwayat_percobaan"] == d.riwayat_percobaan
+
+    def test_siap_json(self):
+        hasil = assemble_module._serialisasi_diagnostik([_diagnosa_stub("dampak")])
+        assert json.loads(json.dumps(hasil, ensure_ascii=False))[0]["poin_id"] == "dampak"
+
+    def test_satu_poin_rusak_tidak_menjatuhkan_poin_lain(self):
+        class _Rusak(DiagnosaPoin):
+            def sebab(self) -> str:
+                raise RuntimeError("diagnosa korup")
+
+        rusak = _Rusak(poin_id="intensitas", berhasil=False)
+
+        hasil = assemble_module._serialisasi_diagnostik(
+            [_diagnosa_stub("itbx"), rusak, _diagnosa_stub("dampak")]
+        )
+
+        assert [d["poin_id"] for d in hasil] == ["itbx", "intensitas", "dampak"]
+        assert hasil[1]["sebab"] == "diagnostik_rusak"
+        assert hasil[0]["sebab"] == "berhasil", "poin lain tidak boleh ikut hilang"
+
 
 class TestPemrosesanParalel:
     def test_poin_diproses_paralel_bukan_sekuensial(self, monkeypatch):

@@ -1,5 +1,5 @@
 {
-  "dibuat": "2026-10-08T20:41:19+00:00",
+  "dibuat": "2026-10-09T02:00:28+00:00",
   "cakupan": {
     "rentang_tanggal_dinilai": [
       "2026-08-03T07:06:47",
@@ -369,12 +369,18 @@
       }
     ]
   },
+  "laju_tolak_guardrail": {
+    "terukur": false,
+    "alasan": "tak ada baris log dgn `diagnostik[].riwayat_percobaan` — instrumentasinya baru (2026-10-09); jalankan precheck sekali lagi lalu ulangi",
+    "n_kasus_dimuat": 60,
+    "n_tanpa_riwayat": 60
+  },
   "berkas_log": "precheck.jsonl",
   "sejak": null,
   "dilewati": {
     "era 8-indikator lama": 309,
     "MockRetriever (replay/test lokal)": 34,
-    "narasi stub (pytest/fixture)": 349,
+    "narasi stub (pytest/fixture)": 355,
     "jalan ulang permohonan yg sama (dedup)": 258
   }
 }

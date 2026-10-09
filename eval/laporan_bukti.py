@@ -273,6 +273,50 @@ def _blok_generasi(gm: dict | None) -> tuple[str, str]:
         f"<li><code>{_e(x['permohonan'])}</code> {_e(x['poin'])}/{_e(x['sub'])}: "
         f"{_e(str(x['temuan']))}</li>" for x in (ar.get("contoh_menyimpang") or [])[:5])
 
+    # Laju tolak guardrail — satu-satunya angka di bagian ini yang menilai keluaran LLM SEBELUM
+    # dikoreksi, jadi satu-satunya yang bisa menjawab "apa gunanya guardrail". Tak terukur atas log
+    # yang belum punya `diagnostik[].riwayat_percobaan`, dan dikatakan begitu, bukan sebagai 0%.
+    lt = gm.get("laju_tolak_guardrail") or {}
+    blok_lt = ""
+    if lt and not lt.get("terukur"):
+        blok_lt = (f'<h3>Laju tolak guardrail</h3><div class="catat"><b>Tak terukur.</b> '
+                   f'{_e(str(lt.get("alasan")))} ({lt.get("n_tanpa_riwayat", 0)} dari '
+                   f'{lt.get("n_kasus_dimuat", 0)} kasus tanpa riwayat percobaan). Dilaporkan '
+                   f'begitu dan bukan 0% &mdash; 0% akan terbaca sebagai &ldquo;guardrail tak '
+                   f'pernah menolak apa pun&rdquo;.</div>')
+    elif lt:
+        pp = lt["percobaan_pertama"]
+        baris_lt = (
+            f'<tr><td><b>Percobaan pertama ditolak guardrail</b></td>'
+            f'{sel({"nilai": pp["nilai"], "n": pp["n"]})}'
+            f'<td class="cat">{pp["ditolak"]} dari {pp["n"]} &mdash; keluaran LLM MENTAH, '
+            f'sebelum ada yang mengoreksinya</td></tr>'
+            f'<tr><td>Dari yang ditolak, akhirnya lolos setelah retry terarah</td>'
+            f'{sel(lt["pulih_setelah_tolak"])}'
+            f'<td class="cat">sisanya jatuh ke template low-confidence</td></tr>')
+        for pid, e in lt["per_poin"].items():
+            baris_lt += (f'<tr><td>&nbsp;&nbsp;<code>{_e(pid)}</code></td>'
+                         f'{sel({"nilai": e["nilai"], "n": e["n"]})}'
+                         f'<td class="cat">{e["ditolak"]} dari {e["n"]} ditolak</td></tr>')
+        baris_sebaran = "".join(
+            f'<tr><td>{jml}&times;</td><td class="cat">{_e(label)}</td></tr>'
+            for label, jml in list(lt["sebaran_masalah"].items())[:10])
+        blok_lt = f"""<h3>Laju tolak guardrail &mdash; faithfulness mentah</h3>
+<p class="cat">Angka-angka di atas menilai narasi yang <b>akhirnya keluar</b>, yaitu yang sudah
+lolos guardrail &mdash; dengan sendirinya bagus, dan karena itu tak satu pun dari keempatnya
+bisa menjawab <b>apa gunanya guardrail</b>. Yang di bawah menilai percobaan <b>pertama</b>.
+Penyebutnya hanya percobaan yang benar-benar sampai ke guardrail: kegagalan panggilan LLM dan
+kegagalan retrieval dikeluarkan, kalau tidak kegagalan infrastruktur akan terhitung sebagai
+kepatuhan model. {lt['n_tanpa_riwayat']} dari {lt['n_kasus_dimuat']} kasus tanpa riwayat
+percobaan (log era lama / retrieval gagal sebelum LLM dipanggil) di luar penyebut.</p>
+<div class="blok"><table>
+<thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang diukur</th></tr></thead>
+<tbody>{baris_lt}</tbody></table></div>
+{f'''<p class="cat">Temuan guardrail di percobaan pertama ({lt["n_temuan"]} temuan; angka &amp;
+isi tanda kutip dinormalkan supaya label bisa dikelompokkan):</p>
+<div class="blok"><table><thead><tr><th>Jumlah</th><th>Label temuan</th></tr></thead>
+<tbody>{baris_sebaran}</tbody></table></div>''' if baris_sebaran else ""}"""
+
     nav = '  <a href="#g">G. Mutu narasi</a>\n'
     bagian = f"""
 <h2 id="g">G. Mutu narasi &mdash; faithfulness &amp; answer relevance</h2>
@@ -288,6 +332,10 @@ dan bukan baris stub pytest. Log juga bukan trafik unik &mdash; satu permohonan 
 sampai 30 kali selama pengembangan &mdash; jadi tiap (permohonan, poin) dipotong ke satu
 narasi terbaru. Dari {c['narasi_dimuat']} narasi tersisa,
 <b>{c['narasi_jalur_llm']}</b> benar-benar keluaran LLM.
+{f"Disaring sejak <b>{_e(gm['sejak'])}</b>." if gm.get("sejak") else
+ "<b>Tidak disaring per tanggal</b>, jadi angka di bagian ini mencampur beberapa versi kode "
+ "&mdash; log merentang dari era sebelum beberapa perbaikan sampai sesudahnya. Jalankan "
+ "<code>python -m eval.metrik_generasi --sejak &lt;tanggal&gt;</code> sebelum mengutipnya."}
 </div>
 <h3>Jalur narasi</h3>
 <p class="cat"><code>app/reasoning/templates.py</code> menghasilkan dua teks deterministik
@@ -313,7 +361,8 @@ sebelum sebarannya dilihat.</p>
 <div class="blok"><table>
 <thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
 <th>&ge;{bp['ambang']}</th><th>median (status sama)</th></tr></thead>
-<tbody>{baris_bp}</tbody></table></div>"""
+<tbody>{baris_bp}</tbody></table></div>
+{blok_lt}"""
     return nav, bagian
 
 

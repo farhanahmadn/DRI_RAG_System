@@ -37,12 +37,14 @@ from eval.metrik_generasi import (
     _normalisasi,
     _posisi_parameter,
     _proporsi,
+    _label_masalah,
     _teks_klausa,
     _ternegasi,
     boilerplate,
     faithfulness_numerik,
     kekhususan,
     ketepatan_arah,
+    laju_tolak_guardrail,
     muat_kasus,
     sebaran_jalur,
 )
@@ -91,13 +93,22 @@ def _keluaran(panjang: str, pendek: str = "", saran: str = "", sitasi=None,
 def _kasus(panjang: str, konteks: PoinKonteks | None = None, poin_id: str = "intensitas",
            permohonan: str = "APP-1", timestamp: str = "2026-09-20T10:00:00",
            saran: str = "", pendek: str = "", sitasi=None, zona="Zona Perumahan",
-           subzona=None) -> Kasus:
+           subzona=None, diagnosa=None) -> Kasus:
     k = konteks or _konteks()
     return Kasus(
         permohonan=permohonan, timestamp=timestamp, poin_id=poin_id, konteks=k,
         keluaran=_keluaran(panjang, pendek=pendek, saran=saran, sitasi=sitasi),
-        zona=zona, zona_subzone=subzona, jalur="llm",
+        zona=zona, zona_subzone=subzona, jalur="llm", diagnosa=diagnosa,
     )
+
+
+def _riwayat(*sebab_dan_masalah) -> dict:
+    """Diagnosa stub: tiap argumen satu percobaan, berupa (sebab, [masalah])."""
+    return {"riwayat_percobaan": [
+        {"percobaan": i, "sebab": s, "masalah": list(m),
+         "exception": "RuntimeError: x" if s == "panggilan_llm_gagal" else None}
+        for i, (s, m) in enumerate(sebab_dan_masalah, 1)
+    ]}
 
 
 class TestBantu:
@@ -442,7 +453,7 @@ class TestBoilerplate:
 
 
 class TestMuatKasus:
-    def _baris(self, timestamp, panjang, nomor="APP-1"):
+    def _baris(self, timestamp, panjang, nomor="APP-1", diagnostik=None):
         # Fixture amplop back-end terbungkus {"statusCode", "message", "data"}; L2Assessment-nya
         # ada di bawah "data" — itu bentuk yang juga tersimpan di logs/precheck.jsonl.
         req = json.loads(_FIXTURE.read_text(encoding="utf-8"))["data"]
@@ -450,6 +461,7 @@ class TestMuatKasus:
         return json.dumps({
             "timestamp": timestamp,
             "request": req,
+            **({"diagnostik": diagnostik} if diagnostik is not None else {}),
             "response": {"poin": [{
                 "poin_id": "intensitas", "kategori": "Intensitas", "status": "MEMENUHI_SYARAT",
                 "reasoning_pendek": panjang[:60], "reasoning_panjang": panjang, "sitasi": [],
@@ -507,6 +519,56 @@ class TestMuatKasus:
         kasus, _ = muat_kasus(p)
         assert [k.jalur for k in kasus] == ["llm"]
 
+    def test_diagnostik_dibawa_ikut_per_poin(self, tmp_path):
+        """Dibawa lewat jalur pemuatan yang SAMA, bukan jalur kedua — supaya seluruh filter
+        (stub/mock/era lama/--sejak) dan dedup berlaku sama utk `laju_tolak_guardrail`."""
+        riwayat = [{"percobaan": 1, "sebab": "guardrail_menolak", "masalah": ["x kosong."],
+                    "exception": None}]
+        diagnostik = [
+            {"poin_id": "intensitas", "sebab": "berhasil", "riwayat_percobaan": riwayat},
+            {"poin_id": "dampak", "sebab": "berhasil", "riwayat_percobaan": []},
+        ]
+        p = tmp_path / "precheck.jsonl"
+        p.write_text(self._baris("2026-09-20T10:00:00", "KDB berada dalam ambang zona perumahan",
+                                 diagnostik=diagnostik) + "\n", encoding="utf-8")
+
+        kasus, _ = muat_kasus(p)
+
+        assert len(kasus) == 1
+        assert kasus[0].poin_id == "intensitas"
+        assert kasus[0].riwayat_percobaan == riwayat
+
+    def test_diagnosa_none_saat_baris_era_lama(self, tmp_path):
+        p = tmp_path / "precheck.jsonl"
+        p.write_text(self._baris("2026-09-20T10:00:00",
+                                 "KDB berada dalam ambang zona perumahan") + "\n",
+                     encoding="utf-8")
+        kasus, _ = muat_kasus(p)
+        assert kasus[0].diagnosa is None
+        assert kasus[0].riwayat_percobaan == []
+
+    def test_dedup_membawa_diagnostik_jalan_terbaru(self, tmp_path):
+        """Riwayat percobaan harus ikut jalan yang dipilih dedup, bukan tertinggal di jalan lama —
+        kalau tidak, laju tolaknya dihitung dari percobaan permohonan versi lain."""
+        lama = [{"poin_id": "intensitas", "riwayat_percobaan": [
+            {"percobaan": 1, "sebab": "guardrail_menolak", "masalah": ["lama."], "exception": None}]}]
+        baru = [{"poin_id": "intensitas", "riwayat_percobaan": [
+            {"percobaan": 1, "sebab": "berhasil", "masalah": [], "exception": None}]}]
+        p = tmp_path / "precheck.jsonl"
+        p.write_text("\n".join([
+            self._baris("2026-09-01T10:00:00", "narasi lama tentang intensitas zona perumahan",
+                        diagnostik=lama),
+            self._baris("2026-09-20T10:00:00", "narasi baru tentang intensitas zona perumahan",
+                        diagnostik=baru),
+        ]) + "\n", encoding="utf-8")
+
+        kasus, _ = muat_kasus(p)
+
+        assert len(kasus) == 1
+        assert kasus[0].riwayat_percobaan[0]["sebab"] == "berhasil"
+        assert laju_tolak_guardrail(kasus)["percobaan_pertama"] == {"n": 1, "ditolak": 0,
+                                                                   "nilai": 0.0}
+
 
 class TestKetepatanArahGabungan:
     def test_penyebut_gabungan_tidak_memuat_kasus_ambigu(self):
@@ -517,3 +579,152 @@ class TestKetepatanArahGabungan:
         assert h["parameter_intensitas"]["n"] == 0
         assert h["parameter_intensitas"]["ambigu_dilewati"] == 1
         assert h["gabungan"]["nilai"] is None, "tak ada yang bisa dinilai -> bukan 0%"
+
+
+class TestLabelMasalah:
+    """Normalisasi label temuan — tanpa ini sebaran masalah cuma jadi daftar satu-satu, karena
+    pesan guardrail menyisipkan nilai konkret ke dalam tanda kutip."""
+
+    def test_angka_di_dalam_kutip_dikelompokkan(self):
+        a = _label_masalah("Reasoning/saran menyebutkan angka '96,1' yang tidak tercantum")
+        b = _label_masalah("Reasoning/saran menyebutkan angka '48' yang tidak tercantum")
+        assert a == b
+        assert "'X'" in a
+
+    def test_frasa_dan_kategori_dikelompokkan(self):
+        a = _label_masalah("Reasoning menyiratkan dampak tinggi ('risiko besar') padahal kategori aktual 'Rendah'.")
+        b = _label_masalah("Reasoning menyiratkan dampak tinggi ('sangat signifikan') padahal kategori aktual 'Sedang'.")
+        assert a == b
+
+    def test_nomor_aturan_system_prompt_dipertahankan(self):
+        """"aturan #8" (provenance angka) dan "aturan #17" (citation_id/titik koma) adalah cek yang
+        BERBEDA — menormalkan nomornya akan menyatukan temuan yang penanganannya tak sama."""
+        assert "#8" in _label_masalah("dilarang (SYSTEM_PROMPT aturan #8). Angka harus")
+        assert "#17" in _label_masalah("DILARANG (SYSTEM_PROMPT aturan #17). Gunakan tanda baca")
+
+    def test_angka_data_di_luar_kutip_dinormalkan(self):
+        a = _label_masalah("runoff_change_index=0.42 jatuh di band 'Tinggi' menurut threshold_bands")
+        b = _label_masalah("runoff_change_index=1.07 jatuh di band 'Sedang' menurut threshold_bands")
+        assert a == b
+
+
+class TestLajuTolakGuardrail:
+    """`laju_tolak_guardrail` — faithfulness MENTAH model, satu-satunya metrik di modul ini yang
+    menilai keluaran LLM sebelum dikoreksi.
+
+    Dua kesalahan yang paling mudah terjadi di sini dan dikunci di bawah: (1) menghitung poin yang
+    percobaan pertamanya gagal di panggilan LLM / retrieval sebagai "diterima guardrail", sehingga
+    kegagalan infrastruktur terbaca sebagai kepatuhan model; (2) melaporkan 0% saat yang sebenarnya
+    terjadi adalah log belum punya datanya.
+    """
+
+    def test_tanpa_riwayat_melaporkan_tak_terukur_bukan_nol(self):
+        """Seluruh log sebelum 2026-10-09 tak punya `riwayat_percobaan`. Jawaban yang benar adalah
+        "tak terukur"; 0.0% akan terbaca sebagai "guardrail tak pernah menolak apa pun"."""
+        h = laju_tolak_guardrail([_kasus("narasi apa pun"), _kasus("narasi lain")])
+        assert h["terukur"] is False
+        assert h["n_tanpa_riwayat"] == 2
+        assert "percobaan_pertama" not in h, "tanpa data, jangan sajikan angka sama sekali"
+
+    def test_laju_tolak_percobaan_pertama(self):
+        kasus = [
+            _kasus("a", permohonan="APP-1", diagnosa=_riwayat(("guardrail_menolak", ["x kosong."]),
+                                                              ("berhasil", []))),
+            _kasus("b", permohonan="APP-2", diagnosa=_riwayat(("berhasil", []))),
+            _kasus("c", permohonan="APP-3", diagnosa=_riwayat(("berhasil", []))),
+            _kasus("d", permohonan="APP-4", diagnosa=_riwayat(("berhasil", []))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["terukur"] is True
+        assert h["percobaan_pertama"] == {"n": 4, "ditolak": 1, "nilai": 0.25}
+
+    def test_percobaan_pertama_gagal_di_llm_keluar_dari_penyebut(self):
+        """Rate limit/timeout bukan penilaian guardrail. Kalau ikut dihitung sbg "tidak ditolak",
+        laju tolaknya turun setiap kali kuota Groq habis — mengukur cuaca, bukan model."""
+        kasus = [
+            _kasus("a", permohonan="APP-1",
+                   diagnosa=_riwayat(("panggilan_llm_gagal", []), ("berhasil", []))),
+            _kasus("b", permohonan="APP-2",
+                   diagnosa=_riwayat(("guardrail_menolak", ["x kosong."]), ("berhasil", []))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["percobaan_pertama"] == {"n": 1, "ditolak": 1, "nilai": 1.0}
+
+    def test_retrieval_gagal_tanpa_riwayat_tidak_terhitung_lolos(self):
+        kasus = [
+            _kasus("a", permohonan="APP-1", diagnosa={"sebab": "retrieval_provider_gagal",
+                                                      "riwayat_percobaan": []}),
+            _kasus("b", permohonan="APP-2", diagnosa=_riwayat(("berhasil", []))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["percobaan_pertama"] == {"n": 1, "ditolak": 0, "nilai": 0.0}
+        assert h["n_tanpa_riwayat"] == 1
+
+    def test_sebaran_masalah_dinormalkan_dan_hanya_dari_percobaan_pertama(self):
+        kasus = [
+            _kasus("a", permohonan="APP-1", diagnosa=_riwayat(
+                ("guardrail_menolak", ["menyebutkan angka '96,1' yang tidak tercantum"]),
+                ("guardrail_menolak", ["rekomendasi.saran kosong."]),
+                ("berhasil", []))),
+            _kasus("b", permohonan="APP-2", diagnosa=_riwayat(
+                ("guardrail_menolak", ["menyebutkan angka '48' yang tidak tercantum"]),
+                ("berhasil", []))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["n_temuan"] == 2
+        assert list(h["sebaran_masalah"].values()) == [2], \
+            "dua angka berbeda -> satu label setelah normalisasi"
+        assert all("kosong" not in lbl for lbl in h["sebaran_masalah"]), \
+            "temuan percobaan ke-2 tidak boleh ikut: metrik ini tentang keluaran MENTAH"
+
+    def test_pulih_setelah_tolak_mengukur_efek_guardrail(self):
+        kasus = [
+            _kasus("a", permohonan="APP-1", diagnosa=_riwayat(("guardrail_menolak", ["x."]),
+                                                              ("berhasil", []))),
+            _kasus("b", permohonan="APP-2", diagnosa=_riwayat(("guardrail_menolak", ["x."]),
+                                                              ("guardrail_menolak", ["x."]),
+                                                              ("guardrail_menolak", ["x."]))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["pulih_setelah_tolak"] == {"n": 2, "kena": 1, "nilai": 0.5}
+
+    def test_per_percobaan_memisahkan_indeks(self):
+        kasus = [_kasus("a", permohonan="APP-1", diagnosa=_riwayat(
+            ("guardrail_menolak", ["x."]), ("guardrail_menolak", ["x."]), ("berhasil", [])))]
+        h = laju_tolak_guardrail(kasus)
+        assert h["per_percobaan"]["1"] == {"n": 1, "ditolak": 1, "nilai": 1.0}
+        assert h["per_percobaan"]["3"] == {"n": 1, "ditolak": 0, "nilai": 0.0}
+
+    def test_per_poin_dipisah(self):
+        kasus = [
+            _kasus("a", poin_id="itbx", permohonan="APP-1",
+                   diagnosa=_riwayat(("guardrail_menolak", ["x."]), ("berhasil", []))),
+            _kasus("b", poin_id="dampak", permohonan="APP-1",
+                   diagnosa=_riwayat(("berhasil", []))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["per_poin"]["itbx"]["nilai"] == 1.0
+        assert h["per_poin"]["dampak"]["nilai"] == 0.0
+
+    def test_narasi_template_low_confidence_tetap_masuk_hitungan(self):
+        """Poin yang guardrail-nya menolak SEMUA percobaan berakhir sbg template_low_confidence.
+        Membuangnya (spt yang benar dilakukan metrik 1-4) akan menyisakan hanya yang berhasil dan
+        menekan laju tolaknya secara sistematis."""
+        k = _kasus("teks template", permohonan="APP-1",
+                   diagnosa=_riwayat(("guardrail_menolak", ["x."]), ("guardrail_menolak", ["x."])))
+        k.jalur = "template_low_confidence"
+        h = laju_tolak_guardrail([k])
+        assert h["percobaan_pertama"]["n"] == 1
+        assert h["pulih_setelah_tolak"]["nilai"] == 0.0
+
+    def test_riwayat_rusak_diabaikan_tanpa_meledak(self):
+        """Log bisa memuat baris dari versi lain / `diagnostik_rusak` — pembacanya tidak boleh
+        mengasumsikan bentuknya."""
+        kasus = [
+            _kasus("a", permohonan="APP-1", diagnosa={"riwayat_percobaan": "bukan daftar"}),
+            _kasus("b", permohonan="APP-2", diagnosa={"riwayat_percobaan": ["bukan dict", 3]}),
+            _kasus("c", permohonan="APP-3", diagnosa=_riwayat(("berhasil", []))),
+        ]
+        h = laju_tolak_guardrail(kasus)
+        assert h["percobaan_pertama"] == {"n": 1, "ditolak": 0, "nilai": 0.0}
+        assert h["n_tanpa_riwayat"] == 2

@@ -32,6 +32,14 @@ def log_precheck(
     log lama cuma menyimpan request+response akhir sehingga "guardrail menolak", "LLM kena rate
     limit", dan "retrieval kosong" tak terbedakan — tak bisa diperbaiki secara terarah.
     Opsional (default None) supaya pemanggil lama & test tetap jalan tanpa perubahan.
+
+    KUNCINYA SELALU DITULIS, juga saat pemanggil tak memasok apa pun (jadi `[]`). Sebelum ini
+    kuncinya dihilangkan kalau `diagnostik is None`, dan akibatnya ketiadaan kunci punya DUA arti
+    yang tak bisa dipisahkan pembaca mana pun: "baris ini lebih tua dari instrumentasinya"
+    (632 dari 798 baris di logs/precheck.jsonl — seluruhnya sebelum 2026-09-07) versus "pemanggil
+    lupa/memilih tidak memasoknya". Dengan kunci yang selalu ada, ketiadaannya tinggal berarti satu
+    hal — baris era lama — dan metrik yang bersandar pada diagnostik (`eval/metrik_generasi.py`)
+    bisa membuang baris itu dari penyebut dgn alasan yang jelas, bukan menebak.
     """
     path = Path(log_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,9 +48,8 @@ def log_precheck(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "request": request.model_dump(mode="json"),
         "response": response.model_dump(mode="json"),
+        "diagnostik": diagnostik if diagnostik is not None else [],
     }
-    if diagnostik is not None:
-        record["diagnostik"] = diagnostik
 
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")

@@ -727,6 +727,25 @@ class DiagnosaPoin:
     # diukur. Ini murni pengamatan, satu arah keluar.
     teks_ditolak_terakhir: str | None = None
 
+    # Satu entri per percobaan yang BENAR-BENAR dijalankan, berurutan:
+    #   {"percobaan": 1-based, "sebab": "berhasil"|"guardrail_menolak"|"panggilan_llm_gagal",
+    #    "masalah": [label temuan guardrail], "exception": "Type: msg" | None}
+    #
+    # Kenapa `masalah_terakhir` saja tidak cukup (2026-10-09). Field itu menyimpan percobaan
+    # TERAKHIR, jadi begitu sebuah poin lolos di percobaan ke-2 atau ke-3 ia ditimpa jadi `[]` —
+    # terbukti di logs/precheck.jsonl 2026-10-02T06:44:22 (poin intensitas & dampak, percobaan=3,
+    # berhasil=true, masalah_terakhir=[]): guardrail menolak keluaran LLM mentah dua kali di sana
+    # dan alasannya hilang total. Padahal justru itu datanya yang menarik — ia merekam faithfulness
+    # MENTAH model sebelum guardrail, dan dengan itu efek teknis guardrail jadi terukur
+    # (`eval/metrik_generasi.py::laju_tolak_guardrail`), bukan diklaim.
+    #
+    # Percobaan yang GAGAL SAMPAI KE LLM (rate limit/timeout) dicatat dgn `masalah: []` dan
+    # `exception` terisi, SENGAJA tidak dengan `masalah: [str(exc)]` walau teks itulah yang
+    # dikirim balik sbg `catatan_perbaikan`: pembaca yang mengagregasi label `masalah` sedang
+    # menghitung temuan guardrail, dan mencampur pesan exception ke sana akan mengarang label
+    # ("RateLimitError: 429") yang bukan temuan guardrail sama sekali. Pembedaannya ada di `sebab`.
+    riwayat_percobaan: list[dict] = field(default_factory=list)
+
     def sebab(self) -> str:
         """Satu label kasar utk dihitung agregat: kenapa poin ini jatuh ke low_confidence.
 
@@ -822,6 +841,12 @@ def generate_poin_terdiagnosis(
             diagnosa.exception_terakhir = f"{type(exc).__name__}: {exc}"
             masalah = [str(exc)]
             diagnosa.masalah_terakhir = list(masalah)
+            diagnosa.riwayat_percobaan.append({
+                "percobaan": percobaan + 1,
+                "sebab": "panggilan_llm_gagal",
+                "masalah": [],  # lihat DiagnosaPoin.riwayat_percobaan: pesan exception bukan temuan guardrail
+                "exception": diagnosa.exception_terakhir,
+            })
             continue
 
         # Percobaan ini sampai ke LLM & dapat jawaban -> exception percobaan SEBELUMNYA (kalau ada)
@@ -830,6 +855,14 @@ def generate_poin_terdiagnosis(
         poin_bersih, masalah = perbaiki_poin(hasil, poin, chunks, assessment)
         diagnosa.masalah_terakhir = list(masalah)
         diagnosa.teks_ditolak_terakhir = _ringkas_teks_ditolak(poin_bersih) if masalah else None
+        # Dicatat SEBELUM cabang sukses di bawah: percobaan yang lolos pun harus punya entri, kalau
+        # tidak, penyebut "berapa percobaan pertama yang sampai ke guardrail" jadi tak terhitung.
+        diagnosa.riwayat_percobaan.append({
+            "percobaan": percobaan + 1,
+            "sebab": "guardrail_menolak" if masalah else "berhasil",
+            "masalah": list(masalah),
+            "exception": None,
+        })
         if not masalah:
             diagnosa.berhasil = True
             if percobaan > 0:

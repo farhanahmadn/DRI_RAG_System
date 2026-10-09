@@ -668,7 +668,10 @@ def _ringkas_diagnostik_log() -> dict:
             rec = json.loads(l)
         except Exception:
             continue
-        if "diagnostik" not in rec:
+        # `log_precheck` kini SELALU menulis kunci ini (jadi `[]` kalau pemanggil tak memasoknya),
+        # supaya ketiadaannya hanya berarti "baris era lama". Pakai nilainya, bukan keberadaan
+        # kuncinya, kalau tidak baris ber-diagnostik kosong akan masuk `n_permohonan` dgn 0 poin.
+        if not rec.get("diagnostik"):
             continue
         n_rec += 1
         for d in rec["diagnostik"]:
@@ -1411,6 +1414,7 @@ def bangun_html(r: dict) -> str:
         rtg = cg.get("rentang_tanggal_dinilai")
         jl, fn = _genm["sebaran_jalur"], _genm["faithfulness_numerik"]
         ks, ar, bp = _genm["kekhususan"], _genm["ketepatan_arah"], _genm["boilerplate"]
+        lt = _genm.get("laju_tolak_guardrail") or {}
         baris_jalur = "".join(
             f"<tr><td><code>{_esc(pid)}</code></td>"
             f'<td>{_fmt_atribusi({"nilai": e["proporsi_llm"], "n": e["n"], "kena": e["llm"]})}</td>'
@@ -1465,6 +1469,56 @@ def bangun_html(r: dict) -> str:
                 f"<td><b>{sb['median']:.3f}</b></td><td>{sb['maks']:.3f}</td>"
                 f"<td>{sb[kunci_amb]}/{e['n']}</td>"
                 f"<td class='net'>{ss['median']:.3f}</td></tr>")
+        # --- Laju tolak guardrail: satu-satunya angka di bagian ini yang menilai keluaran LLM
+        # SEBELUM dikoreksi. Tanpa `riwayat_percobaan` di log, blok ini sengaja mengatakan TAK
+        # TERUKUR alih-alih 0% — 0% akan terbaca "guardrail tak pernah menolak apa pun".
+        blok_lt = ""
+        if lt:
+            if not lt.get("terukur"):
+                blok_lt = f"""
+  <h3>Laju tolak guardrail &mdash; belum terukur</h3>
+  <div class="peringatan"><b>TAK TERUKUR.</b> {_esc(str(lt.get('alasan')))}
+  ({lt.get('n_tanpa_riwayat', 0)} dari {lt.get('n_kasus_dimuat', 0)} kasus tanpa riwayat
+  percobaan). Dilaporkan begitu, bukan sebagai 0% &mdash; 0% akan terbaca sebagai
+  &ldquo;guardrail tak pernah menolak apa pun&rdquo;.</div>"""
+            else:
+                pp = lt["percobaan_pertama"]
+                baris_lt = (
+                    f"<tr><td><b>Percobaan pertama ditolak guardrail</b></td>"
+                    f"<td>{_fmt_atribusi({'nilai': pp['nilai'], 'n': pp['n'], 'kena': pp['ditolak']})}</td>"
+                    "<td class='net'>keluaran LLM MENTAH, sebelum ada yang mengoreksinya</td></tr>"
+                    f"<tr><td>Dari yang ditolak, akhirnya lolos setelah retry terarah</td>"
+                    f"<td>{_fmt_atribusi(lt['pulih_setelah_tolak'])}</td>"
+                    "<td class='net'>sisanya jatuh ke template low-confidence &mdash; tak ada "
+                    "narasi LLM yang keluar</td></tr>")
+                for pid, e in lt["per_poin"].items():
+                    baris_lt += (
+                        f"<tr><td>&nbsp;&nbsp;&nbsp;&nbsp;<code>{_esc(pid)}</code></td>"
+                        f"<td>{_fmt_atribusi({'nilai': e['nilai'], 'n': e['n'], 'kena': e['ditolak']})}</td>"
+                        "<td class='net'>laju tolak percobaan pertama, poin ini</td></tr>")
+                baris_sebaran = "".join(
+                    f"<tr><td>{jml}&times;</td><td class='net'>{_esc(label)}</td></tr>"
+                    for label, jml in list(lt["sebaran_masalah"].items())[:10])
+                blok_lt = f"""
+  <h3>Laju tolak guardrail &mdash; faithfulness MENTAH, sebelum koreksi</h3>
+  <p class="cat">Seluruh angka di atas menilai narasi yang <b>akhirnya keluar</b>, yaitu yang
+  sudah lolos guardrail &mdash; dengan sendirinya bagus, dan karena itu tak satu pun dari
+  keempatnya bisa menjawab <b>apa gunanya guardrail</b>. Yang di bawah menilai percobaan
+  <b>pertama</b>: apa yang model hasilkan sebelum dikoreksi. Penyebutnya dibatasi ke percobaan
+  yang benar-benar sampai ke guardrail &mdash; kegagalan panggilan LLM (rate limit/timeout) dan
+  kegagalan retrieval dikeluarkan, kalau tidak kegagalan infrastruktur akan terhitung sebagai
+  kepatuhan model. {lt['n_tanpa_riwayat']} dari {lt['n_kasus_dimuat']} kasus tak punya riwayat
+  percobaan (baris log era lama atau retrieval gagal sebelum LLM dipanggil) dan TIDAK masuk
+  penyebut.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang diukur</th></tr></thead>
+    <tbody>{baris_lt}</tbody>
+  </table></div>
+  {f'''<p class="cat">Temuan guardrail di percobaan pertama ({lt["n_temuan"]} temuan; angka &amp;
+  isi tanda kutip dinormalkan supaya label bisa dikelompokkan):</p>
+  <div class="kartu"><table><thead><tr><th>Jumlah</th><th>Label temuan</th></tr></thead>
+  <tbody>{baris_sebaran}</tbody></table></div>''' if baris_sebaran else ""}"""
+
         simpang = ar.get("contoh_menyimpang") or []
         daftar_simpang = "".join(
             f"<li><code>{_esc(e['permohonan'])}</code> &mdash; {_esc(e['poin'])}/"
@@ -1524,7 +1578,8 @@ def bangun_html(r: dict) -> str:
     <thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
     <th>&ge;{bp['ambang']}</th><th>median (status sama)</th></tr></thead>
     <tbody>{baris_bp}</tbody>
-  </table></div>"""
+  </table></div>
+{blok_lt}"""
 
     gen = r.get("generasi") or {}
     blok_gen = ""

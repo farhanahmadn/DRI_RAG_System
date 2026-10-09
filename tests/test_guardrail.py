@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 
+import pytest
+
+from app.reasoning import guardrail as guardrail_module
 from app.reasoning import llm_client as llm_client_module
 from app.reasoning.guardrail import (
     DiagnosaPoin,
@@ -1233,6 +1236,147 @@ class TestGeneratePoinTerdiagnosis:
 
         assert "low_confidence" in caplog.text
         assert "sebab=panggilan_llm_gagal" in caplog.text
+
+
+class TestRiwayatPercobaan:
+    """`DiagnosaPoin.riwayat_percobaan` — alasan penolakan percobaan PERTAMA tidak boleh hilang.
+
+    Kenapa kelas ini ada (2026-10-09). `masalah_terakhir` menyimpan percobaan TERAKHIR, jadi poin
+    yang lolos di percobaan ke-2/ke-3 menimpanya jadi `[]` — terverifikasi di
+    logs/precheck.jsonl 2026-10-02T06:44:22 (intensitas & dampak, percobaan=3, berhasil=true,
+    masalah_terakhir=[]). Yang hilang di situ justru satu-satunya rekaman tentang apa yang
+    guardrail tolak dari keluaran LLM MENTAH, yaitu penyebut bagi
+    `eval/metrik_generasi.py::laju_tolak_guardrail`.
+    """
+
+    def test_tolak_lalu_lolos_tetap_merekam_penolakan_pertama(self, monkeypatch):
+        """Inti perbaikannya: percobaan 1 ditolak guardrail, percobaan 2 lolos. `masalah_terakhir`
+        WAJIB kosong (poin ini memang akhirnya bersih) — dan riwayatnya WAJIB tidak kosong."""
+        n = {"i": 0}
+
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            n["i"] += 1
+            if n["i"] == 1:
+                # Titik koma -> ditolak _cek_tanda_baca_dilarang (aturan #17), bukan exception.
+                return {"reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+                        "reasoning_panjang": "Kegiatan termasuk kategori Bersyarat (B); wajib memenuhi ketentuan.",
+                        "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                        "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
+                        "disclaimer": None}
+            return {"reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+                    "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Bersyarat (B) sesuai ketentuan zona.",
+                    "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                    "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
+                    "disclaimer": None}
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(
+            status="B", fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+        )
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        _, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=2)
+
+        assert diagnosa.berhasil is True
+        assert diagnosa.masalah_terakhir == [], "percobaan terakhir memang bersih"
+        assert [e["percobaan"] for e in diagnosa.riwayat_percobaan] == [1, 2]
+        assert [e["sebab"] for e in diagnosa.riwayat_percobaan] == ["guardrail_menolak", "berhasil"]
+        assert diagnosa.riwayat_percobaan[0]["masalah"], \
+            "alasan penolakan percobaan pertama TIDAK boleh hilang — justru ini datanya"
+        assert any("titik koma" in m for m in diagnosa.riwayat_percobaan[0]["masalah"])
+        assert diagnosa.riwayat_percobaan[1]["masalah"] == []
+
+    def test_lolos_di_percobaan_pertama_punya_satu_entri(self, monkeypatch):
+        """Penyebut `laju_tolak_guardrail` dihitung dari riwayat, jadi percobaan yang LOLOS pun
+        harus punya entri — tanpa itu, "sampai ke guardrail dan diterima" tak terhitung."""
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            return {"reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+                    "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Bersyarat (B) sesuai ketentuan zona.",
+                    "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                    "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
+                    "disclaimer": None}
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(
+            status="B", fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+        )
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        _, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=2)
+
+        assert diagnosa.riwayat_percobaan == [
+            {"percobaan": 1, "sebab": "berhasil", "masalah": [], "exception": None}
+        ]
+
+    def test_ditolak_terus_merekam_tiap_percobaan(self, monkeypatch):
+        def _stub_kosong(prompt, json_schema, *, schema_name="response", system=None,
+                         temperature=0.0, max_tokens=1024):
+            return {"reasoning_pendek": "", "reasoning_panjang": "", "sitasi": [],
+                    "saran": "", "disclaimer": None}
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub_kosong)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        _, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=2)
+
+        assert len(diagnosa.riwayat_percobaan) == 3
+        assert {e["sebab"] for e in diagnosa.riwayat_percobaan} == {"guardrail_menolak"}
+        assert all(e["masalah"] for e in diagnosa.riwayat_percobaan)
+
+    def test_percobaan_yang_gagal_di_llm_tidak_dilabeli_temuan_guardrail(self, monkeypatch):
+        """Exception LLM dicatat dgn `masalah: []` + `exception` terisi. Kalau pesan exception ikut
+        masuk `masalah`, sebaran label di `laju_tolak_guardrail` akan mengarang temuan guardrail
+        bernama "RateLimitError: 429" — dan laju tolaknya ikut salah karena penyebutnya berbeda.
+        Terbukti nyata di log: 8 baris 2026-09-08 memuat `TypeError: build_user_prompt() ...
+        'konteks_induk'` di dalam `masalah_terakhir`, padahal itu bug pengembangan, bukan temuan."""
+        n = {"i": 0}
+
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            n["i"] += 1
+            if n["i"] == 1:
+                raise RuntimeError("simulasi RateLimitError: 429")
+            return {"reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+                    "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Bersyarat (B) sesuai ketentuan zona.",
+                    "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+                    "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
+                    "disclaimer": None}
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(
+            status="B", fakta={"lolos": True, "reason": "x"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+        )
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        _, diagnosa = generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=2)
+
+        assert [e["sebab"] for e in diagnosa.riwayat_percobaan] == ["panggilan_llm_gagal", "berhasil"]
+        assert diagnosa.riwayat_percobaan[0]["masalah"] == []
+        assert "RateLimitError: 429" in diagnosa.riwayat_percobaan[0]["exception"]
+
+    def test_retrieval_gagal_sebelum_llm_meninggalkan_riwayat_kosong(self, monkeypatch):
+        """Retrieval raise -> LLM tak pernah dipanggil, jadi guardrail tak pernah menilai apa pun.
+        Riwayat WAJIB kosong supaya poin ini keluar dari penyebut laju tolak, bukan terhitung
+        sebagai percobaan yang diterima (APP-2026-INNER-01: kuota Jina habis, bukan model lemah)."""
+        def _gagal(*args, **kwargs):
+            raise RuntimeError("Panggilan provider 'jina-embed' gagal setelah 3 percobaan: 403")
+
+        monkeypatch.setattr(guardrail_module, "ambil_chunks_pendukung", _gagal)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"})
+        assessment = _muat_assessment("l2_sample_lolos.json")
+
+        with pytest.raises(RuntimeError):
+            generate_poin_terdiagnosis(poin, MockRetriever(), assessment, max_retry=1)
+
+    def test_default_kosong_bukan_dibagi_antar_instans(self):
+        """`field(default_factory=list)` — dua diagnosa tak boleh berbagi daftar yang sama."""
+        a, b = DiagnosaPoin(poin_id="itbx", berhasil=False), DiagnosaPoin(poin_id="dampak", berhasil=False)
+        a.riwayat_percobaan.append({"percobaan": 1, "sebab": "guardrail_menolak",
+                                    "masalah": ["x"], "exception": None})
+        assert b.riwayat_percobaan == []
 
 
 class TestAngkaDariChunkYangDisitasi:
