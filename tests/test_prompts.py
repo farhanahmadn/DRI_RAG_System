@@ -298,6 +298,95 @@ class TestFaktaIntensitas:
         assert "masih kurang 45 m²" in prompt
 
 
+class TestZonaPemohonDiFaktaIntensitas:
+    """Nama zona/sub-zona pemohon WAJIB ikut ke prompt intensitas, dan WAJIB disebut narasinya.
+
+    Bukti kenapa dikunci: jangkar `zona_pemohon` di `eval/metrik_generasi.py::kekhususan` hanya
+    kena 30% (3/10) di poin intensitas vs 100% (11/11) di itbx, dan sebabnya bukan gaya bahasa —
+    pada seluruh 10 narasi intensitas di log, nama zona pemohon tak pernah sampai ke prompt poin
+    itu. Ambang KDB/KLB/KDH dibaca dari tabel Lampiran VI PER ZONA, jadi narasi tanpa nama zona
+    tidak menjelaskan asal ambangnya dan tak bisa diperiksa pembaca.
+    """
+
+    def _poin_intensitas(self, **kw) -> PoinKonteks:
+        fakta = kw.pop("fakta", {
+            "parameter": {
+                "kdb": {"usulan": 70, "ambang_maks": 60, "ambang_min": None,
+                        "memenuhi": False, "satuan": "persen"},
+            },
+        })
+        return _poin(
+            poin_id="intensitas",
+            kategori="Intensitas Bangunan (KDB/KLB/KDH)",
+            tipe_rekomendasi="numerik",
+            status=kw.pop("status", "MELAMPAUI_BATAS"),
+            fakta=fakta,
+            **kw,
+        )
+
+    def test_nama_zona_induk_dan_subzona_masuk_prompt(self):
+        prompt = build_user_prompt(
+            self._poin_intensitas(zona="Zona Pertanian", zona_subzone="P-1"), [])
+        assert "Zona pemohon: Zona Pertanian, sub-zona P-1" in prompt
+
+    def test_kewajiban_menyebut_zona_dinyatakan_eksplisit(self):
+        prompt = build_user_prompt(
+            self._poin_intensitas(zona="Zona Pertanian", zona_subzone="P-1"), [])
+        assert "WAJIB: sebut nama zona pemohon" in prompt
+        # Alasannya ikut disebut, bukan cuma perintahnya: ambang KDB/KLB/KDH adalah ketentuan
+        # per-zona, dan itulah yang membuat penyebutan zona bisa diperiksa pembaca.
+        assert "PER ZONA" in prompt
+
+    def test_subzona_tak_terkonfirmasi_wajib_zona_induk_dan_dilarang_menebak_kode(self):
+        # Cabang mayoritas (96.4% permohonan tak mengirim rdtr_subzone). Kewajiban baru ini TIDAK
+        # BOLEH jadi tekanan mengarang kode sub-zona presisi — kelas bug yang
+        # CAVEAT_SUBZONA_TAK_TERKONFIRMASI ada untuk mencegah.
+        prompt = build_user_prompt(self._poin_intensitas(zona="Zona Perumahan"), [])
+        assert "Zona pemohon: Zona Perumahan (sub-zona presisi TIDAK dikonfirmasi back-end)" in prompt
+        assert "sebut nama zona INDUK saja" in prompt
+        assert "mengarang kode sub-zona" in prompt
+
+    def test_larangan_menebak_subzona_tak_dikirim_saat_subzona_terkonfirmasi(self):
+        # Tak ada yang perlu ditebak kalau sub-zonanya dikirim back-end — kalimat larangan di sana
+        # cuma membakar token pada prompt yang kuota TPM-nya sudah mepet (Groq 8K/kunci).
+        prompt = build_user_prompt(
+            self._poin_intensitas(zona="Zona Perumahan", zona_subzone="R-3"), [])
+        assert "mengarang kode sub-zona" not in prompt
+
+    def test_tidak_dinilai_sebut_zona_tanpa_mengklaim_ada_ambang(self):
+        # Gate berhenti di ITBX -> tak ada parameter sama sekali. Zona tetap disebut (pembaca perlu
+        # tahu zona mana yang ketentuannya belum diperiksa), tapi prompt JANGAN menyuruh
+        # menjelaskan "asal ambang" yang tak pernah dikutip.
+        prompt = build_user_prompt(
+            self._poin_intensitas(status="Tidak Dinilai", fakta={"dinilai": False},
+                                  zona="Zona Perumahan"), [])
+        assert "Zona pemohon: Zona Perumahan" in prompt
+        assert "belum diperiksa" in prompt
+        assert "ambang KDB/KLB/KDH di bawah berasal" not in prompt
+
+    def test_tanpa_zona_sama_sekali_tak_ada_baris_zona(self):
+        # BE tak mengirim rdtr_zone maupun rdtr_subzone: tak ada nama zona yang sah untuk disebut,
+        # jadi jangan menuntut narasi menyebut sesuatu yang tidak diketahui.
+        prompt = build_user_prompt(self._poin_intensitas(), [])
+        assert "Zona pemohon" not in prompt
+        assert "WAJIB: sebut nama zona pemohon" not in prompt
+
+    def test_poin_lain_tak_kena_kewajiban_zona(self):
+        # Sengaja poin-lokal, BUKAN aturan SYSTEM_PROMPT: di `dampak` ketentuannya pasal prosa
+        # lintas-zona (mis. Pasal 53 kawasan resapan air), jadi menuntut nama zona di sana akan
+        # menandai jawaban yang benar sebagai kurang — alasan yang sama dengan
+        # `metrik_atribusi._POIN_BERZONA` dan `metrik_generasi.kekhususan` (jangkar zona hanya
+        # informasional untuk dampak).
+        for poin_id, kategori in (("itbx", "Klasifikasi Kegiatan (ITBX)"),
+                                  ("dampak", "Dampak Terhadap Lingkungan (Hidrologi)")):
+            poin = _poin(poin_id=poin_id, kategori=kategori,
+                         tipe_rekomendasi="kategorikal" if poin_id == "itbx" else "numerik-mitigasi",
+                         status="I" if poin_id == "itbx" else "Rendah",
+                         fakta={"dinilai": True}, zona="Zona Perumahan", zona_subzone="R-3")
+            prompt = build_user_prompt(poin, [])
+            assert "WAJIB: sebut nama zona pemohon" not in prompt
+
+
 # TestFormatTargetParameter dipindah ke tests/test_calculator.py — format_target_parameter() kini
 # tinggal di app/reasoning/calculator.py (satu sumber kebenaran teks, dipakai prompts.py & juga
 # bangun_langkah_konkret_intensitas/dampak, bukan digandakan di sini).
