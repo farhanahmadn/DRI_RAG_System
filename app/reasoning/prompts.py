@@ -200,12 +200,79 @@ def _angka_prompt(nilai: object) -> str:
     return f"{dibulatkan:.2f}".rstrip("0").rstrip(".")
 
 
+def _baris_zona_intensitas(poin: PoinKonteks, ada_parameter: bool) -> list[str]:
+    """Nama zona/sub-zona pemohon + kewajiban menyebutnya, khusus blok fakta intensitas.
+
+    Kenapa ini ada. Ambang KDB/KLB/KDH bukan angka umum: ia dibaca dari tabel Lampiran VI PER
+    ZONA. Narasi yang tak menyebut zona pemohon karena itu tidak menjelaskan dari mana ambangnya
+    datang, dan pembaca tak punya cara memeriksa apakah ambang yang dipakai memang milik zonanya.
+
+    Terukur, bukan dugaan gaya bahasa: jangkar `zona_pemohon` di `eval/metrik_generasi.py::
+    kekhususan` hanya kena 30% (3/10) di poin intensitas, vs 100% (11/11) di itbx. Sebabnya
+    ditelusuri ke prompt, bukan ke model — pada SELURUH 10 narasi intensitas di log, nama zona
+    maupun kode sub-zona pemohon TIDAK PERNAH muncul di prompt poin itu (`poin.zona` ada di
+    PoinKonteks tapi tak pernah dibaca di sini). Di itbx ia ikut hanya karena menumpang free-text
+    `reason` back-end ("Lolos karena kegiatan Diizinkan (I) di zona Zona Pertanian", APP-2026-2428);
+    `fakta` intensitas tak punya field setara. Tiga narasi intensitas yang kebetulan kena pun
+    mencocoki KODE sub-zona saja ("P-1", APP-2026-2428/-8090/-INNER-01) dan tak pernah nama zona
+    induknya — satu-satunya sumber kode itu di prompt lama adalah teks chunk RAG, bukan fakta
+    permohonannya, jadi kebetulan pun bergantung pada chunk apa yang kebetulan terambil.
+
+    Labelnya sengaja frasa Bahasa Indonesia biasa, BUKAN label kapital/snake_case seperti baris
+    fakta lain di blok ini: aturan #10a/#15 SYSTEM_PROMPT melarang label teknis disalin ke narasi,
+    dan di sini nilai yang WAJIB disalin justru ada di barisnya sendiri — label yang menyerupai
+    nama variabel akan menarik model melanggar aturan itu sambil mematuhi yang ini.
+
+    Tak ada angka baru yang masuk narasi lewat jalan ini, jadi aturan #8 (dan gerbang
+    `guardrail._angka_terlacak_ke_sumber`) tak tersentuh: seluruh kode sub-zona di korpus RDTR
+    Sleman Tengah berakhiran satu digit (R-2, P-1, SPU-3, RTH-7, …) sementara cek provenance hanya
+    memeriksa angka >=2 digit (`_RE_ANGKA_MENCURIGAKAN`).
+    """
+    if not (poin.zona or poin.zona_subzone):
+        return []
+    if poin.status == "Tidak Dinilai" and not poin.zona:
+        # Tanpa nama zona induk, satu-satunya yang bisa disebut adalah kode sub-zona — dan
+        # menyuruh model menyebutnya saat gate berhenti sebelum intensitas dinilai berarti
+        # menuntut presisi atas ketentuan yang tak pernah dikutip sama sekali.
+        return []
+
+    if poin.zona_subzone:
+        baris = f"Zona pemohon: {poin.zona}, sub-zona {poin.zona_subzone}" if poin.zona else \
+            f"Zona pemohon: sub-zona {poin.zona_subzone} (nama zona induk tidak dikirim back-end)"
+    else:
+        baris = f"Zona pemohon: {poin.zona} (sub-zona presisi TIDAK dikonfirmasi back-end)"
+    lines = [baris]
+
+    asal = (
+        "dari mana ambang KDB/KLB/KDH di bawah berasal — ambang itu ketentuan PER ZONA, bukan "
+        "angka umum yang berlaku di seluruh wilayah"
+        if ada_parameter else
+        "poin ini — ketentuan intensitas berbeda antar zona, jadi pembaca perlu tahu zona mana "
+        "yang ketentuannya belum diperiksa"
+    )
+    wajib = f"WAJIB: sebut nama zona pemohon di atas apa adanya saat menjelaskan {asal}."
+    if not poin.zona_subzone:
+        # Senada CAVEAT_SUBZONA_TAK_TERKONFIRMASI (cabang mayoritas: 96.4% permohonan, 425 dari
+        # 441, tak mengirim rdtr_subzone — lihat app/reasoning/generator.py): yang disebut WAJIB
+        # zona INDUK. Kewajiban baru ini tidak boleh berubah jadi tekanan mengarang kode sub-zona
+        # presisi — justru kelas bug yang caveat itu ada untuk mencegah. Larangannya hanya
+        # ditempel di cabang ini: kalau sub-zonanya memang dikonfirmasi, tak ada yang perlu
+        # ditebak dan kalimat tambahan cuma membakar token pada prompt yang TPM-nya sudah mepet.
+        wajib += (
+            " Sub-zona presisinya TIDAK diketahui, jadi sebut nama zona INDUK saja — DILARANG "
+            "menyebut, menebak, atau mengarang kode sub-zona (pola huruf-angka) apa pun."
+        )
+    lines.append(wajib)
+    return lines
+
+
 def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
     # Allowlist eksplisit (app/sanitize.py) — key `poin.fakta` yang tak terdaftar utk poin_id ini
     # DIBUANG sebelum sampai ke prompt LLM; key free-text (mis. reason/keterangan_ketentuan) di-scrub
     # pola PII. Pagar ini, bukan asumsi "fakta pasti bersih", yang mencegah field baru bocor nanti.
     fakta = sanitize.sanitize_fakta(poin.poin_id, poin.fakta)
     lines = [f"STATUS_INTENSITAS: {poin.status}"]
+    lines.extend(_baris_zona_intensitas(poin, bool(fakta.get("parameter"))))
 
     target_map = fakta.get("target") or {}
     for nama, param in (fakta.get("parameter") or {}).items():
