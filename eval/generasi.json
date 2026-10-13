@@ -1,16 +1,16 @@
 {
-  "dibuat": "2026-10-09T02:00:28+00:00",
+  "dibuat": "2026-10-13T04:07:45+00:00",
   "cakupan": {
     "rentang_tanggal_dinilai": [
       "2026-08-03T07:06:47",
-      "2026-10-02T06:44:22"
+      "2026-10-09T06:59:19"
     ],
-    "narasi_dimuat": 60,
-    "narasi_jalur_llm": 40,
-    "permohonan_dinilai": 20,
+    "narasi_dimuat": 63,
+    "narasi_jalur_llm": 35,
+    "permohonan_dinilai": 21,
     "narasi_per_poin": {
-      "dampak": 19,
-      "intensitas": 10,
+      "dampak": 13,
+      "intensitas": 11,
       "itbx": 11
     },
     "status_per_poin": {
@@ -21,12 +21,11 @@
       },
       "intensitas": {
         "Tidak Dinilai": 1,
-        "MELAMPAUI_BATAS": 6,
+        "MELAMPAUI_BATAS": 7,
         "MEMENUHI_SYARAT": 3
       },
       "dampak": {
-        "Tidak Dinilai": 7,
-        "Tinggi": 2,
+        "Tidak Dinilai": 3,
         "Rendah": 5,
         "Sedang": 5
       }
@@ -34,46 +33,50 @@
     "chunk_disitasi_tersedia": 14
   },
   "sebaran_jalur": {
-    "n": 60,
+    "n": 63,
     "total": {
-      "llm": 40,
-      "template_low_confidence": 20
+      "template_versi_lama": 7,
+      "template_low_confidence": 21,
+      "llm": 35
     },
-    "proporsi_llm": 0.6666666666666666,
+    "proporsi_llm": 0.5555555555555556,
     "per_poin": {
       "dampak": {
-        "n": 20,
-        "llm": 19,
-        "template_aman": 0,
+        "n": 21,
+        "llm": 13,
         "template_low_confidence": 1,
-        "proporsi_llm": 0.95
+        "template_versi_lama": 7,
+        "proporsi_llm": 0.6190476190476191
       },
       "intensitas": {
-        "n": 20,
-        "llm": 10,
-        "template_aman": 0,
+        "n": 21,
+        "llm": 11,
         "template_low_confidence": 10,
-        "proporsi_llm": 0.5
+        "proporsi_llm": 0.5238095238095238
       },
       "itbx": {
-        "n": 20,
+        "n": 21,
         "llm": 11,
-        "template_aman": 0,
-        "template_low_confidence": 9,
-        "proporsi_llm": 0.55
+        "template_low_confidence": 10,
+        "proporsi_llm": 0.5238095238095238
       }
+    },
+    "dicurigai_template": {
+      "n_narasi": 0,
+      "n_kelompok": 0,
+      "contoh": []
     }
   },
   "faithfulness_numerik": {
     "terukur": true,
     "per_angka": {
-      "n": 149,
-      "kena": 149,
+      "n": 164,
+      "kena": 164,
       "nilai": 1.0
     },
     "per_narasi": {
-      "n": 40,
-      "kena": 40,
+      "n": 35,
+      "kena": 35,
       "nilai": 1.0
     },
     "per_poin": {
@@ -91,25 +94,25 @@
       },
       "intensitas": {
         "angka": {
-          "n": 102,
-          "kena": 102,
+          "n": 114,
+          "kena": 114,
           "nilai": 1.0
         },
         "narasi": {
-          "n": 10,
-          "kena": 10,
+          "n": 11,
+          "kena": 11,
           "nilai": 1.0
         }
       },
       "dampak": {
         "angka": {
-          "n": 38,
-          "kena": 38,
+          "n": 41,
+          "kena": 41,
           "nilai": 1.0
         },
         "narasi": {
-          "n": 19,
-          "kena": 19,
+          "n": 13,
+          "kena": 13,
           "nilai": 1.0
         }
       }
@@ -118,9 +121,9 @@
   },
   "kekhususan": {
     "semua_jangkar": {
-      "n": 40,
-      "kena": 33,
-      "nilai": 0.825
+      "n": 35,
+      "kena": 27,
+      "nilai": 0.7714285714285715
     },
     "per_poin": {
       "itbx": {
@@ -130,32 +133,32 @@
         "tak_ada_jangkar": 0
       },
       "intensitas": {
-        "n": 10,
+        "n": 11,
         "kena": 3,
-        "nilai": 0.3,
+        "nilai": 0.2727272727272727,
         "tak_ada_jangkar": 0
       },
       "dampak": {
-        "n": 19,
-        "kena": 19,
+        "n": 13,
+        "kena": 13,
         "nilai": 1.0,
         "tak_ada_jangkar": 0
       }
     },
     "per_jangkar": {
       "dampak/kategori_dampak": {
-        "n": 12,
-        "kena": 12,
+        "n": 10,
+        "kena": 10,
         "nilai": 1.0
       },
       "dampak/zona_pemohon (informasional)": {
-        "n": 19,
+        "n": 13,
         "kena": 0,
         "nilai": 0.0
       },
       "intensitas/parameter_kdb_gagal": {
-        "n": 5,
-        "kena": 5,
+        "n": 6,
+        "kena": 6,
         "nilai": 1.0
       },
       "intensitas/parameter_kdb_lolos": {
@@ -184,9 +187,9 @@
         "nilai": 1.0
       },
       "intensitas/zona_pemohon": {
-        "n": 10,
+        "n": 11,
         "kena": 3,
-        "nilai": 0.3
+        "nilai": 0.2727272727272727
       },
       "itbx/kbli_diusulkan (informasional)": {
         "n": 11,
@@ -213,6 +216,15 @@
           "zona_pemohon"
         ],
         "kutipan_narasi": "Dalam penentuan intensitas bangunan, perlu mempertimbangkan beberapa faktor seperti Koefisien Dasar Bangunan (KDB), Koefisien Lantai Bangunan (KLB), dan ketinggian bangunan. Namun, karena STATUS_INTEN"
+      },
+      {
+        "permohonan": "APP-2026-0095",
+        "timestamp": "2026-10-09T06:59:19",
+        "poin": "intensitas",
+        "jangkar_hilang": [
+          "zona_pemohon"
+        ],
+        "kutipan_narasi": "**Melampaui Batas** karena **KDB 69.64% > 60%** yang merupakan ambang maksimal yang ditetapkan. KLB usulan 5.57 berada di bawah ambang maksimal 8, dan KDH usulan 60.52% melebihi ambang minimum 30%, se"
       },
       {
         "permohonan": "APP-2026-2850",
@@ -272,15 +284,15 @@
   },
   "ketepatan_arah": {
     "gabungan": {
-      "n": 25,
-      "kena": 24,
-      "nilai": 0.96
+      "n": 26,
+      "kena": 25,
+      "nilai": 0.9615384615384616
     },
     "parameter_intensitas": {
-      "n": 18,
-      "kena": 18,
+      "n": 19,
+      "kena": 19,
       "nilai": 1.0,
-      "ambigu_dilewati": 5
+      "ambigu_dilewati": 6
     },
     "mitigasi_dampak": {
       "n": 4,
@@ -324,11 +336,11 @@
         }
       },
       "intensitas": {
-        "n": 10,
+        "n": 11,
         "status_berbeda": {
-          "median": 0.015566323440339189,
-          "p90": 0.029629629629629627,
-          "maks": 0.02962962962962963,
+          "median": 0.015748031496062992,
+          "p90": 0.03225806451612903,
+          "maks": 0.03225806451612903,
           "n_di_atas_0.5": 0,
           "proporsi_di_atas_ambang": 0.0
         },
@@ -338,49 +350,90 @@
         }
       },
       "dampak": {
-        "n": 19,
+        "n": 13,
         "status_berbeda": {
-          "median": 0.12886597938144329,
-          "p90": 0.7222222222222222,
-          "maks": 0.7222222222222222,
-          "n_di_atas_0.5": 7,
-          "proporsi_di_atas_ambang": 0.3684210526315789
+          "median": 0.104,
+          "p90": 0.2017543859649123,
+          "maks": 0.20175438596491227,
+          "n_di_atas_0.5": 0,
+          "proporsi_di_atas_ambang": 0.0
         },
         "status_sama": {
-          "median": 0.20689655172413793,
-          "maks": 1.0
+          "median": 0.1651376146788991,
+          "maks": 0.6336633663366337
         }
       }
     },
-    "contoh_paling_mirip": [
-      {
-        "poin": "dampak",
-        "kemiripan": 0.722,
-        "a": {
-          "permohonan": "904",
-          "status": "Tinggi",
-          "kutipan": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Tata Guna Lahan' (dampak) setelah beberapa kali percobaan. Status (Tinggi) tetap ber"
-        },
-        "b": {
-          "permohonan": "906",
-          "status": "Rendah",
-          "kutipan": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Tata Guna Lahan' (dampak) setelah beberapa kali percobaan. Status (Rendah) tetap ber"
-        }
-      }
-    ]
+    "contoh_paling_mirip": []
   },
   "laju_tolak_guardrail": {
-    "terukur": false,
-    "alasan": "tak ada baris log dgn `diagnostik[].riwayat_percobaan` — instrumentasinya baru (2026-10-09); jalankan precheck sekali lagi lalu ulangi",
-    "n_kasus_dimuat": 60,
-    "n_tanpa_riwayat": 60
+    "terukur": true,
+    "n_kasus_dimuat": 63,
+    "n_tanpa_riwayat": 60,
+    "percobaan_pertama": {
+      "n": 3,
+      "ditolak": 1,
+      "nilai": 0.3333333333333333
+    },
+    "per_poin": {
+      "dampak": {
+        "n": 1,
+        "ditolak": 0,
+        "nilai": 0.0
+      },
+      "intensitas": {
+        "n": 1,
+        "ditolak": 0,
+        "nilai": 0.0
+      },
+      "itbx": {
+        "n": 1,
+        "ditolak": 1,
+        "nilai": 1.0
+      }
+    },
+    "per_percobaan": {
+      "1": {
+        "n": 3,
+        "ditolak": 1,
+        "nilai": 0.3333333333333333
+      },
+      "3": {
+        "n": 1,
+        "ditolak": 1,
+        "nilai": 1.0
+      }
+    },
+    "pulih_setelah_tolak": {
+      "n": 1,
+      "kena": 0,
+      "nilai": 0.0
+    },
+    "n_temuan": 2,
+    "sebaran_masalah": {
+      "Reasoning tidak menegaskan larangan ('X'/'X'/dst tidak ditemukan) padahal status ITBX = X — verdict harus dinyatakan jelas.": 1,
+      "Reasoning/saran menyebutkan angka 'X' yang tidak tercantum di fakta sumber poin ini — dilarang (SYSTEM_PROMPT aturan #8). Angka harus berasal dari calculator/ba": 1
+    },
+    "contoh": [
+      {
+        "permohonan": "APP-2026-0095",
+        "timestamp": "2026-10-09T06:59:19",
+        "poin": "itbx",
+        "percobaan_terpakai": 3,
+        "akhirnya_lolos": false,
+        "masalah_percobaan_pertama": [
+          "Reasoning tidak menegaskan larangan ('X'/'X'/dst tidak ditemukan) padahal status ITBX = X — verdict harus dinyatakan jelas.",
+          "Reasoning/saran menyebutkan angka 'X' yang tidak tercantum di fakta sumber poin ini — dilarang (SYSTEM_PROMPT aturan #8). Angka harus berasal dari calculator/ba"
+        ]
+      }
+    ]
   },
   "berkas_log": "precheck.jsonl",
   "sejak": null,
   "dilewati": {
     "era 8-indikator lama": 309,
     "MockRetriever (replay/test lokal)": 34,
-    "narasi stub (pytest/fixture)": 355,
-    "jalan ulang permohonan yg sama (dedup)": 258
+    "narasi stub (pytest/fixture)": 364,
+    "jalan ulang permohonan yg sama (dedup)": 261
   }
 }

@@ -1,34 +1,34 @@
 {
-  "dibuat": "2026-10-05T08:40:24+00:00",
+  "dibuat": "2026-10-13T04:08:48+00:00",
   "cakupan": {
     "rentang_tanggal_dinilai": [
       "2026-07-30T07:22:09",
-      "2026-10-02T06:44:22"
+      "2026-10-09T06:59:19"
     ],
-    "permohonan_era_sekarang": 480,
-    "permohonan_retriever_nyata": 109,
-    "permohonan_dari_mock": 371,
-    "sitasi_dinilai": 289,
+    "permohonan_era_sekarang": 506,
+    "permohonan_retriever_nyata": 111,
+    "permohonan_dari_mock": 395,
+    "sitasi_dinilai": 293,
     "sitasi_per_jenis_id": {
-      "korpus": 238,
-      "anchor": 51
+      "korpus": 240,
+      "anchor": 53
     },
     "chunk_tersedia_dari_db": 19
   },
   "presisi_korpus": {
-    "n": 238,
-    "kena": 238,
+    "n": 240,
+    "kena": 240,
     "nilai": 1.0
   },
   "presisi_anchor": {
-    "n": 51,
-    "kena": 51,
+    "n": 53,
+    "kena": 53,
     "nilai": 1.0
   },
   "groundedness_kutipan": {
-    "n": 238,
-    "kena": 234,
-    "nilai": 0.9831932773109243,
+    "n": 240,
+    "kena": 236,
+    "nilai": 0.9833333333333333,
     "kutipan_judul_dokumen": 2,
     "kutipan_terlalu_pendek_dilewati": 0
   },
@@ -49,14 +49,14 @@
       }
     },
     "dilewati": {
-      "intensitas: tak ada sitasi ber-id korpus utk dinilai": 66,
+      "intensitas: tak ada sitasi ber-id korpus utk dinilai": 68,
       "intensitas: poin tak dinilai/absen": 1,
-      "itbx: tak ada sitasi ber-id korpus utk dinilai": 85
+      "itbx: tak ada sitasi ber-id korpus utk dinilai": 87
     }
   },
   "kesepakatan_flag_terverifikasi": {
-    "n": 238,
-    "sepakat": 238,
+    "n": 240,
+    "sepakat": 240,
     "beda": 0,
     "nilai": 1.0
   },

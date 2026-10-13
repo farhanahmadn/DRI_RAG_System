@@ -194,11 +194,11 @@ Ini diperiksa langsung dari jawaban yang sudah pernah dikeluarkan sistem.</p>
 <div class="blok">
       <table class="tabel">
         <thead><tr><th>Yang diperiksa</th><th></th><th>Hasil</th><th></th></tr></thead>
-        <tbody><tr><td><b>Pasal yang dirujuk benar-benar ada</b><span class="th-ket">Tidak ada rujukan karangan. Setiap nomor pasal yang disebut bisa dibuka.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:150px"></span></span></td><td class="angka-besar">100.0%</td><td class="netral">dari 238 sitasi</td></tr><tr><td><b>Kutipannya benar-benar ada di pasal itu</b><span class="th-ket">Teks yang dikutip memang tertulis di pasal yang dirujuk, bukan dirangkai sendiri.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:147px"></span></span></td><td class="angka-besar">98.3%</td><td class="netral">dari 238 sitasi</td></tr><tr><td><b>Rujukan dari back-end dipakai dengan benar</b><span class="th-ket">Pasal yang dikirim sistem lain tidak tertukar atau salah nomor.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:150px"></span></span></td><td class="angka-besar">100.0%</td><td class="netral">dari 51 sitasi</td></tr></tbody>
+        <tbody><tr><td><b>Pasal yang dirujuk benar-benar ada</b><span class="th-ket">Tidak ada rujukan karangan. Setiap nomor pasal yang disebut bisa dibuka.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:150px"></span></span></td><td class="angka-besar">100.0%</td><td class="netral">dari 240 sitasi</td></tr><tr><td><b>Kutipannya benar-benar ada di pasal itu</b><span class="th-ket">Teks yang dikutip memang tertulis di pasal yang dirujuk, bukan dirangkai sendiri.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:148px"></span></span></td><td class="angka-besar">98.3%</td><td class="netral">dari 240 sitasi</td></tr><tr><td><b>Rujukan dari back-end dipakai dengan benar</b><span class="th-ket">Pasal yang dikirim sistem lain tidak tertukar atau salah nomor.</span></td><td><span class="bar" style="width:150px"><span class="bar-isi baik" style="width:150px"></span></span></td><td class="angka-besar">100.0%</td><td class="netral">dari 53 sitasi</td></tr></tbody>
       </table>
       <p class="ket"><b>Yang tersisa:</b> 2 kutipan berisi judul peraturannya, bukan isi pasalnya. Rujukannya benar, tapi kutipannya tidak menjelaskan apa pun.</p>
-      <p class="ket">Diperiksa dari <b>109</b> permohonan nyata
-      (289 sitasi). 371 permohonan lain di catatan
+      <p class="ket">Diperiksa dari <b>111</b> permohonan nyata
+      (293 sitasi). 395 permohonan lain di catatan
       sistem berasal dari pengujian internal, bukan pemohon sungguhan, dan sengaja tidak dihitung.</p></div>
 
 
@@ -209,9 +209,9 @@ membahas permohonan yang ditanyakan &mdash; bukan kalimat umum yang cocok untuk 
 saja. Ketiganya diperiksa <b>secara otomatis</b> dari jawaban yang sudah pernah
 dikeluarkan sistem, tanpa penilaian manusia dan tanpa meminta mesin lain menilai.</p>
 <div class="blok"><table>
-<tbody><tr><td>Tidak mengarang angka</td><td class="ang"><b>100%</b> <span class="ket">dari 40 jawaban</span></td><td class="ket">setiap angka dalam penjelasan dilacak ke data permohonan, pasal yang dikutip, atau hasil hitungan sistem &mdash; angka yang tak punya sumber ditolak</td></tr><tr><td>Menjawab permohonan ini, bukan jawaban umum</td><td class="ang"><b>82%</b> <span class="ket">dari 40 jawaban</span></td><td class="ket">penjelasan menyebut zona, kegiatan, atau parameter milik pemohon ini</td></tr><tr><td>Arah kesimpulan sesuai data</td><td class="ang"><b>96%</b> <span class="ket">dari 25 jawaban</span></td><td class="ket">kalau data menyatakan melampaui batas, penjelasannya tidak boleh berbunyi memenuhi &mdash; dan sebaliknya</td></tr></tbody></table>
-<p class="ket">Diperiksa pada <b>40 jawaban</b> dari
-<b>20 permohonan</b> yang tercatat. Jumlah ini kecil karena catatan
+<tbody><tr><td>Tidak mengarang angka</td><td class="ang"><b>100%</b> <span class="ket">dari 35 jawaban</span></td><td class="ket">setiap angka dalam penjelasan dilacak ke data permohonan, pasal yang dikutip, atau hasil hitungan sistem &mdash; angka yang tak punya sumber ditolak</td></tr><tr><td>Menjawab permohonan ini, bukan jawaban umum</td><td class="ang"><b>77%</b> <span class="ket">dari 35 jawaban</span></td><td class="ket">penjelasan menyebut zona, kegiatan, atau parameter milik pemohon ini</td></tr><tr><td>Arah kesimpulan sesuai data</td><td class="ang"><b>96%</b> <span class="ket">dari 26 jawaban</span></td><td class="ket">kalau data menyatakan melampaui batas, penjelasannya tidak boleh berbunyi memenuhi &mdash; dan sebaliknya</td></tr></tbody></table>
+<p class="ket">Diperiksa pada <b>35 jawaban</b> dari
+<b>21 permohonan</b> yang tercatat. Jumlah ini kecil karena catatan
 sistem sebagian besar berisi pengujian internal, dan jawaban yang dihasilkan template
 cadangan (bukan mesin penjawab) sengaja tidak ikut dinilai.</p></div>
 
@@ -259,7 +259,7 @@ model pencari: jina-embeddings-v3 &middot;
 model pemeringkat: jina-reranker-v3 &middot;
 model penjawab: openai/gpt-oss-20b<br>
 Bobot penggunaan dihitung dari 483 permohonan tercatat.
-Dokumen dibuat 2026-10-09 03:47.
+Dokumen dibuat 2026-10-13 11:09.
 </div>
 
 </div></body></html>

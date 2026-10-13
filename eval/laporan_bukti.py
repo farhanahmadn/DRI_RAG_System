@@ -221,6 +221,8 @@ def _blok_generasi(gm: dict | None) -> tuple[str, str]:
     """
     if not gm or not (gm.get("cakupan") or {}).get("narasi_jalur_llm"):
         return "", ""
+    from eval.eval_rag import _sisa_jalur
+
     c, jl = gm["cakupan"], gm["sebaran_jalur"]
     fn, ks, ar = gm["faithfulness_numerik"], gm["kekhususan"], gm["ketepatan_arah"]
     bp = gm["boilerplate"]
@@ -252,9 +254,26 @@ def _blok_generasi(gm: dict | None) -> tuple[str, str]:
     baris_jl = "".join(
         f"<tr><td><code>{_e(pid)}</code></td>"
         f"<td><b>{e['proporsi_llm']:.0%}</b> <span class='ci'>{e['llm']}/{e['n']}</span></td>"
-        f"<td class='cat'>{e['template_low_confidence']} template low-confidence, "
-        f"{e['template_aman']} template aman</td></tr>"
+        # Label jalur diturunkan dari data (lihat eval_rag._sisa_jalur) — daftarnya bertambah
+        # seiring temuan, jadi kunci tetap di sini akan jadi KeyError.
+        f"<td class='cat'>{_e(_sisa_jalur(e)) or '&mdash;'}</td></tr>"
         for pid, e in jl["per_poin"].items())
+    # Baris total disorot: ia penyebut bagi seluruh metrik di bagian ini, dan tanpanya pembaca
+    # tak tahu berapa bagian keluaran yang sesungguhnya berasal dari model.
+    baris_jl += (
+        f'<tr class="sorot"><td><b>Seluruh poin</b></td>'
+        f'<td><b>{jl["proporsi_llm"]:.1%}</b> '
+        f'<span class="ci">{jl["total"].get("llm", 0)}/{jl["n"]}</span></td>'
+        f"<td class='cat'>{_e(_sisa_jalur({**jl['total'], 'n': jl['n']})) or '&mdash;'}</td></tr>")
+    dct = jl.get("dicurigai_template") or {}
+    catatan_jaring = (
+        f'<div class="catat"><b>Jaring pengaman menyala:</b> {dct["n_narasi"]} narasi berlabel '
+        f'<code>llm</code> teksnya identik lintas-permohonan ({dct["n_kelompok"]} kelompok) '
+        "&mdash; hampir pasti ada versi template yang belum dikenali, sehingga angka di bawah "
+        "terlalu optimistis.</div>"
+        if dct.get("n_narasi") else
+        '<p class="cat"><b>Jaring pengaman:</b> tidak ada narasi <code>llm</code> yang teksnya '
+        "identik lintas-permohonan &mdash; tak ada indikasi versi template lain yang lolos.</p>")
 
     kunci = f"n_di_atas_{bp['ambang']}"
     baris_bp = ""
@@ -346,6 +365,7 @@ template &mdash; terbukti saat metrik ini pertama dijalankan: satu teks template
 <div class="blok"><table>
 <thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
 <tbody>{baris_jl}</tbody></table></div>
+{catatan_jaring}
 <h3>Metrik mutu (hanya narasi jalur LLM)</h3>
 <div class="blok"><table>
 <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang dijamin</th></tr></thead>

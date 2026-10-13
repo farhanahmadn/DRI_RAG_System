@@ -89,6 +89,7 @@ import statistics
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -138,6 +139,9 @@ _JENDELA_PARAMETER = 90
 # near-duplicate; DITETAPKAN DI SINI sebelum distribusinya dilihat, supaya bukan hasil penyetelan.
 _AMBANG_MIRIP = 0.5
 _N_GRAM = 5
+
+# Batas waktu koneksi DB (detik). Lihat `_muat_chunks_disitasi` kenapa ini wajib ada.
+_TIMEOUT_DB_S = 8
 
 _NEGATOR = re.compile(r"\b(tidak|belum|bukan|tanpa|non|kurang)\b")
 
@@ -259,8 +263,66 @@ def _proporsi(pembilang: int, penyebut: int) -> float | None:
 # ---------------------------------------------------------------------------
 
 
+# Nilai pengganti untuk membangun KERANGKA template. Harus huruf-kecil alfanumerik supaya lolos
+# `_normalisasi` utuh sebagai satu token, dan cukup aneh supaya tak mungkin muncul di narasi asli.
+_PENGGANTI = ("zzkategoritemplatezz", "zzpoinidtemplatezz", "zzstatustemplatezz",
+              "zzlimitationstemplatezz")
+_RE_PENGGANTI = re.compile("(" + "|".join(_PENGGANTI) + ")")
+
+
+@lru_cache(maxsize=1)
+def _kerangka_template() -> tuple[re.Pattern[str], ...]:
+    """Regex KERANGKA tiap teks template, dengan nilai yang disubstitusikan dijadikan wildcard.
+
+    KENAPA KERANGKA, BUKAN TEKS UTUH. `_jalur_narasi` mula-mula membandingkan narasi tersimpan
+    dengan template yang dibangkitkan ulang dari konteks hari ini. Itu benar untuk entri baru, tapi
+    gagal untuk entri lama — dan bukan karena kerangka templatenya berubah, melainkan karena
+    NILAI yang disubstitusikan ke dalamnya berubah. Dua kasus nyata di log:
+      - `kategori` poin dampak berganti nama: "Dampak Tata Guna Lahan" (historis) ->
+        "Dampak terhadap Lingkungan Hidrologi" (sekarang). Teks `template_aman` sendiri tak berubah
+        sedikit pun, tapi perbandingan teks-utuh tetap gagal.
+      - `template_low_confidence` kini bercabang pada `status == "Tidak Dinilai"` (perbaikan
+        APP-2026-2428), sehingga entri Agustus yang ditulis cabang generik tak lagi cocok.
+    Akibatnya 7 narasi `dampak` yang sebenarnya template terhitung sebagai keluaran LLM, dan itu
+    menggelembungkan `sebaran_jalur` (66,7% vs 55,6% yang benar), `kekhususan` (82,5% vs 77,1%),
+    serta MENGARANG temuan boilerplate: 7 dari 19 di atas ambang, padahal yang dibandingkan adalah
+    teks template dengan teks template. Angka sebenarnya 0 dari 13.
+
+    Kerangkanya diturunkan dari fungsi templatenya SENDIRI dengan nilai pengganti, bukan dari daftar
+    string beku — jadi ia ikut kalau kerangkanya diubah, dan toleran terhadap pergeseran nilai.
+    Dibangkitkan untuk tiap kombinasi cabang yang memengaruhi teks: status "Tidak Dinilai" vs bukan,
+    dan `fakta['limitations']` terisi vs kosong (lihat `generator._saran_tidak_dinilai`).
+
+    BATAS YANG TERSISA: kalau KERANGKA-nya sendiri yang nanti diubah, entri lama tak akan cocok
+    lagi di sini. Jaring pengamannya `sebaran_jalur()["dicurigai_template"]` — narasi berlabel
+    "llm" yang teksnya identik di dua permohonan berbeda. Itu memunculkan celahnya, bukan
+    menyembunyikannya.
+    """
+    pola: dict[str, re.Pattern[str]] = {}
+    for status in (_PENGGANTI[2], "Tidak Dinilai"):
+        for fakta in ({"limitations": _PENGGANTI[3]}, {}):
+            konteks = PoinKonteks(
+                poin_id=_PENGGANTI[1], kategori=_PENGGANTI[0],
+                tipe_rekomendasi="kategorikal", status=status, fakta=fakta, dasar_hukum=[],
+            )
+            for fn in (template_aman, template_low_confidence):
+                try:
+                    teks = _normalisasi(fn(konteks).reasoning_panjang)
+                except Exception:
+                    continue
+                if not teks:
+                    continue
+                bagian = [
+                    ".+?" if p in _PENGGANTI else re.escape(p)
+                    for p in _RE_PENGGANTI.split(teks) if p
+                ]
+                mentah = "^" + "".join(bagian) + "$"
+                pola.setdefault(mentah, re.compile(mentah))
+    return tuple(pola.values())
+
+
 def _jalur_narasi(konteks: PoinKonteks, keluaran: PoinOutput) -> str:
-    """"llm" | "template_aman" | "template_low_confidence".
+    """"llm" | "template_aman" | "template_low_confidence" | "template_versi_lama".
 
     KENAPA INI WAJIB ADA. Tidak semua narasi di log berasal dari LLM. `app/reasoning/templates.py`
     menghasilkan dua teks DETERMINISTIK tanpa memanggil model sama sekali: `template_aman` untuk
@@ -273,6 +335,11 @@ def _jalur_narasi(konteks: PoinKonteks, keluaran: PoinOutput) -> str:
     Deteksinya membangkitkan ulang template dari `PoinKonteks` yang sama lalu membandingkan teksnya
     — BUKAN mencocokkan string yang disalin ke sini. Kalau templatenya diubah, deteksi ini ikut
     berubah sendiri, ketimbang diam-diam mulai menganggap teks template sebagai keluaran LLM.
+
+    Dua tahap. Pertama perbandingan teks UTUH, yang menjawab persis template mana yang dipakai.
+    Kalau gagal, perbandingan KERANGKA (`_kerangka_template`, lihat docstring-nya untuk bukti
+    kenapa tahap ini wajib ada) — ia mengenali teks template yang nilai substitusinya sudah
+    bergeser, dan dilabeli terpisah supaya laporan jujur soal asalnya.
     """
     narasi = _normalisasi(keluaran.reasoning_panjang)
     if not narasi:
@@ -284,6 +351,8 @@ def _jalur_narasi(konteks: PoinKonteks, keluaran: PoinOutput) -> str:
                 return nama
         except Exception:
             continue
+    if any(p.match(narasi) for p in _kerangka_template()):
+        return "template_versi_lama"
     return "llm"
 
 
@@ -426,6 +495,11 @@ def _muat_chunks_disitasi(ids: set[str]) -> dict[str, Chunk]:
     Tanpa DB, `faithfulness_numerik` dilaporkan sebagai TAK TERUKUR, bukan dihitung tanpa teks
     chunk — menjalankan cek itu tanpa `sumber` dari chunk akan menolak angka yang sah dan
     menghasilkan laju lolos yang terlalu rendah, yaitu angka yang salah dan bukan angka yang hilang.
+
+    `connect_timeout` WAJIB ada. Tanpa itu `psycopg.connect` menggantung sampai batas waktu OS
+    ketika Docker/Postgres mati — terukur: modul ini sempat menggantung >120 detik dan dihentikan
+    paksa, padahal jawaban yang benar ("tak terukur") sudah pasti sejak detik pertama. Degradasi
+    yang cepat dan jujur lebih baik daripada proses yang membeku tanpa keterangan.
     """
     if not ids:
         return {}
@@ -436,7 +510,7 @@ def _muat_chunks_disitasi(ids: set[str]) -> dict[str, Chunk]:
     try:
         import psycopg
 
-        with psycopg.connect(dsn) as conn:
+        with psycopg.connect(dsn, connect_timeout=_TIMEOUT_DB_S) as conn:
             baris = conn.execute(
                 "SELECT id, level, teks, dokumen, pasal, ayat, zona FROM chunks WHERE id = ANY(%s)",
                 (sorted(ids),),
@@ -1020,15 +1094,34 @@ def sebaran_jalur(kasus: list[Kasus]) -> dict:
         per_poin.setdefault(k.poin_id, Counter())[k.jalur] += 1
     total = Counter(k.jalur for k in kasus)
     n = len(kasus)
+
+    # Jaring pengaman atas batas `_kerangka_template`: narasi yang MASIH berlabel "llm" tapi
+    # teksnya identik di dua permohonan BERBEDA. Narasi LLM asli tak pernah begitu — terukur,
+    # tetangga terdekat lintas-permohonan untuk tiap permohonan nyata ada di 0,02-0,20. Jadi
+    # angka tak-nol di sini berarti ada versi template yang belum dikenali, dan laporan harus
+    # mengatakannya alih-alih diam.
+    per_teks: dict[str, set[str]] = {}
+    for k in kasus:
+        if k.jalur != "llm":
+            continue
+        per_teks.setdefault(_normalisasi(k.keluaran.reasoning_panjang), set()).add(k.permohonan)
+    dicurigai = {t: sorted(a) for t, a in per_teks.items() if len(a) > 1}
+
     return {
         "n": n,
         "total": dict(total),
         "proporsi_llm": _proporsi(total.get("llm", 0), n),
         "per_poin": {
-            p: {"n": sum(c.values()), **{j: c.get(j, 0) for j in
-                                         ("llm", "template_aman", "template_low_confidence")},
+            p: {"n": sum(c.values()), "llm": c.get("llm", 0),
+                **{j: v for j, v in sorted(c.items()) if j != "llm"},
                 "proporsi_llm": _proporsi(c.get("llm", 0), sum(c.values()))}
             for p, c in sorted(per_poin.items())
+        },
+        "dicurigai_template": {
+            "n_narasi": sum(len(a) for a in dicurigai.values()),
+            "n_kelompok": len(dicurigai),
+            "contoh": [{"permohonan": a, "kutipan": t[:160]}
+                       for t, a in sorted(dicurigai.items(), key=lambda x: -len(x[1]))[:5]],
         },
     }
 
@@ -1087,8 +1180,18 @@ def cetak(h: dict, lewat: dict) -> None:
     print(f"  narasi dari LLM           {_pct({'nilai': j['proporsi_llm']}):>10s}   "
           f"(n={j['n']})  {j['total']}")
     for p, e in j["per_poin"].items():
-        print(f"    {p:11s} {_pct({'nilai': e['proporsi_llm']}):>10s}  (llm={e['llm']}, "
-              f"aman={e['template_aman']}, low_conf={e['template_low_confidence']})")
+        lain = ", ".join(f"{k}={v}" for k, v in e.items()
+                         if k not in ("n", "llm", "proporsi_llm"))
+        print(f"    {p:11s} {_pct({'nilai': e['proporsi_llm']}):>10s}  (llm={e['llm']}"
+              f"{', ' + lain if lain else ''})")
+    dc = j.get("dicurigai_template") or {}
+    if dc.get("n_narasi"):
+        print(f"  !! {dc['n_narasi']} narasi berlabel 'llm' teksnya IDENTIK lintas-permohonan "
+              f"({dc['n_kelompok']} kelompok) — kemungkinan versi template yang belum dikenali:")
+        for e in dc["contoh"][:3]:
+            print(f"     {e['permohonan']}: {e['kutipan'][:110]}")
+    else:
+        print("  (jaring pengaman: tak ada narasi 'llm' yang teksnya identik lintas-permohonan)")
 
     f = h["faithfulness_numerik"]
     print("\n=== 1. FAITHFULNESS NUMERIK (replay cek provenance produksi) ===")

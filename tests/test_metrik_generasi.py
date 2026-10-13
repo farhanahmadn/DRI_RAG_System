@@ -357,6 +357,150 @@ class TestJalurNarasi:
         assert kekhususan([k for k in [tmpl] if k.jalur == "llm"])["semua_jangkar"]["nilai"] is None
 
 
+class TestKerangkaTemplateVersiLama:
+    """Teks template yang NILAI substitusinya sudah bergeser harus tetap terdeteksi.
+
+    Regresi yang paling mahal di modul ini. Perbandingan teks-utuh saja membiarkan 7 narasi
+    `dampak` lolos sebagai keluaran LLM, dan itu menggelembungkan `sebaran_jalur` (66,7% vs 55,6%),
+    `kekhususan` (82,5% vs 77,1%), serta MENGARANG temuan boilerplate 7/19 yang sebenarnya 0/13.
+    Sebabnya bukan kerangka template yang berubah, melainkan nilai yang disubstitusikan ke dalamnya.
+    """
+
+    def test_kategori_poin_berganti_nama_tetap_terdeteksi(self):
+        """Kasus nyata: `kategori` dampak berganti "Dampak Tata Guna Lahan" -> "Dampak terhadap
+        Lingkungan Hidrologi". Teks `template_aman` sendiri tak berubah sedikit pun."""
+        from app.reasoning.templates import template_aman
+
+        lama = _konteks(poin_id="dampak", kategori="Dampak Tata Guna Lahan",
+                        tipe_rekomendasi="numerik-mitigasi", status="Sedang",
+                        fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}})
+        sekarang = _konteks(poin_id="dampak", kategori="Dampak terhadap Lingkungan Hidrologi",
+                            tipe_rekomendasi="numerik-mitigasi", status="Sedang",
+                            fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}})
+        tersimpan = template_aman(lama)
+        assert _jalur_narasi(lama, tersimpan) == "template_aman", "kontrol: kategori yang sama"
+        assert _jalur_narasi(sekarang, tersimpan) == "template_versi_lama"
+
+    def test_cabang_status_berubah_tetap_terdeteksi(self):
+        """`template_low_confidence` kini bercabang pada status "Tidak Dinilai" (APP-2026-2428);
+        entri Agustus ditulis cabang generik dengan status itu terinterpolasi apa adanya."""
+        teks_lama = (
+            "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk "
+            "poin 'Dampak Tata Guna Lahan' (dampak) setelah beberapa kali percobaan. Status "
+            "(Tidak Dinilai) tetap berdasarkan data asli dari back-end. Mohon dilakukan "
+            "peninjauan manual oleh petugas."
+        )
+        konteks = _konteks(poin_id="dampak", kategori="Dampak terhadap Lingkungan Hidrologi",
+                           tipe_rekomendasi="numerik-mitigasi", status="Tidak Dinilai",
+                           fakta={"dinilai": False})
+        assert _jalur_narasi(konteks, _keluaran(teks_lama)) == "template_versi_lama"
+
+    def test_narasi_llm_tidak_ikut_tertangkap(self):
+        """Kerangka ber-wildcard tak boleh menyapu narasi asli — kalau ya, metrik mutu jadi kosong
+        dan kelihatan seperti 'tak ada data' padahal datanya ada."""
+        konteks = _konteks()
+        for teks in (
+            "KDB melampaui ambang 60% pada sub-zona R-2 sesuai Lampiran VI",
+            "Berdasarkan data yang diberikan, pemohon masih memiliki ruang KDH yang cukup "
+            "sehingga poin ini tidak bermasalah",
+            "Tidak dievaluasi lebih lanjut karena pemohon belum melengkapi dokumen",
+        ):
+            assert _jalur_narasi(konteks, _keluaran(teks)) == "llm", teks[:40]
+
+    def test_kerangka_memuat_wildcard_bukan_nilai_pengganti(self):
+        """Kerangkanya diturunkan dari fungsi templatenya sendiri; nilai pengganti tak boleh bocor
+        ke polanya (kalau bocor, ia hanya cocok dengan dirinya sendiri)."""
+        from eval.metrik_generasi import _PENGGANTI, _kerangka_template
+
+        pola = _kerangka_template()
+        assert len(pola) >= 3
+        # Nilai pengganti TIDAK BOLEH bocor ke pola mana pun — kalau bocor, pola itu hanya cocok
+        # dengan dirinya sendiri dan tak pernah mengenali entri log apa pun.
+        for p in pola:
+            for s in _PENGGANTI:
+                assert s not in p.pattern, p.pattern[:80]
+        # Mayoritas template menyubstitusikan nilai, jadi wildcard harus ada di sebagian pola.
+        # Tidak di SEMUA: `generator._SARAN_TIDAK_DINILAI` teks konstan tanpa substitusi apa pun,
+        # jadi kerangkanya memang literal penuh — itu benar, bukan cacat.
+        assert any(".+?" in p.pattern for p in pola)
+
+
+class TestJaringPengamanTemplate:
+    """`dicurigai_template` memunculkan versi template yang belum dikenali, bukan menyembunyikannya."""
+
+    _TEKS = ("Berdasarkan ketentuan yang berlaku poin ini dinilai sesuai dengan aturan yang "
+             "ditetapkan dalam lampiran peraturan daerah setempat")
+
+    def test_teks_identik_lintas_permohonan_ditandai(self):
+        h = sebaran_jalur([_kasus(self._TEKS, permohonan="APP-1"),
+                           _kasus(self._TEKS, permohonan="APP-2")])
+        assert h["dicurigai_template"]["n_narasi"] == 2
+        assert h["dicurigai_template"]["n_kelompok"] == 1
+
+    def test_permohonan_sama_tidak_ditandai(self):
+        """Satu permohonan dengan dua poin bernarasi sama bukan indikasi template."""
+        h = sebaran_jalur([_kasus(self._TEKS, permohonan="APP-1"),
+                           _kasus(self._TEKS, permohonan="APP-1", poin_id="dampak")])
+        assert h["dicurigai_template"]["n_narasi"] == 0
+
+    def test_narasi_berbeda_tidak_ditandai(self):
+        h = sebaran_jalur([_kasus("KDB melampaui ambang di sub-zona R-2", permohonan="APP-1"),
+                           _kasus("KDH masih dalam ambang minimal", permohonan="APP-2")])
+        assert h["dicurigai_template"]["n_narasi"] == 0
+
+    def test_jalur_template_tidak_ikut_dicurigai(self):
+        """Yang sudah terdeteksi template jelas tak perlu dicurigai lagi."""
+        from app.reasoning.templates import template_low_confidence
+
+        konteks = _konteks()
+        tmpl = template_low_confidence(konteks)
+        ks = [Kasus(permohonan=f"APP-{i}", timestamp="2026-09-20T10:00:00",
+                    poin_id="intensitas", konteks=konteks, keluaran=tmpl,
+                    zona="Zona Perumahan", zona_subzone=None,
+                    jalur=_jalur_narasi(konteks, tmpl)) for i in (1, 2)]
+        h = sebaran_jalur(ks)
+        assert h["dicurigai_template"]["n_narasi"] == 0
+        assert h["total"]["template_low_confidence"] == 2
+
+
+class TestTimeoutKoneksiDb:
+    """`psycopg.connect` TANPA `connect_timeout` menggantung saat Docker/Postgres mati — terukur
+    >120 detik lalu dihentikan paksa, padahal jawaban yang benar ("tak terukur") sudah pasti sejak
+    awal. Degradasi cepat & jujur lebih baik daripada proses membeku tanpa keterangan."""
+
+    def test_connect_dipanggil_dengan_timeout(self, monkeypatch):
+        import psycopg
+
+        from eval.metrik_generasi import _TIMEOUT_DB_S, _muat_chunks_disitasi
+
+        tertangkap = {}
+
+        def palsu(dsn, **kwargs):
+            tertangkap.update(kwargs)
+            raise RuntimeError("DB mati (disimulasikan)")
+
+        monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+        monkeypatch.setattr(psycopg, "connect", palsu)
+        assert _muat_chunks_disitasi({"rdtr-sleman-tengah-vi-r-2"}) == {}
+        assert tertangkap.get("connect_timeout") == _TIMEOUT_DB_S
+
+    def test_atribusi_juga_memakai_timeout(self, monkeypatch):
+        import psycopg
+
+        from eval.metrik_atribusi import _TIMEOUT_DB_S, _muat_chunks
+
+        tertangkap = {}
+
+        def palsu(dsn, **kwargs):
+            tertangkap.update(kwargs)
+            raise RuntimeError("DB mati (disimulasikan)")
+
+        monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+        monkeypatch.setattr(psycopg, "connect", palsu)
+        assert _muat_chunks({"rdtr-sleman-tengah-vi-r-2"}) == {}
+        assert tertangkap.get("connect_timeout") == _TIMEOUT_DB_S
+
+
 class TestKekhususan:
     # Konteks dgn HANYA kdb yang gagal: jangkar wajibnya jadi kdb saja, sehingga tes di bawah
     # benar-benar menguji jangkar zona dan bukan ikut gagal karena klb/kdh tak disebut.

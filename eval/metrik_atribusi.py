@@ -207,9 +207,16 @@ def muat_permohonan(path: Path, sejak: str | None = None) -> tuple[list[Permohon
     return keluar, dict(lewat)
 
 
+_TIMEOUT_DB_S = 8
+
+
 def _muat_chunks(ids: set[str]) -> dict[str, dict]:
     """Ambil teks & zona chunk yang disitasi. Tanpa DB, metrik yang butuh teks dilewati — bukan
-    diganti nilai default yang kelihatan seperti hasil."""
+    diganti nilai default yang kelihatan seperti hasil.
+
+    `connect_timeout` wajib: tanpa itu `psycopg.connect` menggantung sampai batas waktu OS saat
+    Docker/Postgres mati, padahal jawaban yang benar ("tak terukur") sudah pasti sejak awal.
+    """
     if not ids:
         return {}
     dsn = os.getenv("DATABASE_URL")
@@ -218,7 +225,7 @@ def _muat_chunks(ids: set[str]) -> dict[str, dict]:
     try:
         import psycopg
 
-        with psycopg.connect(dsn) as conn:
+        with psycopg.connect(dsn, connect_timeout=_TIMEOUT_DB_S) as conn:
             baris = conn.execute(
                 "SELECT id, zona, level, teks FROM chunks WHERE id = ANY(%s)", (sorted(ids),)
             ).fetchall()

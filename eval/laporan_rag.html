@@ -351,17 +351,17 @@
   <code>eval/metrik_atribusi.py</code>.</p>
   <div class="peringatan">
   <b>Baca cakupannya dulu.</b> Log bukan trafik produksi yang bersih: dari
-  <b>480</b> permohonan era 3-poin, hanya
-  <b>109</b> yang sitasinya berasal dari retriever nyata —
-  <b>371</b> berasal dari <code>MockRetriever</code> (replay/test
+  <b>506</b> permohonan era 3-poin, hanya
+  <b>111</b> yang sitasinya berasal dari retriever nyata —
+  <b>395</b> berasal dari <code>MockRetriever</code> (replay/test
   lokal) dan dibuang. Kalau tidak dipilah, yang terukur adalah mock, bukan sistem.
-  Rentang tanggal yang terhitung: <b>2026-07-30 .. 2026-10-02</b>.
+  Rentang tanggal yang terhitung: <b>2026-07-30 .. 2026-10-09</b>.
   <b>TIDAK disaring per tanggal</b>, jadi angkanya mencampur beberapa versi kode — pakai <code>--sejak</code> sebelum mengutipnya.
-  Sitasi yang dinilai: <b>289</b> {'korpus': 238, 'anchor': 51}.
+  Sitasi yang dinilai: <b>293</b> {'korpus': 240, 'anchor': 53}.
   </div>
   <div class="kartu"><table>
     <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang ditangkap</th></tr></thead>
-    <tbody><tr><td>Presisi sitasi — id chunk ada di korpus</td><td><b>100.0%</b> <span class="net">(n=238, 238)</span></td><td class='net'>menangkap halusinasi rujukan</td></tr><tr><td>Presisi sitasi anchor — indeks dasar_hukum sah</td><td><b>100.0%</b> <span class="net">(n=51, 51)</span></td><td class='net'>anchor-N harus menunjuk item yang benar-benar dikirim back-end</td></tr><tr><td>Groundedness kutipan — teks ada di chunk disitasi</td><td><b>98.3%</b> <span class="net">(n=238, 234)</span></td><td class='net'>menangkap kutipan karangan; normalisasi spasi &amp;amp; tanda baca</td></tr><tr><td>Recall sitasi terhadap keluarga zona pemohon</td><td><b>30.3%</b> <span class="net">(n=66, 20)</span></td><td class='net'>menangkap kelas bug APP-2026-6191/2428</td></tr><tr><td>Kesepakatan flag &lt;code&gt;terverifikasi&lt;/code&gt;</td><td><b>100.0%</b> <span class="net">(n=238, 238)</span></td><td class='net'>flag sistem hanya memeriksa keberadaan id, bukan isi kutipan</td></tr></tbody>
+    <tbody><tr><td>Presisi sitasi — id chunk ada di korpus</td><td><b>100.0%</b> <span class="net">(n=240, 240)</span></td><td class='net'>menangkap halusinasi rujukan</td></tr><tr><td>Presisi sitasi anchor — indeks dasar_hukum sah</td><td><b>100.0%</b> <span class="net">(n=53, 53)</span></td><td class='net'>anchor-N harus menunjuk item yang benar-benar dikirim back-end</td></tr><tr><td>Groundedness kutipan — teks ada di chunk disitasi</td><td><b>98.3%</b> <span class="net">(n=240, 236)</span></td><td class='net'>menangkap kutipan karangan; normalisasi spasi &amp;amp; tanda baca</td></tr><tr><td>Recall sitasi terhadap keluarga zona pemohon</td><td><b>30.3%</b> <span class="net">(n=66, 20)</span></td><td class='net'>menangkap kelas bug APP-2026-6191/2428</td></tr><tr><td>Kesepakatan flag &lt;code&gt;terverifikasi&lt;/code&gt;</td><td><b>100.0%</b> <span class="net">(n=240, 240)</span></td><td class='net'>flag sistem hanya memeriksa keberadaan id, bukan isi kutipan</td></tr></tbody>
   </table></div>
   <p class="cat">Recall zona dihitung <b>per poin</b>, bukan per permohonan: ketentuan
   <code>dampak</code> tersaji sebagai pasal prosa lintas-zona, jadi menuntut sitasi ber-zona di
@@ -383,13 +383,13 @@
   <code>logs/precheck.jsonl</code> oleh <code>eval/metrik_generasi.py</code>.</p>
   <div class="peringatan">
   <b>Penyebutnya kecil, dan itu bagian dari hasilnya.</b> Dari seluruh log, hanya
-  <b>20 permohonan</b> era 3-poin yang memakai retriever nyata dan
+  <b>21 permohonan</b> era 3-poin yang memakai retriever nyata dan
   bukan baris stub pytest. Log juga bukan trafik unik: satu permohonan di-replay sampai 30
   kali selama pengembangan, jadi tiap (permohonan, poin) dipotong ke <b>satu narasi terbaru</b>
   &mdash; tanpa itu, permohonan yang paling sering bermasalah justru dapat bobot terbesar.
-  Dari 60 narasi tersisa, <b>40</b> benar-benar
+  Dari 63 narasi tersisa, <b>35</b> benar-benar
   keluaran LLM; sisanya teks template deterministik (lihat tabel jalur).
-  Rentang tanggal: <b>2026-08-03 .. 2026-10-02</b>.
+  Rentang tanggal: <b>2026-08-03 .. 2026-10-09</b>.
   <b>TIDAK disaring per tanggal</b>, jadi angkanya mencampur beberapa versi kode &mdash; pakai <code>--sejak</code> sebelum mengutipnya.
   </div>
 
@@ -399,17 +399,29 @@
   satu saat retry guardrail habis. Keduanya identik lintas permohonan dan tak pernah menyebut
   partikular apa pun, jadi memasukkannya ke metrik mutu akan mengukur <b>template</b>, bukan
   model &mdash; terbukti saat modul ini pertama dijalankan: satu teks template muncul di 11
-  permohonan berbeda dan menarik kekhususan poin dampak ke 0,0%. Deteksinya membangkitkan
-  ulang template dari konteks yang sama, bukan mencocokkan string salinan.</p>
+  permohonan berbeda dan menarik kekhususan poin dampak ke 0,0%.</p>
+  <p class="cat">Deteksinya <b>dua tahap</b>, dan tahap kedua wajib ada. Tahap pertama
+  membangkitkan ulang template dari konteks yang sama lalu membandingkan teksnya &mdash; bukan
+  mencocokkan string salinan. Itu benar untuk entri baru, tapi gagal untuk entri lama bukan karena
+  kerangka templatenya berubah, melainkan karena <b>nilai yang disubstitusikan</b> ke dalamnya
+  berubah: label <code>kategori</code> poin dampak berganti dari &ldquo;Dampak Tata Guna
+  Lahan&rdquo; menjadi &ldquo;Dampak terhadap Lingkungan Hidrologi&rdquo;, dan
+  <code>template_low_confidence</code> kini bercabang pada status &ldquo;Tidak Dinilai&rdquo;.
+  Akibatnya 7 narasi dampak lolos sebagai keluaran model, menggelembungkan angka jalur dari
+  <b>55,6%</b> yang benar menjadi 66,7%, kekhususan dari 77,1% menjadi 82,5%, dan
+  <b>mengarang</b> temuan boilerplate 7 dari 19 yang sebenarnya 0 dari 13. Tahap kedua karena itu
+  mencocokkan <b>kerangka</b> template dengan nilai substitusi dijadikan wildcard, diturunkan dari
+  fungsi templatenya sendiri. Sisanya ditangkap jaring pengaman di bawah tabel.</p>
   <div class="kartu"><table>
     <thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
-    <tbody><tr><td><code>dampak</code></td><td><b>95.0%</b> <span class="net">(n=20, 19)</span></td><td class='net'>1 jatuh ke template low-confidence, 0 ke template aman</td></tr><tr><td><code>intensitas</code></td><td><b>50.0%</b> <span class="net">(n=20, 10)</span></td><td class='net'>10 jatuh ke template low-confidence, 0 ke template aman</td></tr><tr><td><code>itbx</code></td><td><b>55.0%</b> <span class="net">(n=20, 11)</span></td><td class='net'>9 jatuh ke template low-confidence, 0 ke template aman</td></tr></tbody>
+    <tbody><tr><td><code>dampak</code></td><td><b>61.9%</b> <span class="net">(n=21, 13)</span></td><td class='net'>1 template low-confidence, 7 teks template versi lama</td></tr><tr><td><code>intensitas</code></td><td><b>52.4%</b> <span class="net">(n=21, 11)</span></td><td class='net'>10 template low-confidence</td></tr><tr><td><code>itbx</code></td><td><b>52.4%</b> <span class="net">(n=21, 11)</span></td><td class='net'>10 template low-confidence</td></tr><tr class="sorot"><td><b>Seluruh poin</b></td><td><b>55.6%</b> <span class="net">(n=63, 35)</span></td><td class='net'>21 template low-confidence, 7 teks template versi lama</td></tr></tbody>
   </table></div>
+  <p class="cat"><b>Jaring pengaman:</b> tidak ada narasi <code>llm</code> yang teksnya identik lintas-permohonan, jadi tak ada indikasi versi template lain yang masih lolos deteksi.</p>
 
   <h3>Faithfulness, kekhususan, dan ketepatan arah</h3>
   <div class="kartu"><table>
     <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang dijamin</th></tr></thead>
-    <tbody><tr><td><b>Faithfulness numerik</b> &mdash; per narasi</td><td><b>100.0%</b> <span class="net">(n=40, 40)</span></td><td class='net'>replay cek provenance produksi; satu angka tak terlacak sudah cukup menggagalkan narasi, persis seperti keputusan guardrail</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per angka</td><td><b>100.0%</b> <span class="net">(n=149, 149)</span></td><td class='net'>tiap angka &ge;2 digit di narasi dinilai sendiri</td></tr><tr><td><b>Kekhususan</b> &mdash; seluruh jangkar tersebut</td><td><b>82.5%</b> <span class="net">(n=40, 33)</span></td><td class='net'>answer relevance: narasi menyebut zona, kegiatan, atau parameter yang benar-benar milik permohonan ini</td></tr><tr><td><b>Ketepatan arah</b> &mdash; gabungan</td><td><b>96.0%</b> <span class="net">(n=25, 24)</span></td><td class='net'>klaim arah di narasi vs fakta boolean back-end</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per parameter intensitas</td><td><b>100.0%</b> <span class="net">(n=18, 18)</span></td><td class='net'>5 kasus ambigu TIDAK masuk penyebut &mdash; &ldquo;tak bisa dinilai&rdquo; bukan &ldquo;salah&rdquo;</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;kebutuhan mitigasi dampak</td><td><b>75.0%</b> <span class="net">(n=4, 3)</span></td><td class='net'><code>mitigasi.perlu_mitigasi</code> hanya True utk Tinggi/Sangat Tinggi</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;klaim kategori ITBX</td><td><b>100.0%</b> <span class="net">(n=3, 3)</span></td><td class='net'>huruf yang diklaim narasi harus sama dgn <code>status</code></td></tr></tbody>
+    <tbody><tr><td><b>Faithfulness numerik</b> &mdash; per narasi</td><td><b>100.0%</b> <span class="net">(n=35, 35)</span></td><td class='net'>replay cek provenance produksi; satu angka tak terlacak sudah cukup menggagalkan narasi, persis seperti keputusan guardrail</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per angka</td><td><b>100.0%</b> <span class="net">(n=164, 164)</span></td><td class='net'>tiap angka &ge;2 digit di narasi dinilai sendiri</td></tr><tr><td><b>Kekhususan</b> &mdash; seluruh jangkar tersebut</td><td><b>77.1%</b> <span class="net">(n=35, 27)</span></td><td class='net'>answer relevance: narasi menyebut zona, kegiatan, atau parameter yang benar-benar milik permohonan ini</td></tr><tr><td><b>Ketepatan arah</b> &mdash; gabungan</td><td><b>96.2%</b> <span class="net">(n=26, 25)</span></td><td class='net'>klaim arah di narasi vs fakta boolean back-end</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;per parameter intensitas</td><td><b>100.0%</b> <span class="net">(n=19, 19)</span></td><td class='net'>6 kasus ambigu TIDAK masuk penyebut &mdash; &ldquo;tak bisa dinilai&rdquo; bukan &ldquo;salah&rdquo;</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;kebutuhan mitigasi dampak</td><td><b>75.0%</b> <span class="net">(n=4, 3)</span></td><td class='net'><code>mitigasi.perlu_mitigasi</code> hanya True utk Tinggi/Sangat Tinggi</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;klaim kategori ITBX</td><td><b>100.0%</b> <span class="net">(n=3, 3)</span></td><td class='net'>huruf yang diklaim narasi harus sama dgn <code>status</code></td></tr></tbody>
   </table></div>
   <div class="peringatan"><b>Penyimpangan arah yang tercatat:</b><ul><li><code>APP-2026-INNER-01</code> &mdash; dampak/mitigasi: ['fakta=tak perlu, narasi=perlu']</li></ul></div>
 
@@ -423,8 +435,27 @@
   <div class="kartu"><table>
     <thead><tr><th>Poin</th><th>n</th><th>median (status beda)</th><th>maks</th>
     <th>&ge;0.5</th><th>median (status sama)</th></tr></thead>
-    <tbody><tr><td><code>itbx</code></td><td>11</td><td><b>0.024</b></td><td>0.045</td><td>0/11</td><td class='net'>0.043</td></tr><tr><td><code>intensitas</code></td><td>10</td><td><b>0.016</b></td><td>0.030</td><td>0/10</td><td class='net'>0.017</td></tr><tr><td><code>dampak</code></td><td>19</td><td><b>0.129</b></td><td>0.722</td><td>7/19</td><td class='net'>0.207</td></tr></tbody>
+    <tbody><tr><td><code>itbx</code></td><td>11</td><td><b>0.024</b></td><td>0.045</td><td>0/11</td><td class='net'>0.043</td></tr><tr><td><code>intensitas</code></td><td>11</td><td><b>0.016</b></td><td>0.032</td><td>0/11</td><td class='net'>0.017</td></tr><tr><td><code>dampak</code></td><td>13</td><td><b>0.104</b></td><td>0.202</td><td>0/13</td><td class='net'>0.165</td></tr></tbody>
   </table></div>
+
+  <h3>Laju tolak guardrail &mdash; faithfulness MENTAH, sebelum koreksi</h3>
+  <p class="cat">Seluruh angka di atas menilai narasi yang <b>akhirnya keluar</b>, yaitu yang
+  sudah lolos guardrail &mdash; dengan sendirinya bagus, dan karena itu tak satu pun dari
+  keempatnya bisa menjawab <b>apa gunanya guardrail</b>. Yang di bawah menilai percobaan
+  <b>pertama</b>: apa yang model hasilkan sebelum dikoreksi. Penyebutnya dibatasi ke percobaan
+  yang benar-benar sampai ke guardrail &mdash; kegagalan panggilan LLM (rate limit/timeout) dan
+  kegagalan retrieval dikeluarkan, kalau tidak kegagalan infrastruktur akan terhitung sebagai
+  kepatuhan model. 60 dari 63 kasus tak punya riwayat
+  percobaan (baris log era lama atau retrieval gagal sebelum LLM dipanggil) dan TIDAK masuk
+  penyebut.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Metrik</th><th>Nilai</th><th>Apa yang diukur</th></tr></thead>
+    <tbody><tr><td><b>Percobaan pertama ditolak guardrail</b></td><td><b>33.3%</b> <span class="net">(n=3, 1)</span></td><td class='net'>keluaran LLM MENTAH, sebelum ada yang mengoreksinya</td></tr><tr><td>Dari yang ditolak, akhirnya lolos setelah retry terarah</td><td><b>0.0%</b> <span class="net">(n=1, 0)</span></td><td class='net'>sisanya jatuh ke template low-confidence &mdash; tak ada narasi LLM yang keluar</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;<code>dampak</code></td><td><b>0.0%</b> <span class="net">(n=1, 0)</span></td><td class='net'>laju tolak percobaan pertama, poin ini</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;<code>intensitas</code></td><td><b>0.0%</b> <span class="net">(n=1, 0)</span></td><td class='net'>laju tolak percobaan pertama, poin ini</td></tr><tr><td>&nbsp;&nbsp;&nbsp;&nbsp;<code>itbx</code></td><td><b>100.0%</b> <span class="net">(n=1, 1)</span></td><td class='net'>laju tolak percobaan pertama, poin ini</td></tr></tbody>
+  </table></div>
+  <p class="cat">Temuan guardrail di percobaan pertama (2 temuan; angka &amp;
+  isi tanda kutip dinormalkan supaya label bisa dikelompokkan):</p>
+  <div class="kartu"><table><thead><tr><th>Jumlah</th><th>Label temuan</th></tr></thead>
+  <tbody><tr><td>1&times;</td><td class='net'>Reasoning tidak menegaskan larangan ('X'/'X'/dst tidak ditemukan) padahal status ITBX = X — verdict harus dinyatakan jelas.</td></tr><tr><td>1&times;</td><td class='net'>Reasoning/saran menyebutkan angka 'X' yang tidak tercantum di fakta sumber poin ini — dilarang (SYSTEM_PROMPT aturan #8). Angka harus berasal dari calculator/ba</td></tr></tbody></table></div>
 
   <h2>11. Sisi generasi — data operasional historis</h2>
   <div class="peringatan" style="margin-bottom:14px">

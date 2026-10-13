@@ -879,6 +879,26 @@ def muat_atribusi(berkas: Path | None = None) -> dict | None:
         return None
 
 
+_LABEL_JALUR = {
+    "template_low_confidence": "template low-confidence",
+    "template_aman": "template aman",
+    "template_versi_lama": "teks template versi lama",
+}
+
+
+def _sisa_jalur(e: dict) -> str:
+    """"10 template low-confidence, 7 teks template versi lama" — seluruh jalur selain LLM.
+
+    Dibangun dari kunci yang BENAR-BENAR ada di hasil, karena daftar jalurnya bertambah seiring
+    temuan (lihat `metrik_generasi._kerangka_template`). Label yang belum dikenal dicetak apa
+    adanya ketimbang disembunyikan.
+    """
+    bagian = [f"{v} {_LABEL_JALUR.get(k, k)}"
+              for k, v in sorted(e.items())
+              if k not in ("n", "llm", "proporsi_llm") and isinstance(v, int) and v]
+    return ", ".join(bagian)
+
+
 def muat_generasi(berkas: Path | None = None) -> dict | None:
     """Baca hasil eval/metrik_generasi.py kalau sudah pernah dijalankan.
 
@@ -1418,9 +1438,30 @@ def bangun_html(r: dict) -> str:
         baris_jalur = "".join(
             f"<tr><td><code>{_esc(pid)}</code></td>"
             f'<td>{_fmt_atribusi({"nilai": e["proporsi_llm"], "n": e["n"], "kena": e["llm"]})}</td>'
-            f"<td class='net'>{e['template_low_confidence']} jatuh ke template "
-            f"low-confidence, {e['template_aman']} ke template aman</td></tr>"
+            # Label jalur diturunkan dari data, bukan ditanam: `template_versi_lama` baru
+            # ditambahkan setelah terbukti ada teks template yang nilai substitusinya bergeser,
+            # dan daftarnya bisa bertambah lagi. Kunci tetap di sini akan jadi KeyError.
+            f"<td class='net'>{_esc(_sisa_jalur(e)) or '&mdash;'}</td></tr>"
             for pid, e in jl["per_poin"].items())
+        # Baris total disorot: ini penyebut bagi SELURUH metrik di bawahnya, dan tanpa baris ini
+        # pembaca hanya melihat tiga angka per poin tanpa tahu berapa bagian keluaran yang
+        # sesungguhnya berasal dari model.
+        baris_jalur += (
+            f'<tr class="sorot"><td><b>Seluruh poin</b></td>'
+            f'<td>{_fmt_atribusi({"nilai": jl["proporsi_llm"], "n": jl["n"], "kena": jl["total"].get("llm", 0)})}</td>'
+            f"<td class='net'>{_esc(_sisa_jalur({**jl['total'], 'n': jl['n']})) or '&mdash;'}"
+            "</td></tr>")
+        dct = jl.get("dicurigai_template") or {}
+        catatan_jaring = (
+            f'<div class="peringatan"><b>Jaring pengaman menyala:</b> {dct["n_narasi"]} narasi '
+            f'berlabel <code>llm</code> teksnya identik lintas-permohonan ({dct["n_kelompok"]} '
+            "kelompok). Narasi model asli tak pernah begitu, jadi hampir pasti ada versi template "
+            "yang belum dikenali &mdash; angka di bawah ini terlalu optimistis sampai itu "
+            "ditangani.</div>"
+            if dct.get("n_narasi") else
+            '<p class="cat"><b>Jaring pengaman:</b> tidak ada narasi <code>llm</code> yang teksnya '
+            "identik lintas-permohonan, jadi tak ada indikasi versi template lain yang masih "
+            "lolos deteksi.</p>")
         baris_mutu = ""
         if fn.get("terukur"):
             baris_mutu += (
@@ -1552,12 +1593,24 @@ def bangun_html(r: dict) -> str:
   satu saat retry guardrail habis. Keduanya identik lintas permohonan dan tak pernah menyebut
   partikular apa pun, jadi memasukkannya ke metrik mutu akan mengukur <b>template</b>, bukan
   model &mdash; terbukti saat modul ini pertama dijalankan: satu teks template muncul di 11
-  permohonan berbeda dan menarik kekhususan poin dampak ke 0,0%. Deteksinya membangkitkan
-  ulang template dari konteks yang sama, bukan mencocokkan string salinan.</p>
+  permohonan berbeda dan menarik kekhususan poin dampak ke 0,0%.</p>
+  <p class="cat">Deteksinya <b>dua tahap</b>, dan tahap kedua wajib ada. Tahap pertama
+  membangkitkan ulang template dari konteks yang sama lalu membandingkan teksnya &mdash; bukan
+  mencocokkan string salinan. Itu benar untuk entri baru, tapi gagal untuk entri lama bukan karena
+  kerangka templatenya berubah, melainkan karena <b>nilai yang disubstitusikan</b> ke dalamnya
+  berubah: label <code>kategori</code> poin dampak berganti dari &ldquo;Dampak Tata Guna
+  Lahan&rdquo; menjadi &ldquo;Dampak terhadap Lingkungan Hidrologi&rdquo;, dan
+  <code>template_low_confidence</code> kini bercabang pada status &ldquo;Tidak Dinilai&rdquo;.
+  Akibatnya 7 narasi dampak lolos sebagai keluaran model, menggelembungkan angka jalur dari
+  <b>55,6%</b> yang benar menjadi 66,7%, kekhususan dari 77,1% menjadi 82,5%, dan
+  <b>mengarang</b> temuan boilerplate 7 dari 19 yang sebenarnya 0 dari 13. Tahap kedua karena itu
+  mencocokkan <b>kerangka</b> template dengan nilai substitusi dijadikan wildcard, diturunkan dari
+  fungsi templatenya sendiri. Sisanya ditangkap jaring pengaman di bawah tabel.</p>
   <div class="kartu"><table>
     <thead><tr><th>Poin</th><th>Narasi dari LLM</th><th>Sisanya</th></tr></thead>
     <tbody>{baris_jalur}</tbody>
   </table></div>
+  {catatan_jaring}
 
   <h3>Faithfulness, kekhususan, dan ketepatan arah</h3>
   <div class="kartu"><table>
