@@ -849,7 +849,15 @@ def generate_poin_terdiagnosis(
     diagnosa.jumlah_chunk = len(chunks)
 
     masalah: list[str] = []
-    for percobaan in range(max_retry + 1):
+    # APP-2026-0095: Groq kadang membalas 400 json_validate_failed dgn keluaran KOSONG — gangguan
+    # sesaat, bukan salah isi teks. Satu kegagalan panggilan seperti itu diberi percobaan
+    # TAMBAHAN di luar jatah guardrail (maks 1 per poin, supaya tak berputar tanpa batas).
+    # PIIDetectedError dikecualikan: mengulang tak akan mengubah hasilnya.
+    sisa_jatah = max_retry + 1
+    bonus_tersedia = 1
+    percobaan = -1
+    while sisa_jatah > 0:
+        percobaan += 1
         catatan = "; ".join(masalah) if percobaan > 0 else None
         suhu = 0.4 if percobaan > 0 else 0.0
         diagnosa.percobaan = percobaan + 1
@@ -881,11 +889,16 @@ def generate_poin_terdiagnosis(
                 "masalah": [],  # lihat DiagnosaPoin.riwayat_percobaan: pesan exception bukan temuan guardrail
                 "exception": diagnosa.exception_terakhir,
             })
+            if bonus_tersedia and type(exc).__name__ != "PIIDetectedError":
+                bonus_tersedia -= 1  # percobaan ini tak memakan jatah guardrail
+            else:
+                sisa_jatah -= 1
             continue
 
         # Percobaan ini sampai ke LLM & dapat jawaban -> exception percobaan SEBELUMNYA (kalau ada)
         # tak lagi menjadi sebab; jangan sampai salah melabeli "panggilan_llm_gagal".
         diagnosa.exception_terakhir = None
+        sisa_jatah -= 1
         poin_bersih, masalah = perbaiki_poin(hasil, poin, chunks, assessment)
         diagnosa.masalah_terakhir = list(masalah)
         diagnosa.teks_ditolak_terakhir = _ringkas_teks_ditolak(poin_bersih) if masalah else None

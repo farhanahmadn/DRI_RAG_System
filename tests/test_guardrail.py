@@ -1016,7 +1016,7 @@ class TestGeneratePoinDenganGuardrail:
         assessment = _muat_assessment("l2_sample_lolos.json")
         hasil = generate_poin_dengan_guardrail(poin, MockRetriever(), assessment, max_retry=1)
 
-        assert panggilan["n"] == 2  # max_retry=1 -> 2 percobaan
+        assert panggilan["n"] == 3  # max_retry=1 -> 2 jatah + 1 percobaan tambahan utk gangguan panggilan
         assert hasil.low_confidence is True
 
     def test_exception_generate_poin_dilog_bukan_ditelan_diam(self, monkeypatch, caplog):
@@ -1111,7 +1111,7 @@ class TestGeneratePoinTerdiagnosis:
 
         assert hasil.low_confidence is True
         assert diagnosa.berhasil is False
-        assert diagnosa.percobaan == 2                      # max_retry=1 -> 2 percobaan
+        assert diagnosa.percobaan == 3                      # max_retry=1 -> 2 jatah + 1 tambahan
         assert diagnosa.sebab() == "panggilan_llm_gagal"
         assert "simulasi RateLimitError" in diagnosa.exception_terakhir
 
@@ -1606,3 +1606,37 @@ class TestPerbaikiTitikKomaDanAngkaReason:
         )
         assert _angka_terlacak_ke_sumber("743.5", poin)
         assert not _angka_terlacak_ke_sumber("999.5", poin)
+
+
+class TestPercobaanTambahanUntukGangguanPanggilan:
+    """APP-2026-0095: Groq 400 'keluaran kosong' tak boleh memakan jatah guardrail."""
+
+    @staticmethod
+    def _jalankan(monkeypatch, urutan):
+        n = {"i": 0}
+        ok = {"reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
+              "reasoning_panjang": "Kegiatan yang diusulkan termasuk kategori Bersyarat (B) sesuai ketentuan zona.",
+              "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
+              "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.", "disclaimer": None}
+        buruk = dict(ok, reasoning_panjang="Kegiatan Bersyarat (B) seluas 7731 hektare.")
+
+        def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
+            hasil = urutan[min(n["i"], len(urutan) - 1)]
+            n["i"] += 1
+            if hasil == "err":
+                raise RuntimeError("400 json_validate_failed")
+            return ok if hasil == "ok" else buruk
+
+        monkeypatch.setattr(llm_client_module, "generate", _stub)
+        poin = _poin(status="B", fakta={"lolos": True, "reason": "x"},
+                     dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")])
+        _, d = generate_poin_terdiagnosis(poin, MockRetriever(), _muat_assessment("l2_sample_lolos.json"), max_retry=2)
+        return d, n["i"]
+
+    def test_error_lalu_tiga_percobaan_guardrail_penuh(self, monkeypatch):
+        d, panggilan = self._jalankan(monkeypatch, ["err", "buruk", "buruk", "ok"])
+        assert d.berhasil is True and panggilan == 4
+
+    def test_bonus_hanya_satu(self, monkeypatch):
+        d, panggilan = self._jalankan(monkeypatch, ["err"])
+        assert d.berhasil is False and panggilan == 4  # 1 bonus + 3 jatah, lalu berhenti
