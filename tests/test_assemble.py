@@ -867,3 +867,36 @@ def test_narasi_rekomendasi_titik_koma_diperbaiki_bukan_fallback(monkeypatch):
     hasil = asm._rakit_narasi_rekomendasi([], "Tidak Setuju")
     assert hasil.paragraf_gate_intensitas == "ITBX tidak sesuai, pemohon perlu meninjau lokasi."
     assert hasil.paragraf_dampak == "Dampak rendah."
+
+
+class TestAngkaDikutipDariSaranDiizinkan:
+    """APP-2026-UJI-4: larangan angka total bikin kesimpulan 'persentase tertentu'. Kini angka
+    yang dikutip persis dari saran poin diizinkan, angka karangan tetap ditolak."""
+
+    def _poin_list(self):
+        return [
+            _poin_output(poin_id="intensitas", rekomendasi=RekomendasiOutput(
+                tipe="numerik", saran="Menurunkan luas lantai dasar hingga 861.6 m² agar KDB turun ke 60%.")),
+        ]
+
+    def test_kesimpulan_mengutip_angka_saran_lolos(self, monkeypatch):
+        _patch_kesimpulan_llm(monkeypatch, hasil_dict={
+            "langkah_berdampak": ["Luas lantai dasar perlu diturunkan hingga 861.6 m² agar KDB menjadi 60%."],
+            "catatan_lokasi": None})
+        hasil = _rakit_kesimpulan(self._poin_list(), "Tidak Setuju")
+        assert "861.6" in hasil.langkah_berdampak[0]
+
+    def test_kesimpulan_angka_karangan_tetap_fallback(self, monkeypatch):
+        _patch_kesimpulan_llm(monkeypatch, hasil_dict={
+            "langkah_berdampak": ["Luas lantai dasar perlu diturunkan hingga 999.9 m²."], "catatan_lokasi": None})
+        hasil = _rakit_kesimpulan(self._poin_list(), "Tidak Setuju")
+        assert hasil.langkah_berdampak == [self._poin_list()[0].rekomendasi.saran]
+
+    def test_narasi_mengutip_angka_saran_lolos(self, monkeypatch):
+        _patch_narasi_llm(monkeypatch, hasil_dict={
+            "paragraf_gate_intensitas": "Intensitas melampaui batas, luas lantai dasar perlu turun hingga 861.6 m².",
+            "paragraf_dampak": "Dampak perlu dipantau."})
+        poin_list = self._poin_list() + [
+            _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Pantau dampak."))]
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Tidak Setuju")
+        assert "861.6" in hasil.paragraf_gate_intensitas

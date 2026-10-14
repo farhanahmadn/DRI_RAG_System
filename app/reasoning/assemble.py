@@ -21,6 +21,7 @@ from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
 from app.reasoning.guardrail import (
     DiagnosaPoin,
+    _dekat_dgn_pembulatan,
     _perbaiki_titik_koma,
     caveat_fallback_itbx,
     generate_poin_terdiagnosis,
@@ -191,6 +192,22 @@ def _rakit_ringkasan_dampak(assessment: L2Assessment) -> RingkasanDampakOutput:
     return RingkasanDampakOutput(impact_category=kategori, impact_score=impact.impact_score, kalimat=kalimat)
 
 
+def _angka_tak_terlacak_ke_saran(teks: str, poin_list: list[PoinOutput]) -> str | None:
+    """Angka pertama di `teks` yang TIDAK tercantum di saran/langkah_konkret per-poin, atau None.
+
+    Larangan angka total di kesimpulan/narasi membuat LLM menulis "persentase tertentu" dan
+    "dimensi minimum tertentu" (APP-2026-UJI-4) — tak berguna bagi reviewer. Angka itu sebenarnya
+    sudah final di saran poin (dari kalkulator/BE), jadi mengutipnya persis AMAN. Yang tetap
+    dilarang: angka yang tak bisa dilacak ke saran manapun (karangan/hitungan LLM)."""
+    sumber = " ".join(p.rekomendasi.saran for p in poin_list)
+    sumber += " " + " ".join(l.deskripsi for p in poin_list for l in p.rekomendasi.langkah_konkret)
+    for m in _RE_ANGKA_MENCURIGAKAN.finditer(teks):
+        angka = m.group(0)
+        if re.search(rf"\b{re.escape(angka)}\b", sumber) is None and not _dekat_dgn_pembulatan(angka, sumber):
+            return angka
+    return None
+
+
 def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput]) -> KesimpulanOutput:
     """Dipakai kalau panggilan LLM sintesis gagal/melanggar aturan — deterministik, saran
     per-poin verbatim (sudah lolos guardrail, jadi aman ditampilkan apa adanya)."""
@@ -212,8 +229,12 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> K
         langkah = hasil.get("langkah_berdampak") or []
         catatan = hasil.get("catatan_lokasi")
         gabungan = " ".join(langkah) + " " + (catatan or "")
-        if _RE_ANGKA_MENCURIGAKAN.search(gabungan):
-            raise ValueError("Kesimpulan LLM menyebutkan angka — dilarang (SYSTEM_PROMPT_KESIMPULAN aturan #3).")
+        asing = _angka_tak_terlacak_ke_saran(gabungan, poin_list)
+        if asing is not None:
+            raise ValueError(
+                f"Kesimpulan LLM menyebutkan angka {asing!r} yang tak ada di saran poin — dilarang "
+                "(SYSTEM_PROMPT_KESIMPULAN aturan #3)."
+            )
         return KesimpulanOutput(langkah_berdampak=langkah, catatan_lokasi=catatan)
     except Exception:
         logger.exception("Sintesis kesimpulan via LLM gagal/melanggar aturan — fallback deterministik.")
@@ -255,10 +276,11 @@ def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: s
         paragraf_gate = _perbaiki_titik_koma(hasil.get("paragraf_gate_intensitas") or "")
         paragraf_dampak = _perbaiki_titik_koma(hasil.get("paragraf_dampak") or "")
         gabungan = f"{paragraf_gate} {paragraf_dampak}"
-        if _RE_ANGKA_MENCURIGAKAN.search(gabungan):
+        asing = _angka_tak_terlacak_ke_saran(gabungan, poin_list)
+        if asing is not None:
             raise ValueError(
-                "Narasi rekomendasi LLM menyebutkan angka — dilarang "
-                "(SYSTEM_PROMPT_NARASI_REKOMENDASI aturan #5)."
+                f"Narasi rekomendasi LLM menyebutkan angka {asing!r} yang tak ada di saran poin — "
+                "dilarang (SYSTEM_PROMPT_NARASI_REKOMENDASI aturan #5)."
             )
         if ";" in gabungan:
             raise ValueError(

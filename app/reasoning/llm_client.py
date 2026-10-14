@@ -233,7 +233,9 @@ _PETA_KARAKTER = str.maketrans({
 
 def _normalisasi_karakter(nilai):
     if isinstance(nilai, str):
-        return nilai.translate(_PETA_KARAKTER)
+        # Model kadang menulis dua karakter backslash+n alih-alih baris baru di dalam string JSON
+        # (APP-2026-UJI-4: "...turun ke 60%.\\n2. Menambah RTH" tampil mentah di saran/narasi).
+        return nilai.translate(_PETA_KARAKTER).replace("\\n", "\n")
     if isinstance(nilai, list):
         return [_normalisasi_karakter(v) for v in nilai]
     if isinstance(nilai, dict):

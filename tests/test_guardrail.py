@@ -1703,3 +1703,8 @@ class TestSaranDampakWajibAdaTindakan:
         )
         _, masalah = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
         assert not any("DILARANG" in m and "tindakan" in m for m in masalah)
+
+
+def test_normalisasi_backslash_n_literal_jadi_baris_baru():
+    from app.reasoning.llm_client import _normalisasi_karakter
+    assert _normalisasi_karakter({"saran": "1. A.\n2. B."}) == {"saran": "1. A.\n2. B."}
