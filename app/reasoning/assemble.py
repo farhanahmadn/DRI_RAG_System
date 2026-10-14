@@ -19,7 +19,12 @@ from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
 from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import normalisasi_kategori_dampak
-from app.reasoning.guardrail import DiagnosaPoin, caveat_fallback_itbx, generate_poin_terdiagnosis
+from app.reasoning.guardrail import (
+    DiagnosaPoin,
+    _perbaiki_titik_koma,
+    caveat_fallback_itbx,
+    generate_poin_terdiagnosis,
+)
 from app.reasoning.prompts import (
     CAVEAT_SUBZONA_TAK_TERKONFIRMASI,
     SYSTEM_PROMPT_KESIMPULAN,
@@ -245,8 +250,10 @@ def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: s
             schema_name="narasi_rekomendasi",
             system=SYSTEM_PROMPT_NARASI_REKOMENDASI,
         )
-        paragraf_gate = hasil.get("paragraf_gate_intensitas") or ""
-        paragraf_dampak = hasil.get("paragraf_dampak") or ""
+        # Titik koma = gaya, bukan fakta: diperbaiki (bukan dibuang seluruh sintesis ke fallback).
+        # Log VPS 2026-10-14: satu ';' membuang narasi LLM yang sudah jadi.
+        paragraf_gate = _perbaiki_titik_koma(hasil.get("paragraf_gate_intensitas") or "")
+        paragraf_dampak = _perbaiki_titik_koma(hasil.get("paragraf_dampak") or "")
         gabungan = f"{paragraf_gate} {paragraf_dampak}"
         if _RE_ANGKA_MENCURIGAKAN.search(gabungan):
             raise ValueError(

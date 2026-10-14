@@ -427,3 +427,80 @@ def test_generate_returns_valid_json():
     assert isinstance(result, dict)
     assert "ok" in result
     assert isinstance(result["ok"], bool)
+
+
+class TestEkskalasiTokenKeluaranKosong:
+    """Log VPS 2026-10-14: Groq 400 json_validate_failed dgn failed_generation KOSONG = token habis
+    utk reasoning. Mengulang dgn max_tokens sama gagal identik 3/3 (itbx multi-zona)."""
+
+    @staticmethod
+    def _error_kosong():
+        import httpx
+        from openai import BadRequestError
+        req = httpx.Request("POST", "https://api.groq.com/x")
+        resp = httpx.Response(400, request=req)
+        return BadRequestError(
+            "Error code: 400 - {'error': {'message': \"Failed to validate JSON.\", "
+            "'code': 'json_validate_failed', 'failed_generation': ''}}",
+            response=resp, body=None,
+        )
+
+    def _siapkan(self, monkeypatch):
+        import app.reasoning.llm_client as m
+        monkeypatch.setattr(m, "_rotator", None)
+        monkeypatch.setenv("GROQ_API_KEYS", "kunci-1")
+        monkeypatch.setenv("LLM_MODEL", "model-tes")
+        return m
+
+    def test_naikkan_max_tokens_sekali_lalu_berhasil(self, monkeypatch):
+        m = self._siapkan(monkeypatch)
+        dipakai = []
+
+        def _stub(client, messages, json_schema, schema_name, temperature, max_tokens):
+            dipakai.append(max_tokens)
+            if len(dipakai) == 1:
+                raise self._error_kosong()
+
+            class _C:
+                class _M:
+                    content = '{"ok": true}'
+                choices = [type("X", (), {"message": _M()})()]
+            return _C()
+
+        monkeypatch.setattr(m, "_panggil_llm_sekali", _stub)
+        assert m.generate("p", {"type": "object"}, schema_name="t") == {"ok": True}
+        assert dipakai == [2048, m._MAKS_TOKEN_EKSKALASI]
+
+    def test_hanya_sekali_eskalasi_lalu_menyerah(self, monkeypatch):
+        import pytest
+        from openai import BadRequestError
+        m = self._siapkan(monkeypatch)
+        n = {"i": 0}
+
+        def _stub(*a, **k):
+            n["i"] += 1
+            raise self._error_kosong()
+
+        monkeypatch.setattr(m, "_panggil_llm_sekali", _stub)
+        with pytest.raises(BadRequestError):
+            m.generate("p", {"type": "object"}, schema_name="t")
+        assert n["i"] == 2
+
+    def test_json_rusak_dengan_isi_tidak_dieskalasi(self, monkeypatch):
+        import httpx
+        import pytest
+        from openai import BadRequestError
+        m = self._siapkan(monkeypatch)
+        n = {"i": 0}
+
+        def _stub(*a, **k):
+            n["i"] += 1
+            raise BadRequestError(
+                "Error code: 400 - {'error': {'code': 'json_validate_failed', 'failed_generation': '{rusak'}}",
+                response=httpx.Response(400, request=httpx.Request("POST", "https://x")), body=None,
+            )
+
+        monkeypatch.setattr(m, "_panggil_llm_sekali", _stub)
+        with pytest.raises(BadRequestError):
+            m.generate("p", {"type": "object"}, schema_name="t")
+        assert n["i"] == 1

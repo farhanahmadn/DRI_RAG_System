@@ -357,7 +357,7 @@ class TestRakitNarasiRekomendasi:
         assert hasil.paragraf_gate_intensitas == "Saran asli ITBX."  # fallback, bukan teks LLM ber-angka
         assert hasil.paragraf_dampak == "Saran asli dampak."
 
-    def test_llm_pakai_titik_koma_fallback_deterministik(self, monkeypatch):
+    def test_llm_pakai_titik_koma_diperbaiki_bukan_fallback(self, monkeypatch):
         _patch_narasi_llm(
             monkeypatch,
             hasil_dict={
@@ -373,7 +373,7 @@ class TestRakitNarasiRekomendasi:
         hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Setuju")
 
         assert ";" not in hasil.paragraf_gate_intensitas
-        assert hasil.paragraf_gate_intensitas == "Saran asli ITBX."
+        assert hasil.paragraf_gate_intensitas == "ITBX memenuhi ketentuan, intensitas juga memenuhi."
 
     def test_llm_paragraf_kosong_fallback_deterministik(self, monkeypatch):
         _patch_narasi_llm(
@@ -853,3 +853,17 @@ class TestCaveatSubzonaTakTerkonfirmasi:
         poin_intensitas = next(p for p in output.poin if p.poin_id == "intensitas")
         assert poin_intensitas.status == "Tidak Dinilai"
         assert CAVEAT_SUBZONA_TAK_TERKONFIRMASI not in output.catatan_global
+
+
+def test_narasi_rekomendasi_titik_koma_diperbaiki_bukan_fallback(monkeypatch):
+    """Log VPS 2026-10-14: satu ';' membuang narasi LLM yang sudah jadi ke fallback."""
+    from app.reasoning import assemble as asm
+    from app.reasoning import llm_client as lc
+
+    monkeypatch.setattr(lc, "generate", lambda *a, **k: {
+        "paragraf_gate_intensitas": "ITBX tidak sesuai; pemohon perlu meninjau lokasi.",
+        "paragraf_dampak": "Dampak rendah.",
+    })
+    hasil = asm._rakit_narasi_rekomendasi([], "Tidak Setuju")
+    assert hasil.paragraf_gate_intensitas == "ITBX tidak sesuai, pemohon perlu meninjau lokasi."
+    assert hasil.paragraf_dampak == "Dampak rendah."

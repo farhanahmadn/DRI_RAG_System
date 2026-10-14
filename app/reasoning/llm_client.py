@@ -241,6 +241,18 @@ def _normalisasi_karakter(nilai):
     return nilai
 
 
+_MAKS_TOKEN_EKSKALASI = int(os.getenv("LLM_MAX_TOKENS_EKSKALASI", "8192"))
+
+
+def _keluaran_kosong_token_habis(exc: BadRequestError) -> bool:
+    """Groq 400 `json_validate_failed` dgn `failed_generation` KOSONG: model reasoning menghabiskan
+    seluruh max_tokens utk berpikir sebelum menulis satu karakter JSON pun. Beda dari JSON rusak
+    (failed_generation berisi teks). Mengulang dgn max_tokens SAMA akan gagal identik — log VPS
+    2026-10-14: itbx multi-zona gagal 3/3 persis begitu."""
+    pesan = str(exc)
+    return "json_validate_failed" in pesan and "'failed_generation': ''" in pesan
+
+
 def generate(
     prompt: str,
     json_schema: dict,
@@ -287,11 +299,22 @@ def generate(
         idx = rotator.kunci_awal()
         tunggu_di_kunci_ini = 0
         kunci_berbeda_dicoba = 1
+        sudah_eskalasi_token = False
         while True:
             client = rotator.client_utk(idx)
             try:
                 completion = _panggil_llm_sekali(client, messages, json_schema, schema_name, temperature, max_tokens)
                 break
+            except BadRequestError as exc:
+                if sudah_eskalasi_token or max_tokens >= _MAKS_TOKEN_EKSKALASI or not _keluaran_kosong_token_habis(exc):
+                    raise
+                sudah_eskalasi_token = True
+                logger.warning(
+                    "Keluaran LLM kosong (kemungkinan token habis utk reasoning) — ulang dgn max_tokens %d -> %d",
+                    max_tokens, _MAKS_TOKEN_EKSKALASI,
+                )
+                max_tokens = _MAKS_TOKEN_EKSKALASI
+                continue
             except RateLimitError as exc:
                 jenis = _klasifikasi_rate_limit(str(exc))
                 pindah_kunci = False
