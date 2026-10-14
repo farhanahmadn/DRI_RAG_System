@@ -1052,10 +1052,16 @@ class TestDiagnosaSebab:
     def test_panggilan_llm_gagal_menang_atas_sebab_lain(self):
         # Rate limit / timeout: sebab paling akar, walau masalah guardrail juga terisi.
         d = DiagnosaPoin(
-            poin_id="itbx", berhasil=False, jumlah_chunk=3,
+            poin_id="itbx", berhasil=False, jumlah_chunk=3, percobaan=1,
             masalah_terakhir=["sitasi kosong"], exception_terakhir="RateLimitError: 429",
         )
         assert d.sebab() == "panggilan_llm_gagal"
+
+    def test_db_mati_sebelum_llm_dipanggil_bukan_llm_gagal(self):
+        # 2026-10-14: Postgres lokal mati -> ConnectionTimeout dari ambil_chunks_pendukung, percobaan=0.
+        d = DiagnosaPoin(poin_id="itbx", berhasil=False, percobaan=0,
+                         exception_terakhir="ConnectionTimeout: connection timeout expired")
+        assert d.sebab() == "retrieval_db_gagal"
 
     def test_retrieval_kosong(self):
         d = DiagnosaPoin(poin_id="itbx", berhasil=False, jumlah_chunk=0, masalah_terakhir=["sitasi kosong"])
@@ -1078,7 +1084,7 @@ class TestDiagnosaSebab:
     def test_exception_llm_asli_tetap_panggilan_llm_gagal(self):
         # Kontrol negatif — exception dari SDK Groq (RateLimitError/BadRequestError/dst, tanpa
         # penanda "Panggilan provider") TETAP "panggilan_llm_gagal" spt semula.
-        d = DiagnosaPoin(poin_id="itbx", berhasil=False, exception_terakhir="RateLimitError: 429")
+        d = DiagnosaPoin(poin_id="itbx", berhasil=False, percobaan=1, exception_terakhir="RateLimitError: 429")
         assert d.sebab() == "panggilan_llm_gagal"
 
     def test_guardrail_menolak(self):

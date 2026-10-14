@@ -763,6 +763,11 @@ class DiagnosaPoin:
         if self.exception_terakhir:
             if "Panggilan provider '" in self.exception_terakhir:
                 return "retrieval_provider_gagal"
+            # percobaan == 0: gagal SEBELUM loop LLM mulai (ambil_chunks_pendukung raise selain
+            # error provider, mis. Postgres/pgvector mati: ConnectionTimeout ke localhost:5432,
+            # 2026-10-14). Bukan salah LLM, jangan dilabeli begitu.
+            if self.percobaan == 0:
+                return "retrieval_db_gagal"
             return "panggilan_llm_gagal"
         if self.jumlah_chunk == 0:
             return "retrieval_kosong"
