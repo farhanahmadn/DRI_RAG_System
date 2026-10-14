@@ -385,7 +385,10 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             butir.append(f"pertahankan luas RTH minimal {_angka_prompt(pemeliharaan['luas_rth_m2'])} m² sesuai usulan")
         if pemeliharaan.get("luas_bangunan_m2") is not None:
             butir.append(f"jaga luas bangunan tidak melebihi {_angka_prompt(pemeliharaan['luas_bangunan_m2'])} m² sesuai usulan")
-        butir.append("sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik")
+        if poin.kawasan_resapan is False:
+            butir.append("sediakan tampungan air hujan (tandon atau kolam kecil) dan rawat saluran drainase sebagai praktik baik")
+        else:
+            butir.append("sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik")
         lines.append(
             f"\nSARAN_PEMELIHARAAN (WAJIB): dampak tergolong {poin.status}, jadi TIDAK perlu mitigasi "
             "korektif. Namun saran WAJIB tetap berisi langkah pencegahan dan pemeliharaan yang konkret. "
@@ -425,8 +428,10 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
         if dimensi.get("nilai") is not None:
             detail.append(
-                f"ATAU sumur/kolam resapan dimensi minimum {_angka_prompt(dimensi['nilai'])} "
-                f"{dimensi.get('satuan') or ''}"
+                ("ATAU tampungan air hujan (tandon atau kolam retensi) kapasitas minimum "
+                 if target_mitigasi.get("jenis_fasilitas") == "tampungan"
+                 else "ATAU sumur/kolam resapan dimensi minimum ")
+                + f"{_angka_prompt(dimensi['nilai'])} {dimensi.get('satuan') or ''}"
             )
         if detail:
             # ", " BUKAN "; " — item permintaan user 2026-09-21: DILARANG tanda titik koma di

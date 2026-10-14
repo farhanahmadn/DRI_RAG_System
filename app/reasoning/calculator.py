@@ -136,7 +136,40 @@ def _ambil_pemeliharaan_dampak(impact: ImpactAssessment) -> dict:
     return hasil
 
 
-def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment) -> dict:
+def _fmt_id(nilai: float) -> str:
+    """Format angka ala BE: titik ribuan, koma desimal, 2 desimal ("1.077,00")."""
+    return f"{nilai:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _saran_tampungan(rekom: dict, ambang: float, penyesuaian: dict, dimensi: dict) -> str | None:
+    """Saran mitigasi utk lokasi BUKAN kawasan resapan air: angka luas/KDB/KDH/kapasitas tetap
+    angka BE, tapi fasilitas alternatifnya TAMPUNGAN air hujan (tandon/kolam retensi), bukan sumur
+    resapan. Sumur resapan mengandalkan peresapan ke tanah di kawasan resapan; di luar itu ia bukan
+    pilihan yang pantas. ASUMSI yang perlu dikonfirmasi BE/ahli hidrologi: volume minimum dari
+    rumus BE diperlakukan sebagai kapasitas tampungan."""
+    bagian = []
+    b, r = penyesuaian.get("luas_bangunan_maks_m2"), penyesuaian.get("luas_rth_min_m2")
+    if b is not None:
+        kdb = penyesuaian.get("kdb_maks_persen")
+        bagian.append(f"menyesuaikan luas lantai dasar bangunan menjadi maksimal {_fmt_id(b)} m²"
+                      + (f" (KDB maks {_fmt_angka(kdb)}%)" if kdb is not None else ""))
+    if r is not None:
+        kdh = penyesuaian.get("kdh_min_persen")
+        bagian.append(f"menyediakan RTH minimal {_fmt_id(r)} m²"
+                      + (f" (KDH min {_fmt_angka(kdh)}%)" if kdh is not None else ""))
+    if not bagian and not (dimensi and dimensi.get("nilai") is not None):
+        return None
+    awal = (f"Untuk menurunkan dampak dari {str(rekom.get('status_dampak') or '').upper()} menjadi "
+            f"{str(rekom.get('target_kategori') or '').upper()} (indeks <= {_fmt_angka(ambang)}): ")
+    kalimat = awal + "pemohon disarankan " + " dan ".join(bagian) if bagian else awal + "pemohon disarankan"
+    if dimensi and dimensi.get("nilai") is not None:
+        kalimat += (", atau " if bagian else " ") + (
+            f"menyediakan tampungan air hujan (tandon atau kolam retensi) dengan kapasitas minimum "
+            f"{_fmt_angka(dimensi['nilai'])} {dimensi.get('satuan') or ''}".rstrip())
+    return kalimat + ". Lokasi ini bukan kawasan resapan air."
+
+
+def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment, kawasan_resapan: bool | None = None) -> dict:
     """Arah mitigasi KUALITATIF. TIDAK menghitung ulang c_after/runoff_change_index/impact_score —
     rumus C masih volatile di back-end (sudah direvisi berkali-kali), DILARANG di-hardcode di sini.
     Angka di `*_referensi` HANYA echo apa adanya dari back-end, bukan dihitung/didefinisikan ulang.
@@ -155,7 +188,8 @@ def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment) -> dict:
             "arah": [
                 "pertahankan luas RTH sesuai usulan",
                 "jaga luas bangunan tidak melebihi usulan",
-                "sumur atau kolam resapan sebagai praktik baik",
+                ("tampungan air hujan sebagai praktik baik" if kawasan_resapan is False
+                 else "sumur atau kolam resapan sebagai praktik baik"),
             ],
         }
         pemeliharaan = _ambil_pemeliharaan_dampak(impact)
@@ -168,7 +202,7 @@ def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment) -> dict:
         "arah": [
             "turunkan KDB (proporsi tapak/bangunan)",
             "naikkan KDH/RTH",
-            "sumur resapan",
+            "tampungan air hujan (tandon)" if kawasan_resapan is False else "sumur resapan",
             "kolam retensi",
         ],
     }
@@ -194,7 +228,7 @@ _URUTAN_KATEGORI_DAMPAK = ("Rendah", "Sedang", "Tinggi", "Sangat Tinggi")
 _RE_BAND_DAMPAK = re.compile(r"(?P<op>[<>])?\s*(?P<n1>\d+(?:\.\d+)?)\s*(?:-\s*(?P<n2>\d+(?:\.\d+)?))?")
 
 
-def hitung_target_mitigasi_dampak(impact: ImpactAssessment) -> dict:
+def hitung_target_mitigasi_dampak(impact: ImpactAssessment, kawasan_resapan: bool | None = None) -> dict:
     """Ambang `runoff_change_index` yang perlu dicapai (turun DI BAWAH ambang ini) supaya kategori
     dampak pindah ke SATU TINGKAT LEBIH RINGAN — murni aritmatika ambang atas `threshold_bands`
     (SUDAH diberi back-end) vs `runoff_change_index` (SUDAH diberi back-end). TIDAK menghitung ulang
@@ -246,6 +280,11 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment) -> dict:
         if dimensi:
             hasil["dimensi_minimum_resapan"] = dimensi
         saran_be = rekom.get("saran")
+        if kawasan_resapan is False:
+            # Lokasi non-resapan: teks sumur resapan dari BE TIDAK diteruskan; saran dirakit ulang
+            # dari angka-angka BE yang sama (lihat _saran_tampungan).
+            hasil["jenis_fasilitas"] = "tampungan"
+            saran_be = _saran_tampungan(rekom, rekom["target_indeks_maks"], penyesuaian or {}, dimensi or {})
         if saran_be:
             hasil["saran_be"] = saran_be
         return hasil
@@ -384,7 +423,14 @@ def bangun_langkah_pemeliharaan_dampak(mitigasi: dict, kawasan_resapan: bool | N
             "nilai_target": luas_bangunan,
             "satuan": "m²",
         })
-    if kawasan_resapan:
+    parameter_fasilitas = "Sumur/Kolam Resapan"
+    if kawasan_resapan is False:
+        parameter_fasilitas = "Tampungan Air Hujan"
+        deskripsi_sumur = (
+            "Lokasi bukan kawasan resapan air: sediakan tampungan air hujan (tandon atau kolam kecil) "
+            "dan rawat saluran drainase sebagai praktik baik pengelolaan limpasan."
+        )
+    elif kawasan_resapan:
         deskripsi_sumur = (
             "Lokasi berada di kawasan resapan air: sediakan sumur atau kolam resapan sesuai ketentuan "
             "khusus kawasan resapan air dan pastikan air hujan tidak melimpas keluar lahan."
@@ -395,7 +441,7 @@ def bangun_langkah_pemeliharaan_dampak(mitigasi: dict, kawasan_resapan: bool | N
             "baik pengelolaan limpasan, walaupun dampak tergolong ringan."
         )
     langkah.append({
-        "parameter": "Sumur/Kolam Resapan",
+        "parameter": parameter_fasilitas,
         "deskripsi": deskripsi_sumur,
         "nilai_saat_ini": None,
         "nilai_target": None,
@@ -478,11 +524,15 @@ def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:
             })
         if dimensi and dimensi.get("nilai") is not None:
             satuan_dimensi = dimensi.get("satuan") or ""
+            tampungan = target_mitigasi.get("jenis_fasilitas") == "tampungan"
             langkah_rinci.append({
-                "parameter": "Dimensi Minimum Sumur Resapan",
+                "parameter": "Kapasitas Minimum Tampungan Air Hujan" if tampungan else "Dimensi Minimum Sumur Resapan",
                 "deskripsi": (
-                    f"Alternatif: sediakan sumur atau kolam resapan dengan dimensi minimum "
-                    f"{_fmt_angka(dimensi['nilai'])} {satuan_dimensi} berdasarkan rumus mitigasi hidrologi."
+                    (f"Alternatif: sediakan tampungan air hujan (tandon atau kolam retensi) dengan kapasitas "
+                     f"minimum {_fmt_angka(dimensi['nilai'])} {satuan_dimensi}. Lokasi bukan kawasan resapan air.")
+                    if tampungan else
+                    (f"Alternatif: sediakan sumur atau kolam resapan dengan dimensi minimum "
+                     f"{_fmt_angka(dimensi['nilai'])} {satuan_dimensi} berdasarkan rumus mitigasi hidrologi.")
                 ),
                 "nilai_saat_ini": 0,
                 "nilai_target": _bulat2(dimensi["nilai"]),

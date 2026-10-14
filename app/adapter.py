@@ -225,10 +225,10 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "luas_usulan_melebihi_persil": impact.luas_usulan_melebihi_persil,
             "kawasan_resapan": assessment.lokasi.kawasan_resapan,
             # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
-            "mitigasi": sarankan_arah_mitigasi_dampak(impact),
+            "mitigasi": sarankan_arah_mitigasi_dampak(impact, assessment.lokasi.kawasan_resapan),
             # Target kuantitatif (ambang runoff_change_index utk turun 1 kategori) — murni aritmatika
             # threshold_bands vs index yang SUDAH diberi back-end, bukan hitung ulang rumus C.
-            "target_mitigasi": hitung_target_mitigasi_dampak(impact),
+            "target_mitigasi": hitung_target_mitigasi_dampak(impact, assessment.lokasi.kawasan_resapan),
         },
         dasar_hukum=[],
         zona=assessment.lokasi.rdtr_zone,

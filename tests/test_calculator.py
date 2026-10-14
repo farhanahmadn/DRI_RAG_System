@@ -527,9 +527,53 @@ def test_langkah_sumur_resapan_dampak_ringan_mengikuti_status_resapan():
     from app.reasoning.calculator import bangun_langkah_dampak_poin
     mitigasi = {"perlu_mitigasi": False, "arah": ["x"], "pemeliharaan": {}}
 
-    def _sumur(status):
+    def _fasilitas(status):
         langkah = bangun_langkah_dampak_poin({"mitigasi": mitigasi, "kawasan_resapan": status})
-        return [l for l in langkah if l["parameter"] == "Sumur/Kolam Resapan"][0]["deskripsi"]
+        return langkah[-1]
 
-    assert "ketentuan khusus kawasan resapan air" in _sumur(True)
-    assert "praktik baik" in _sumur(False) and "praktik baik" in _sumur(None)
+    assert _fasilitas(True)["parameter"] == "Sumur/Kolam Resapan"
+    assert "ketentuan khusus kawasan resapan air" in _fasilitas(True)["deskripsi"]
+    assert _fasilitas(None)["parameter"] == "Sumur/Kolam Resapan"
+    assert "praktik baik" in _fasilitas(None)["deskripsi"]
+    # Lokasi non-resapan: bukan sumur resapan, tapi tampungan air hujan.
+    assert _fasilitas(False)["parameter"] == "Tampungan Air Hujan"
+    assert "sumur" not in _fasilitas(False)["deskripsi"].lower()
+
+
+class TestMitigasiTinggiNonResapan:
+    """APP-2026-UJI-4: lokasi non-resapan tak boleh disarankan sumur resapan."""
+
+    def _impact(self):
+        return ImpactAssessment(
+            dinilai=True, impact_category="TINGGI", runoff_change_index=2.671,
+            rekomendasi_mitigasi={
+                "status_dampak": "TINGGI", "target_kategori": "SEDANG", "target_indeks_maks": 2.5,
+                "dimensi_minimum": {"nilai": 0.62, "satuan": "m³"},
+                "rekomendasi_penyesuaian_lahan": {
+                    "luas_bangunan_maks_m2": 1077.0, "luas_rth_min_m2": 359.0,
+                    "kdb_maks_persen": 75, "kdh_min_persen": 25},
+                "saran": "... atau menyediakan fasilitas sumur/kolam resapan air hujan ..."},
+        )
+
+    def test_saran_dirakit_ulang_tanpa_sumur_resapan_dengan_angka_be(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact(), False)
+        saran = hasil["saran_be"]
+        assert "sumur" not in saran.lower()
+        assert "1.077,00 m²" in saran and "359,00 m²" in saran and "0.62 m³" in saran
+        assert "tampungan air hujan" in saran and "bukan kawasan resapan air" in saran
+        assert hasil["jenis_fasilitas"] == "tampungan"
+
+    def test_langkah_konkret_tampungan(self):
+        hasil = hitung_target_mitigasi_dampak(self._impact(), False)
+        nama = [l["parameter"] for l in bangun_langkah_konkret_dampak(hasil)]
+        assert nama[-1] == "Kapasitas Minimum Tampungan Air Hujan"
+
+    def test_resapan_dan_tak_diketahui_tetap_saran_be_apa_adanya(self):
+        for status in (True, None):
+            hasil = hitung_target_mitigasi_dampak(self._impact(), status)
+            assert "sumur/kolam resapan" in hasil["saran_be"]
+            assert "jenis_fasilitas" not in hasil
+
+    def test_arah_mitigasi_tinggi_non_resapan(self):
+        arah = sarankan_arah_mitigasi_dampak(self._impact(), False)["arah"]
+        assert "sumur resapan" not in arah and any("tampungan" in a for a in arah)

@@ -289,6 +289,15 @@ def chunk_ketentuan_resapan(chunk: Chunk) -> bool:
     return (chunk.pasal or "").strip() == "53" and "resapan" in (chunk.teks or "").lower()
 
 
+def chunk_terkait_resapan(chunk: Chunk) -> bool:
+    """Lebih luas dari `chunk_ketentuan_resapan`: juga chunk pasal LAIN yang memuat kebijakan
+    "zero delta Q" (mis. Pasal 50 ayat 11, kawasan rawan kekeringan, ikut tampil di APP-2026-UJI-4
+    padahal lokasi non-resapan dan bukan kawasan rawan kekeringan). Hanya dipakai utk MEMBUANG pada
+    lokasi non-resapan."""
+    teks = (chunk.teks or "").lower()
+    return chunk_ketentuan_resapan(chunk) or "zero delta q" in teks
+
+
 def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retriever: Retriever,
                                   top_k: int) -> list[Chunk]:
     """Poin dampak: sitasi ketentuan resapan air mengikuti `kawasan_resapan` dari BE.
@@ -300,7 +309,7 @@ def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retrie
     if poin.poin_id != "dampak" or poin.kawasan_resapan is None:
         return chunks
     if poin.kawasan_resapan is False:
-        return [c for c in chunks if not chunk_ketentuan_resapan(c)][:top_k]
+        return [c for c in chunks if not chunk_terkait_resapan(c)][:top_k]
     if any(chunk_ketentuan_resapan(c) for c in chunks):
         return chunks
     filters = (RetrievalFilters(zona=poin.zona_subzone) if poin.zona_subzone

@@ -1278,3 +1278,17 @@ class TestSitasiResapanMengikutiStatusBE:
         p53 = self._chunk("p53-a3", "53", "kawasan resapan air")
         poin = _poin(poin_id="itbx", kawasan_resapan=False)
         assert _sesuaikan_dgn_status_resapan([p53], poin, self._Retriever([]), 3) == [p53]
+
+
+def test_non_resapan_juga_membuang_chunk_zero_delta_q_pasal_lain():
+    """APP-2026-UJI-4: Pasal 50 ayat 11 (kawasan rawan kekeringan, memuat zero delta Q) ikut
+    tersitasi di lokasi non-resapan."""
+    from app.retrieval.base import Chunk
+    from app.reasoning.generator import _sesuaikan_dgn_status_resapan, chunk_terkait_resapan
+    p50 = Chunk(id="p50-a11", level="ayat", dokumen="Perbup", pasal="50",
+                teks="(11) kawasan rawan bencana kekeringan: memastikan air tidak melimpas (zero delta Q policy) dengan pembuatan sumur")
+    biasa = Chunk(id="vi-r-3", level="tabel", dokumen="Perbup", pasal="", teks="Lampiran VI R-3")
+    assert chunk_terkait_resapan(p50) and not chunk_terkait_resapan(biasa)
+    poin = TestSitasiResapanMengikutiStatusBE()._poin(False)
+    hasil = _sesuaikan_dgn_status_resapan([p50, biasa], poin, TestSitasiResapanMengikutiStatusBE._Retriever([]), 3)
+    assert [c.id for c in hasil] == ["vi-r-3"]
