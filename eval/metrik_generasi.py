@@ -380,7 +380,7 @@ class Kasus:
 
         [] punya DUA sebab yang sama-sama berarti "tak terukur", bukan "nol penolakan": baris log
         lebih tua dari field ini (seluruh log sebelum 2026-10-09), atau retrieval gagal sebelum
-        LLM sempat dipanggil sekali pun (`sebab` = retrieval_kosong/retrieval_provider_gagal).
+        LLM sempat dipanggil sekali pun (`sebab` = retrieval_kosong/retrieval_provider_gagal/retrieval_db_gagal).
         Keduanya dibuang dari penyebut di `laju_tolak_guardrail`, tidak dihitung sebagai lolos.
         """
         r = (self.diagnosa or {}).get("riwayat_percobaan")

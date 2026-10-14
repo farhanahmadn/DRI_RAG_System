@@ -1730,7 +1730,8 @@ def bangun_html(r: dict) -> str:
     blok_gen = ""
     if gen.get("n_poin"):
         palet = {"berhasil": "#059669", "guardrail_menolak": "#d97706",
-                 "panggilan_llm_gagal": "#dc2626", "retrieval_kosong": "#7c3aed"}
+                 "panggilan_llm_gagal": "#dc2626", "retrieval_kosong": "#7c3aed",
+                 "retrieval_provider_gagal": "#0891b2", "retrieval_db_gagal": "#475569"}
         sitasi_txt = (f"{gen['sitasi_terverifikasi']}/{gen['sitasi']} sitasi terverifikasi"
                       if gen.get("sitasi") else "tidak ada sitasi tercatat")
         n_gagal = gen["sebab"].get("panggilan_llm_gagal", 0)
