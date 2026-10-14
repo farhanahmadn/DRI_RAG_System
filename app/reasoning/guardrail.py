@@ -336,6 +336,11 @@ def _angka_terlacak_ke_sumber(
     sumber += " " + " ".join(_angka_fakta_poin(poin))
     sumber += " " + " ".join(d.pasal or "" for d in poin.dasar_hukum)
     sumber += " " + " ".join(d.dokumen or "" for d in poin.dasar_hukum)
+    # APP-2026-0095: `REASON` BE disuntikkan ke prompt ITBX (prompts._bangun_fakta_itbx) sehingga LLM
+    # sah mengutip angkanya (mis. "Zona Pertanian (743.5 m2: Status X)"), tapi dulu tak termasuk
+    # `sumber` -> guardrail menolak angka yg ia sendiri suruh LLM baca. Teks mentah, tanpa reformat.
+    if isinstance(poin.fakta.get("reason"), str):
+        sumber += " " + poin.fakta["reason"]
     # APP-2026-8025/-5067: `rekomendasi_mitigasi.saran`/`catatan` BE ditulis format Indonesia
     # (titik ribuan, koma desimal, mis. "11.551,06 m²") — `_RE_ANGKA_MENCURIGAKAN` men-tokenize ini
     # BEDA dari representasi float Python (`_angka_fakta_poin` di atas sudah menambah
@@ -591,6 +596,18 @@ def _cek_citation_id_bocor(poin_output: PoinOutput, poin: PoinKonteks, chunks: l
 _RE_TANDA_BACA_DILARANG = re.compile(r";")
 
 
+_RE_TITIK_KOMA_DAFTAR = re.compile(r"\s*;\s*(?=\d+[.)]\s)")
+_RE_TITIK_KOMA = re.compile(r"\s*;\s*")
+
+
+def _perbaiki_titik_koma(teks: str) -> str:
+    """Titik koma adalah gaya, bukan fakta: menolak lalu meregenerasi seluruh poin untuk satu ';'
+    membuang percobaan (APP-2026-0095: ITBX gagal 3x, percobaan terakhir hanya karena ';' di
+    daftar bernomor). Perbaiki deterministik: '; 2.' -> '. 2.', selainnya ';' -> ','."""
+    teks = _RE_TITIK_KOMA_DAFTAR.sub(". ", teks)
+    return _RE_TITIK_KOMA.sub(", ", teks)
+
+
 def _cek_tanda_baca_dilarang(poin_output: PoinOutput) -> list[str]:
     teks = (
         f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} "
@@ -662,6 +679,18 @@ def perbaiki_poin(
             ),
         }
     )
+
+    poin_bersih = poin_bersih.model_copy(update={
+        "reasoning_pendek": _perbaiki_titik_koma(poin_bersih.reasoning_pendek),
+        "reasoning_panjang": _perbaiki_titik_koma(poin_bersih.reasoning_panjang),
+        "rekomendasi": poin_bersih.rekomendasi.model_copy(update={
+            "saran": _perbaiki_titik_koma(poin_bersih.rekomendasi.saran),
+            "disclaimer": (
+                _perbaiki_titik_koma(poin_bersih.rekomendasi.disclaimer)
+                if poin_bersih.rekomendasi.disclaimer else poin_bersih.rekomendasi.disclaimer
+            ),
+        }),
+    })
 
     if not poin_bersih.reasoning_pendek.strip() or not poin_bersih.reasoning_panjang.strip():
         masalah.append("reasoning_pendek/reasoning_panjang kosong.")

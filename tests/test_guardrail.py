@@ -1263,9 +1263,10 @@ class TestRiwayatPercobaan:
         def _stub(prompt, json_schema, *, schema_name="response", system=None, temperature=0.0, max_tokens=1024):
             n["i"] += 1
             if n["i"] == 1:
-                # Titik koma -> ditolak _cek_tanda_baca_dilarang (aturan #17), bukan exception.
+                # Angka tak terlacak -> ditolak _cek_konsistensi_numerik (aturan #8), bukan exception.
+                # (Titik koma dulu dipakai di sini, tapi kini diperbaiki otomatis, bukan ditolak.)
                 return {"reasoning_pendek": "Kegiatan termasuk kategori Bersyarat (B) di zona ini.",
-                        "reasoning_panjang": "Kegiatan termasuk kategori Bersyarat (B); wajib memenuhi ketentuan.",
+                        "reasoning_panjang": "Kegiatan termasuk kategori Bersyarat (B) seluas 7731 hektare.",
                         "sitasi": [{"citation_id": "anchor-0", "kutipan": "Kutipan dari anchor."}],
                         "saran": "Penuhi persyaratan yang ditetapkan sebelum kegiatan dijalankan.",
                         "disclaimer": None}
@@ -1290,7 +1291,7 @@ class TestRiwayatPercobaan:
         assert [e["sebab"] for e in diagnosa.riwayat_percobaan] == ["guardrail_menolak", "berhasil"]
         assert diagnosa.riwayat_percobaan[0]["masalah"], \
             "alasan penolakan percobaan pertama TIDAK boleh hilang — justru ini datanya"
-        assert any("titik koma" in m for m in diagnosa.riwayat_percobaan[0]["masalah"])
+        assert any("angka" in m for m in diagnosa.riwayat_percobaan[0]["masalah"])
         assert diagnosa.riwayat_percobaan[1]["masalah"] == []
 
     def test_lolos_di_percobaan_pertama_punya_satu_entri(self, monkeypatch):
@@ -1584,3 +1585,24 @@ class TestCekTandaBacaDilarang:
             rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="Lengkapi dokumen X, lalu ajukan izin Y."),
         )
         assert _cek_tanda_baca_dilarang(output) == []
+
+
+class TestPerbaikiTitikKomaDanAngkaReason:
+    """APP-2026-0095: ITBX gagal 3x. Percobaan 2 ditolak karena angka dari REASON (yang disuntik ke
+    prompt) tak diakui sebagai sumber; percobaan 3 hanya karena satu ';' di daftar bernomor."""
+
+    def test_titik_koma_diperbaiki_bukan_ditolak(self):
+        from app.reasoning.guardrail import _perbaiki_titik_koma
+        assert _perbaiki_titik_koma("1. Satu; 2. Dua; 3. Tiga") == "1. Satu. 2. Dua. 3. Tiga"
+        assert _perbaiki_titik_koma("Pertama; kedua") == "Pertama, kedua"
+        assert ";" not in _perbaiki_titik_koma("a ;b;  c")
+
+    def test_angka_dari_reason_diakui_sebagai_sumber(self):
+        from app.reasoning.guardrail import _angka_terlacak_ke_sumber
+        poin = _poin(
+            status="X",
+            fakta={"reason": "Rincian: Zona Pertanian (743.5 m2: Status X)"},
+            dasar_hukum=[DasarHukum(dokumen="RDTR Sleman", pasal="Matriks ITBX", kutipan="Data KBLI referensi")],
+        )
+        assert _angka_terlacak_ke_sumber("743.5", poin)
+        assert not _angka_terlacak_ke_sumber("999.5", poin)
