@@ -1,0 +1,241 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "18ca9c7f-a341-42e7-811c-dcf8dfc54dcd",
+    "application_number": "APP-2026-UJI-2-TINGGI-RESAPAN",
+    "timestamp": "2026-10-14T05:00:00.000Z",
+    "lokasi": {
+      "koordinat": {
+        "lat": -7.688990626701707,
+        "lon": 110.33266290793831
+      },
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.332403846,
+              -7.688919756
+            ],
+            [
+              110.332749952,
+              -7.689269609
+            ],
+            [
+              110.332881472,
+              -7.688933476
+            ],
+            [
+              110.332597665,
+              -7.688775699
+            ],
+            [
+              110.332403846,
+              -7.688919756
+            ]
+          ]
+        ]
+      },
+      "rdtr_zone": "Zona Perumahan",
+      "rdtr_subzone": "R-3",
+      "rdtr_subzone_source": "geojson_overlay",
+      "luas_lahan_m2": 1436.0
+    },
+    "gate_hukum": {
+      "final_gate_status": "Tidak Lolos",
+      "rekomendasi_sistem": "Tidak Setuju",
+      "decisive_stage": "intensitas",
+      "tahapan": {
+        "itbx": {
+          "status": "B",
+          "lolos": true,
+          "kbli_diusulkan": "Penyediaan",
+          "kegiatan_diusulkan": "Penyediaan Akomodasi Lainnya",
+          "kegiatan_diizinkan": [],
+          "kegiatan_terbatas": [],
+          "kegiatan_bersyarat": [
+            "Penyediaan Akomodasi Lainnya"
+          ],
+          "keterangan_ketentuan": [
+            "Ketentuan Umum kegiatan yang diperbolehkan secara Terbatas (T): hanya untuk perumahan dan akomodasi terbatas",
+            "Ketentuan Umum kegiatan yang diperbolehkan secara Bersyarat (B): luas keseluruhan kegiatan akomodasi makan minum maksimal 20% dari luas blok"
+          ],
+          "reason": "Lolos karena kegiatan Bersyarat (B) di zona Zona Perumahan",
+          "dasar_hukum": [
+            {
+              "dokumen": "RDTR Sleman",
+              "pasal": "Matriks ITBX (R-3)",
+              "kutipan": "Data KBLI referensi"
+            }
+          ]
+        },
+        "lp2b": {
+          "status": "AMAN",
+          "lolos": true,
+          "reason": null
+        },
+        "sempadan": {
+          "status": "AMAN",
+          "lolos": true,
+          "reason": null
+        },
+        "intensitas": {
+          "status": "MELAMPAUI_BATAS",
+          "lolos": false,
+          "parameter": {
+            "kdb": {
+              "usulan": 83.57,
+              "ambang_maks": 50.0,
+              "memenuhi": false,
+              "satuan": "persen"
+            },
+            "klb": {
+              "usulan": 2.51,
+              "ambang_maks": 3.0,
+              "memenuhi": true,
+              "satuan": "rasio"
+            },
+            "kdh": {
+              "usulan": 13.93,
+              "ambang_min": 30.0,
+              "memenuhi": false,
+              "satuan": "persen"
+            }
+          },
+          "luas_tapak_m2": 1200.0,
+          "jumlah_lantai": 3,
+          "luas_rth_usulan_m2": 200.0,
+          "reason": "Melanggar Aturan: KDB (83.57%) melebihi batas maksimal Zona Perumahan (50.00%), KDH (13.93%) kurang dari batas minimal Zona Perumahan (30.00%)",
+          "dasar_hukum": [
+            {
+              "dokumen": "RDTR Sleman",
+              "pasal": "Ketentuan Intensitas Ruang (R-3)",
+              "kutipan": "KDB maks 50%, KLB maks 3.0, KDH min 30% (kawasan resapan air)"
+            }
+          ]
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": true,
+      "c_before": 0.3,
+      "c_after": 0.801,
+      "delta_c": 0.501,
+      "runoff_change_index": 2.671,
+      "impact_score": 46,
+      "impact_category": "TINGGI",
+      "calculation_details": "C_Sebelum = 0.3; C_Sesudah = 0.801 (Luas Persil: 1436.0 m2, Permohonan: 1400 m2)",
+      "threshold_bands": {
+        "Rendah": "index < 1.5",
+        "Sedang": "1.5-2.5",
+        "Tinggi": "2.5-4.0",
+        "Sangat Tinggi": "> 4.0"
+      },
+      "rekomendasi_mitigasi": {
+        "status_dampak": "TINGGI",
+        "target_kategori": "SEDANG",
+        "target_indeks_maks": 2.5,
+        "c_target_sedang": 0.75,
+        "dimensi_minimum": {
+          "nilai": 0.62,
+          "satuan": "m³",
+          "rumus": "(C_sesudah - 2.5 x C_sebelum) x 0.013659 x Luas Lahan terbangun / (5 x 3.14 x 0.086)",
+          "parameter": {
+            "c_sesudah": 0.801,
+            "c_sebelum": 0.3,
+            "c_target_sedang": 0.75,
+            "luas_lahan_terbangun_m2": 1200.0,
+            "faktor_pembilang": 0.013659,
+            "faktor_penyebut": 1.3502
+          }
+        },
+        "rekomendasi_penyesuaian_lahan": {
+          "luas_bangunan_maks_m2": 1077.0,
+          "luas_rth_min_m2": 359.0,
+          "kdb_maks_persen": 75,
+          "kdh_min_persen": 25,
+          "catatan": "Agar indeks runoff turun ke <= 2.5 (kategori Sedang), luas bangunan maksimal adalah 1.077,00 m² dan RTH minimal 359,00 m²."
+        },
+        "saran": "Untuk menurunkan dampak dari TINGGI menjadi SEDANG (indeks <= 2.5): pemohon disarankan menyesuaikan luas lantai dasar bangunan menjadi maksimal 1.077,00 m² (KDB maks 75%) dan menyediakan RTH minimal 359,00 m² (KDH min 25%), atau menyediakan fasilitas sumur/kolam resapan air hujan dengan dimensi kapasitas minimum 0.62 m³."
+      },
+      "existing_surface_details": {
+        "kelas": "Daerah tak Terbangun / RTH",
+        "luas_persil_m2": 1436.0,
+        "luas_persil_source": "land_area",
+        "c_before_source": "rth_baseline_taman",
+        "proporsi": 1,
+        "C": 0.3
+      },
+      "proposed_surface_details": {
+        "Bangunan/Atap": 83.6,
+        "Taman/RTH": 13.9,
+        "Sisa Persil Eksisting": 2.5
+      },
+      "detailed_surface_breakdown": {
+        "luas_persil_m2": 1436.0,
+        "luas_persil_source": "land_area",
+        "luas_permohonan_m2": 1400.0,
+        "luas_sisa_m2": 36.0,
+        "proporsi_sisa": 0.025,
+        "proporsi_permohonan": 0.975,
+        "proporsi_terbangun": 0.857,
+        "proporsi_taman": 0.143,
+        "is_persil_found": false,
+        "is_multi_persil": false,
+        "persil_count": 0,
+        "persil_unioned": false,
+        "luas_usulan_melebihi_persil": false,
+        "kdb_usulan_persen": 83.57,
+        "kdh_usulan_persen": 13.93,
+        "Bangunan/Atap": {
+          "luas_m2": 1200.0,
+          "proporsi": 0.836,
+          "proporsi_dlm_permohonan": 0.857,
+          "C": 0.9,
+          "kelas": "Perdagangan Pusat Kota"
+        },
+        "Taman/RTH": {
+          "luas_m2": 200.0,
+          "proporsi": 0.139,
+          "proporsi_dlm_permohonan": 0.143,
+          "C": 0.3,
+          "kelas": "Taman / RTH"
+        },
+        "Sisa Persil Eksisting": {
+          "luas_m2": 36.0,
+          "proporsi": 0.025,
+          "C": 0.3,
+          "kelas": "Daerah tak Terbangun / RTH"
+        }
+      },
+      "c_coefficients": {
+        "C_Atap_KBLI": 0.9,
+        "Kelas_Atap": "Perdagangan Pusat Kota",
+        "C_Taman": 0.3,
+        "C_Sisa_Persil": 0.3,
+        "Kelas_Eksisting": "Daerah tak Terbangun / RTH",
+        "Luas_Persil_m2": 1436.0,
+        "Luas_Permohonan_m2": 1400.0,
+        "Luas_Sisa_m2": 36.0,
+        "Proporsi_Sisa": 0.025,
+        "Proporsi_Permohonan": 0.975,
+        "Proporsi_Terbangun": 0.857,
+        "Proporsi_Taman": 0.143,
+        "Luas_Persil_Source": "land_area",
+        "C_Before_Source": "rth_baseline_taman"
+      },
+      "luas_lahan_m2": 1436.0,
+      "luas_persil_source": "land_area",
+      "c_before_source": "rth_baseline_taman",
+      "luas_usulan_melebihi_persil": false,
+      "data_confidence": "High",
+      "limitations": null,
+      "multi_persil": false
+    },
+    "meta": {
+      "data_confidence_keseluruhan": "Tinggi",
+      "caveats": []
+    }
+  }
+}
