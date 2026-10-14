@@ -5,6 +5,7 @@ berikutnya). Lihat CLAUDE.md § Kontrak Input untuk kontrak gate_hukum/impact_as
 """
 
 import os
+import re
 
 from app.reasoning.calculator import (
     hitung_target_intensitas,
@@ -98,6 +99,44 @@ def _bangun_poin_itbx(assessment: L2Assessment) -> PoinKonteks:
     )
 
 
+def _zona_pemilik_ambang(assessment: L2Assessment) -> tuple[str | None, str | None]:
+    """(nama_zona, kode_zona) zona yang MEMILIKI ambang pada `tahapan.intensitas`, atau
+    (None, None) bila tak bisa dipastikan.
+
+    APP-2026-0095: lahan menyilang tiga zona. `lokasi.rdtr_zone` = Zona Pertanian (P-1), tapi
+    Pertanian berstatus X sehingga intensitasnya TIDAK_DIEVALUASI, dan ambang pada
+    `tahapan.intensitas` (KDB maks 60%) milik Zona Perumahan. Memakai `lokasi.rdtr_zone` membuat
+    narasi menulis "KDB melebihi 60% di Zona Pertanian P-1" dan retrieval mengambil Lampiran VI
+    P-1 (KDB 10%) yang bertabrakan dgn angka BE.
+
+    Penentu: kode zona di akhir `dasar_hukum[].pasal` ("... (R)") yang cocok dgn tepat satu entri
+    `intensitas_zones`; kalau tak ada, entri tunggal yang status & ambangnya sama persis.
+    """
+    intensitas = assessment.gate_hukum.tahapan.intensitas
+    zona_list = assessment.gate_hukum.intensitas_zones or []
+    if intensitas is None or len(zona_list) < 2:
+        return None, None
+
+    kode_pasal = {
+        m.group(1).strip().upper()
+        for d in intensitas.dasar_hukum
+        if (m := re.search(r"\(([^()]+)\)\s*$", d.pasal or ""))
+    }
+    cocok = [z for z in zona_list if z.kode_zona and z.kode_zona.strip().upper() in kode_pasal]
+    if len(cocok) != 1:
+        def _ambang(parameter: dict) -> dict:
+            return {
+                nama: (p.get("ambang_maks"), p.get("ambang_min")) if isinstance(p, dict)
+                else (p.ambang_maks, p.ambang_min)
+                for nama, p in parameter.items()
+            }
+        milik = _ambang(intensitas.parameter)
+        cocok = [z for z in zona_list if z.status == intensitas.status and _ambang(z.parameter) == milik]
+    if len(cocok) != 1:
+        return None, None
+    return cocok[0].nama_zona, cocok[0].kode_zona
+
+
 def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
     intensitas = assessment.gate_hukum.tahapan.intensitas
     if intensitas is None:
@@ -116,6 +155,12 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
             zona=assessment.lokasi.rdtr_zone,
         zona_subzone=assessment.lokasi.rdtr_subzone,
         )
+    zona, zona_subzone = assessment.lokasi.rdtr_zone, assessment.lokasi.rdtr_subzone
+    nama_pemilik, _ = _zona_pemilik_ambang(assessment)
+    if nama_pemilik and nama_pemilik.strip().lower() != (zona or "").strip().lower():
+        # Sub-zona lokasi (mis. P-1) milik zona LAIN, bukan pemilik ambang -> jangan dibawa.
+        # Sub-zona pemilik ambang tak dikirim BE, jadi caveat sub-zona tak terkonfirmasi berlaku.
+        zona, zona_subzone = nama_pemilik, None
     return PoinKonteks(
         poin_id="intensitas",
         kategori="Intensitas Bangunan (KDB/KLB/KDH)",
@@ -146,8 +191,8 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
             "target": hitung_target_intensitas(intensitas, assessment.lokasi.luas_lahan_m2),
         },
         dasar_hukum=intensitas.dasar_hukum,
-        zona=assessment.lokasi.rdtr_zone,
-        zona_subzone=assessment.lokasi.rdtr_subzone,
+        zona=zona,
+        zona_subzone=zona_subzone,
     )
 
 

@@ -10,7 +10,7 @@ from app.adapter import (
     deteksi_fallback_itbx,
     di_luar_cakupan,
 )
-from app.schemas import L2Assessment, Lokasi
+from app.schemas import DasarHukum, IntensitasZona, L2Assessment, Lokasi
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -407,3 +407,44 @@ class TestDiLuarCakupanWilayah:
         menjatuhkan permohonan, dan diam lebih baik drpd peringatan palsu."""
         monkeypatch.setenv("CAKUPAN_BBOX", nilai)
         assert di_luar_cakupan(self._lokasi(-7.78329, 110.47835)) is False
+
+
+def _multi_zona_0095():
+    """Meniru APP-2026-0095: lokasi = Zona Pertanian P-1 (X, intensitas tak dievaluasi), tapi
+    ambang pada tahapan.intensitas milik Zona Perumahan (R)."""
+    a = _muat_assessment("l2_sample_lolos.json")
+    i = a.gate_hukum.tahapan.intensitas
+    param = {n: {"ambang_maks": p.ambang_maks, "ambang_min": p.ambang_min} for n, p in i.parameter.items()}
+    kosong = {n: {"ambang_maks": None, "ambang_min": None} for n in param}
+    dh = DasarHukum(dokumen="RDTR Sleman", pasal="Ketentuan Intensitas Ruang (R)", kutipan="KDB maks 60%")
+    tahap = a.gate_hukum.tahapan.model_copy(update={"intensitas": i.model_copy(update={"dasar_hukum": [dh]})})
+    zones = [
+        IntensitasZona(nama_zona="Zona Pertanian", kode_zona="P", status="TIDAK_DIEVALUASI", parameter=kosong),
+        IntensitasZona(nama_zona="Zona Perumahan", kode_zona="R", status=i.status, parameter=param),
+    ]
+    gate = a.gate_hukum.model_copy(update={"tahapan": tahap, "intensitas_zones": zones})
+    lokasi = a.lokasi.model_copy(update={"rdtr_zone": "Zona Pertanian", "rdtr_subzone": "P-1"})
+    return a.model_copy(update={"gate_hukum": gate, "lokasi": lokasi})
+
+
+def test_intensitas_multi_zona_memakai_zona_pemilik_ambang_bukan_zona_lokasi():
+    poin = {p.poin_id: p for p in adaptasi(_multi_zona_0095()).poin}
+    assert poin["intensitas"].zona == "Zona Perumahan"
+    assert poin["intensitas"].zona_subzone is None  # P-1 milik zona lain, jangan dibawa
+    assert poin["itbx"].zona == "Zona Pertanian"  # ITBX tak berubah
+
+
+def test_intensitas_zona_pemilik_ambang_ditentukan_lewat_ambang_bila_pasal_tak_ada_kodenya():
+    a = _multi_zona_0095()
+    i = a.gate_hukum.tahapan.intensitas
+    dh = DasarHukum(dokumen="RDTR Sleman", pasal="Ketentuan Intensitas Ruang", kutipan="KDB maks 60%")
+    tahap = a.gate_hukum.tahapan.model_copy(update={"intensitas": i.model_copy(update={"dasar_hukum": [dh]})})
+    a = a.model_copy(update={"gate_hukum": a.gate_hukum.model_copy(update={"tahapan": tahap})})
+    assert {p.poin_id: p for p in adaptasi(a).poin}["intensitas"].zona == "Zona Perumahan"
+
+
+def test_intensitas_tanpa_intensitas_zones_tetap_memakai_zona_lokasi():
+    a = _muat_assessment("l2_sample_lolos.json")
+    poin = {p.poin_id: p for p in adaptasi(a).poin}
+    assert poin["intensitas"].zona == a.lokasi.rdtr_zone
+    assert poin["intensitas"].zona_subzone == a.lokasi.rdtr_subzone

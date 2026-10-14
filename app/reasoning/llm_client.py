@@ -222,6 +222,25 @@ def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict,
         )
 
 
+# Model (gpt-oss) kadang memakai varian Unicode yg tampak sama dgn tanda hubung/spasi biasa
+# (APP-2026-0095: "sub-zona P-1" bertanda hubung U+2011). Visual identik, tapi pencarian teks/salin-tempel di FE
+# tak menemukannya. Dinormalisasi ke ASCII di satu pintu keluaran LLM, sebelum guardrail.
+_PETA_KARAKTER = str.maketrans({
+    "\u2010": "-", "\u2011": "-", "\u2012": "-",
+    "\u00a0": " ", "\u202f": " ", "\u2007": " ", "\u2009": " ",
+})
+
+
+def _normalisasi_karakter(nilai):
+    if isinstance(nilai, str):
+        return nilai.translate(_PETA_KARAKTER)
+    if isinstance(nilai, list):
+        return [_normalisasi_karakter(v) for v in nilai]
+    if isinstance(nilai, dict):
+        return {k: _normalisasi_karakter(v) for k, v in nilai.items()}
+    return nilai
+
+
 def generate(
     prompt: str,
     json_schema: dict,
@@ -318,6 +337,7 @@ def generate(
             hasil = json.loads(content)
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"LLM tidak mengembalikan JSON valid: {content!r}") from exc
+        hasil = _normalisasi_karakter(hasil)
 
         return hasil
     except Exception as exc:

@@ -600,6 +600,20 @@ _RE_TITIK_KOMA_DAFTAR = re.compile(r"\s*;\s*(?=\d+[.)]\s)")
 _RE_TITIK_KOMA = re.compile(r"\s*;\s*")
 
 
+_RE_REFERENSI_PENUTUP = re.compile(r"[ \t]*Referensi\s*:[^\n]*")
+_RE_BATAS_KALIMAT = re.compile(r"[.!?]\s+[A-Z]")
+
+
+def _buang_referensi_inline(teks: str) -> str:
+    """Daftar "Referensi: ..." di dalam narasi duplikat field `sitasi` dan memuat rujukan yg tak
+    relevan (APP-2026-0095: ITBX menyebut "Lampiran VI ketentuan intensitas"). Dibuang hanya bila
+    ia kalimat PENUTUP barisnya (tak ada batas kalimat di dalamnya), supaya kalimat lain tak ikut
+    terhapus."""
+    def _ganti(m: re.Match) -> str:
+        return m.group(0) if _RE_BATAS_KALIMAT.search(m.group(0)) else ""
+    return _RE_REFERENSI_PENUTUP.sub(_ganti, teks).rstrip()
+
+
 def _perbaiki_titik_koma(teks: str) -> str:
     """Titik koma adalah gaya, bukan fakta: menolak lalu meregenerasi seluruh poin untuk satu ';'
     membuang percobaan (APP-2026-0095: ITBX gagal 3x, percobaan terakhir hanya karena ';' di
@@ -682,7 +696,7 @@ def perbaiki_poin(
 
     poin_bersih = poin_bersih.model_copy(update={
         "reasoning_pendek": _perbaiki_titik_koma(poin_bersih.reasoning_pendek),
-        "reasoning_panjang": _perbaiki_titik_koma(poin_bersih.reasoning_panjang),
+        "reasoning_panjang": _perbaiki_titik_koma(_buang_referensi_inline(poin_bersih.reasoning_panjang)),
         "rekomendasi": poin_bersih.rekomendasi.model_copy(update={
             "saran": _perbaiki_titik_koma(poin_bersih.rekomendasi.saran),
             "disclaimer": (

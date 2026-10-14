@@ -103,6 +103,15 @@ class Tahapan(BaseModel):
     intensitas: IntensitasTahap | None = None
 
 
+class IntensitasZona(BaseModel):
+    """Hasil intensitas PER ZONA (kasus lahan menyilang beberapa zona). Hanya field yg dipakai
+    adapter utk menentukan zona pemilik ambang pada `tahapan.intensitas`."""
+    nama_zona: str | None = None
+    kode_zona: str | None = None
+    status: str | None = None
+    parameter: dict[str, Any] = {}
+
+
 class GateHukum(BaseModel):
     final_gate_status: Literal["Lolos", "Lolos Bersyarat", "Tidak Lolos"]
     # Rekomendasi versi back-end — informational only. Kita turunkan rekomendasi_sistem sendiri secara
@@ -110,6 +119,7 @@ class GateHukum(BaseModel):
     rekomendasi_sistem: str | None = None
     decisive_stage: str | None = None
     tahapan: Tahapan
+    intensitas_zones: list[IntensitasZona] | None = None
 
 
 class ImpactAssessment(BaseModel):

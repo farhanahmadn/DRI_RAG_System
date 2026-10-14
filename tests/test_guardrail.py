@@ -1640,3 +1640,20 @@ class TestPercobaanTambahanUntukGangguanPanggilan:
     def test_bonus_hanya_satu(self, monkeypatch):
         d, panggilan = self._jalankan(monkeypatch, ["err"])
         assert d.berhasil is False and panggilan == 4  # 1 bonus + 3 jatah, lalu berhenti
+
+
+class TestNormalisasiDanReferensi:
+    def test_buang_referensi_penutup_baris(self):
+        from app.reasoning.guardrail import _buang_referensi_inline
+        teks = "Penjelasan utama.\n\nReferensi: RDTR Sleman Matriks ITBX, Lampiran V.B dan Lampiran VI."
+        assert _buang_referensi_inline(teks) == "Penjelasan utama."
+
+    def test_referensi_di_tengah_kalimat_lain_tidak_dihapus(self):
+        from app.reasoning.guardrail import _buang_referensi_inline
+        teks = "Lihat Referensi: Pasal 53. Kemudian pemohon harus menyesuaikan KDB."
+        assert _buang_referensi_inline(teks) == teks
+
+    def test_normalisasi_karakter_llm(self):
+        from app.reasoning.llm_client import _normalisasi_karakter
+        hasil = _normalisasi_karakter({"a": "sub\u2011zona P\u20111", "b": ["10\u202fm"], "c": 5})
+        assert hasil == {"a": "sub-zona P-1", "b": ["10 m"], "c": 5}
