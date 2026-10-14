@@ -2,7 +2,7 @@
   "statusCode": 200,
   "message": "L2 Spatial Risk Assessment completed successfully",
   "data": {
-    "application_id": "5d2a8adb-2945-4a3b-8efb-fb2441ef0c12",
+    "application_id": "a69b736b-e6d2-4083-9e41-d4e651849edd",
     "application_number": "APP-2026-UJI-4-TINGGI-NONRESAPAN",
     "timestamp": "2026-10-14T05:00:00.000Z",
     "lokasi": {
@@ -39,6 +39,7 @@
       },
       "rdtr_zone": "Zona Perumahan",
       "rdtr_subzone": "R-3",
+      "kawasan_resapan": false,
       "rdtr_subzone_source": "geojson_overlay",
       "luas_lahan_m2": 1436.0
     },

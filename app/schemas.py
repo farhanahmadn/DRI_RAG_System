@@ -40,6 +40,11 @@ class Lokasi(BaseModel):
     # tetap fallback ke filter keluarga zona (zona_prefix) kalau None (lihat app/adapter.py,
     # app/reasoning/generator.py).
     rdtr_subzone: str | None = None
+    # USULAN KONTRAK (belum dikonfirmasi BE): apakah titik/persil berada di KAWASAN RESAPAN AIR
+    # (peta Lampiran VII.F, ditentukan per BLOK — bukan per zona). True/False = BE yakin, None =
+    # tak diketahui (perilaku lama, retrieval hanya menebak dari kode zona). Menentukan apakah
+    # ketentuan khusus resapan air (Pasal 53, zero delta Q) boleh dikutip & disebut di poin dampak.
+    kawasan_resapan: bool | None = None
     # Provenance penentuan sub-zona di atas (mis. "geojson_overlay") — informational only, TIDAK
     # dipakai logika apa pun saat ini; disimpan siapa tahu suatu saat perlu bedakan tingkat
     # kepercayaan per-sumber.
@@ -240,6 +245,8 @@ class PoinKonteks(BaseModel):
     # ini (RetrievalFilters.zona) — jauh lebih presisi drpd filter keluarga (zona_prefix) yg cuma
     # bisa menyaring "R" tanpa bisa beda R-2/R-3/R-4.
     zona_subzone: str | None = None
+    # Lihat Lokasi.kawasan_resapan. Hanya dibaca poin dampak.
+    kawasan_resapan: bool | None = None
 
 
 class AdapterResult(BaseModel):

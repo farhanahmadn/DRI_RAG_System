@@ -280,6 +280,36 @@ def _pilih_chunks_referensi(chunks: list[Chunk], poin: PoinKonteks, top_k: int) 
     return [chunk for _, _, chunk in berskor[:top_k]]
 
 
+_QUERY_KETENTUAN_RESAPAN = "ketentuan khusus kawasan resapan air zero delta Q sumur resapan"
+
+
+def chunk_ketentuan_resapan(chunk: Chunk) -> bool:
+    """Chunk Pasal 53 (ketentuan khusus kawasan resapan air). Chunk Lampiran VI yang cuma menyebut
+    "resapan/non-resapan" sebagai kolom tabel BUKAN ketentuan khusus, jadi tak ikut."""
+    return (chunk.pasal or "").strip() == "53" and "resapan" in (chunk.teks or "").lower()
+
+
+def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retriever: Retriever,
+                                  top_k: int) -> list[Chunk]:
+    """Poin dampak: sitasi ketentuan resapan air mengikuti `kawasan_resapan` dari BE.
+
+    False -> buang (APP-2026-UJI-4: lokasi non-resapan tetap mengutip Pasal 53 ayat 3 hanya karena
+    R-3 ada di daftar zonanya; pasal itu berlaku per blok resapan, bukan per zona).
+    True  -> pastikan ada (tak boleh bergantung pada untung-untungan retrieval).
+    None  -> perilaku lama."""
+    if poin.poin_id != "dampak" or poin.kawasan_resapan is None:
+        return chunks
+    if poin.kawasan_resapan is False:
+        return [c for c in chunks if not chunk_ketentuan_resapan(c)][:top_k]
+    if any(chunk_ketentuan_resapan(c) for c in chunks):
+        return chunks
+    filters = (RetrievalFilters(zona=poin.zona_subzone) if poin.zona_subzone
+               else RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona)))
+    tambahan = [c for c in retriever.search(_QUERY_KETENTUAN_RESAPAN, filters, top_k=4)
+                if chunk_ketentuan_resapan(c)][:1]
+    return (tambahan + chunks)[: max(top_k, len(tambahan))]
+
+
 def ambil_chunks_pendukung(
     poin: PoinKonteks,
     retriever: Retriever,
@@ -299,6 +329,8 @@ def ambil_chunks_pendukung(
     # pemohon dulu (lihat _pilih_chunks_referensi utk bukti & alasan lengkapnya).
     top_k = top_k_utk(poin.poin_id, top_k_dukungan)
     chunks = _pilih_chunks_referensi(chunks, poin, top_k)
+    # Over-fetch sedikit kalau chunk resapan akan dibuang, supaya jatah top_k tak habis percuma.
+    top_k_cari = top_k + 2 if (poin.poin_id == "dampak" and poin.kawasan_resapan is False) else top_k
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
         if poin.poin_id == "intensitas":
@@ -315,9 +347,9 @@ def ambil_chunks_pendukung(
             filters = RetrievalFilters(zona=poin.zona_subzone)
         else:
             filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
-        chunks = retriever.search(query_fallback, filters, top_k=top_k,
+        chunks = retriever.search(query_fallback, filters, top_k=top_k_cari,
                                   tanpa_lexical=poin.poin_id in _TANPA_LEXICAL_PER_POIN)
-    return chunks
+    return _sesuaikan_dgn_status_resapan(chunks, poin, retriever, top_k)
 
 
 # Batas ekspansi small-to-big. Diukur dari korpus nyata (2026-09-08): 137 pasal induk, median 1.449

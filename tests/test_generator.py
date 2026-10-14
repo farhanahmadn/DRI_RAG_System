@@ -1224,3 +1224,57 @@ class TestTopKPerPoin:
         ambil_chunks_pendukung(poin, _Perekam(), top_k_dukungan=3)
 
         assert terekam["top_k"] == 5
+
+
+class TestSitasiResapanMengikutiStatusBE:
+    """APP-2026-UJI-4: lokasi non-resapan tetap mengutip Pasal 53 (kawasan resapan air)."""
+
+    @staticmethod
+    def _chunk(cid, pasal, teks):
+        from app.retrieval.base import Chunk
+        return Chunk(id=cid, level="ayat", teks=teks, dokumen="Perbup 80/2023", pasal=pasal)
+
+    class _Retriever:
+        def __init__(self, hasil_search):
+            self.hasil_search = hasil_search
+            self.query = []
+
+        def search(self, query, filters, top_k=5, **kw):
+            self.query.append(query)
+            return self.hasil_search
+
+        def get_by_reference(self, refs):
+            return []
+
+    def _poin(self, resapan):
+        return _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+                     fakta={"dinilai": True}, zona="Zona Perumahan", zona_subzone="R-3",
+                     kawasan_resapan=resapan)
+
+    def test_non_resapan_membuang_pasal_53(self):
+        from app.reasoning.generator import _sesuaikan_dgn_status_resapan
+        p53 = self._chunk("p53-a3", "53", "Ketentuan khusus kawasan resapan air ... zero delta Q")
+        lain = self._chunk("vi-r-3", "", "Lampiran VI intensitas, resapan/non-resapan")
+        hasil = _sesuaikan_dgn_status_resapan([p53, lain], self._poin(False), self._Retriever([]), 3)
+        assert [c.id for c in hasil] == ["vi-r-3"]
+
+    def test_resapan_menambahkan_pasal_53_bila_belum_ada(self):
+        from app.reasoning.generator import _sesuaikan_dgn_status_resapan
+        p53 = self._chunk("p53-a3", "53", "Ketentuan khusus kawasan resapan air ... zero delta Q")
+        lain = self._chunk("vi-r-3", "", "Lampiran VI intensitas")
+        r = self._Retriever([p53])
+        hasil = _sesuaikan_dgn_status_resapan([lain], self._poin(True), r, 3)
+        assert "p53-a3" in [c.id for c in hasil]
+
+    def test_tidak_diketahui_perilaku_lama(self):
+        from app.reasoning.generator import _sesuaikan_dgn_status_resapan
+        p53 = self._chunk("p53-a3", "53", "kawasan resapan air")
+        r = self._Retriever([])
+        assert _sesuaikan_dgn_status_resapan([p53], self._poin(None), r, 3) == [p53]
+        assert r.query == []
+
+    def test_poin_lain_tak_tersentuh(self):
+        from app.reasoning.generator import _sesuaikan_dgn_status_resapan
+        p53 = self._chunk("p53-a3", "53", "kawasan resapan air")
+        poin = _poin(poin_id="itbx", kawasan_resapan=False)
+        assert _sesuaikan_dgn_status_resapan([p53], poin, self._Retriever([]), 3) == [p53]

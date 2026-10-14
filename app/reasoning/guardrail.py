@@ -633,6 +633,27 @@ _RE_SARAN_TANPA_TINDAKAN = re.compile(
 )
 
 
+_RE_KLAIM_RESAPAN = re.compile(
+    r"zero\s+delta\s+q|pasal\s+53|"
+    r"berada\s+(?:di|pada|dalam)\s+(?:kawasan|zona|daerah|area|wilayah)\s+resapan",
+    re.IGNORECASE,
+)
+
+
+def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """Lokasi yang BE nyatakan BUKAN kawasan resapan air tak boleh dijelaskan memakai ketentuan
+    kawasan resapan (APP-2026-UJI-4)."""
+    if poin.poin_id != "dampak" or poin.kawasan_resapan is not False:
+        return []
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
+    if _RE_KLAIM_RESAPAN.search(teks):
+        return [
+            "narasi dampak memakai ketentuan/klaim kawasan resapan air (zero delta Q, Pasal 53, atau "
+            "'berada di kawasan resapan'), padahal lokasi BUKAN kawasan resapan air — DILARANG."
+        ]
+    return []
+
+
 def _cek_saran_dampak_tanpa_tindakan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     """Permintaan user 2026-10-14: dampak yang dinilai (termasuk Rendah) WAJIB tetap punya saran
     pencegahan/pemeliharaan konkret, bukan "tidak diperlukan tindakan"."""
@@ -747,6 +768,7 @@ def perbaiki_poin(
     masalah.extend(_cek_citation_id_bocor(poin_bersih, poin, chunks))
     masalah.extend(_cek_tanda_baca_dilarang(poin_bersih))
     masalah.extend(_cek_saran_dampak_tanpa_tindakan(poin_bersih, poin))
+    masalah.extend(_cek_klaim_resapan(poin_bersih, poin))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 

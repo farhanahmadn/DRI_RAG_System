@@ -354,7 +354,7 @@ def bangun_langkah_konkret_intensitas(parameter: dict, target_map: dict) -> list
     return langkah
 
 
-def bangun_langkah_pemeliharaan_dampak(mitigasi: dict) -> list[dict]:
+def bangun_langkah_pemeliharaan_dampak(mitigasi: dict, kawasan_resapan: bool | None = None) -> list[dict]:
     """langkah_konkret utk dampak Rendah/Sedang (tanpa mitigasi korektif): menjaga kondisi yang
     sudah baik tetap baik. Angka = usulan pemohon sendiri (`mitigasi['pemeliharaan']`), nilai
     target sama dgn nilai saat ini karena yang diminta adalah MEMPERTAHANKAN, bukan mengubah."""
@@ -384,12 +384,19 @@ def bangun_langkah_pemeliharaan_dampak(mitigasi: dict) -> list[dict]:
             "nilai_target": luas_bangunan,
             "satuan": "m²",
         })
-    langkah.append({
-        "parameter": "Sumur/Kolam Resapan",
-        "deskripsi": (
+    if kawasan_resapan:
+        deskripsi_sumur = (
+            "Lokasi berada di kawasan resapan air: sediakan sumur atau kolam resapan sesuai ketentuan "
+            "khusus kawasan resapan air dan pastikan air hujan tidak melimpas keluar lahan."
+        )
+    else:
+        deskripsi_sumur = (
             "Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik "
             "baik pengelolaan limpasan, walaupun dampak tergolong ringan."
-        ),
+        )
+    langkah.append({
+        "parameter": "Sumur/Kolam Resapan",
+        "deskripsi": deskripsi_sumur,
         "nilai_saat_ini": None,
         "nilai_target": None,
         "satuan": None,
@@ -406,7 +413,9 @@ def bangun_langkah_dampak_poin(fakta: dict) -> list[dict]:
         # Gerbang yang SAMA dgn target (`pilih_target_dampak_poin`): poin yang tak butuh mitigasi
         # korektif tak boleh bocor angka target walau kalkulator kebetulan menghasilkannya
         # (APP-2026-8376) — yang tersisa hanya langkah pemeliharaan.
-        return bangun_langkah_pemeliharaan_dampak(mitigasi) if mitigasi.get("arah") else []
+        if not mitigasi.get("arah"):
+            return []
+        return bangun_langkah_pemeliharaan_dampak(mitigasi, (fakta or {}).get("kawasan_resapan"))
     return bangun_langkah_konkret_dampak((fakta or {}).get("target_mitigasi") or {})
 
 

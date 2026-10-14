@@ -1708,3 +1708,32 @@ class TestSaranDampakWajibAdaTindakan:
 def test_normalisasi_backslash_n_literal_jadi_baris_baru():
     from app.reasoning.llm_client import _normalisasi_karakter
     assert _normalisasi_karakter({"saran": "1. A.\n2. B."}) == {"saran": "1. A.\n2. B."}
+
+
+class TestKlaimResapanMengikutiStatusBE:
+    def _poin_dampak(self, resapan):
+        return _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+                     fakta={"dinilai": True, "mitigasi": {"perlu_mitigasi": True, "arah": ["x"]}},
+                     kawasan_resapan=resapan)
+
+    def _out(self, teks):
+        return _poin_output(poin_id="dampak", status="Tinggi", reasoning_panjang=teks,
+                            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Kurangi luas bangunan."))
+
+    def test_non_resapan_menolak_klaim_resapan(self):
+        a = _muat_assessment("l2_sample_lolos.json")
+        for teks in ("Wajib zero delta Q policy.", "Sesuai Pasal 53 ayat 3.",
+                     "Lokasi berada di kawasan resapan air."):
+            _, masalah = perbaiki_poin(self._out(teks), self._poin_dampak(False), [], a)
+            assert any("BUKAN kawasan resapan" in m for m in masalah), teks
+
+    def test_non_resapan_boleh_menyebut_bukan_kawasan_resapan(self):
+        a = _muat_assessment("l2_sample_lolos.json")
+        _, masalah = perbaiki_poin(self._out("Lokasi bukan kawasan resapan air."), self._poin_dampak(False), [], a)
+        assert not any("BUKAN kawasan resapan" in m for m in masalah)
+
+    def test_resapan_dan_tak_diketahui_tak_kena_cek(self):
+        a = _muat_assessment("l2_sample_lolos.json")
+        for status in (True, None):
+            _, masalah = perbaiki_poin(self._out("Wajib zero delta Q policy."), self._poin_dampak(status), [], a)
+            assert not any("BUKAN kawasan resapan" in m for m in masalah)

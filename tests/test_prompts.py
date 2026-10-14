@@ -693,3 +693,17 @@ class TestKonteksIndukDiPrompt:
         prompt = build_user_prompt(_poin(), [chunk], konteks_induk={"chunk-lain": "teks nyasar"})
 
         assert "teks nyasar" not in prompt
+
+
+def test_fakta_dampak_memuat_status_kawasan_resapan():
+    from app.reasoning.prompts import _bangun_fakta_dampak
+    from app.schemas import PoinKonteks
+
+    def _teks(resapan):
+        p = PoinKonteks(poin_id="dampak", kategori="Dampak", tipe_rekomendasi="numerik-mitigasi",
+                        status="Rendah", fakta={"dinilai": True}, kawasan_resapan=resapan)
+        return "\n".join(_bangun_fakta_dampak(p))
+
+    assert "KAWASAN_RESAPAN_AIR: YA" in _teks(True)
+    assert "KAWASAN_RESAPAN_AIR: TIDAK." in _teks(False) and "DILARANG menyebut" in _teks(False)
+    assert "TIDAK DIKETAHUI" in _teks(None)

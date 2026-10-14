@@ -223,6 +223,7 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "data_confidence": impact.data_confidence,
             "limitations": impact.limitations,
             "luas_usulan_melebihi_persil": impact.luas_usulan_melebihi_persil,
+            "kawasan_resapan": assessment.lokasi.kawasan_resapan,
             # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
             "mitigasi": sarankan_arah_mitigasi_dampak(impact),
             # Target kuantitatif (ambang runoff_change_index utk turun 1 kategori) — murni aritmatika
@@ -232,6 +233,7 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
         dasar_hukum=[],
         zona=assessment.lokasi.rdtr_zone,
         zona_subzone=assessment.lokasi.rdtr_subzone,
+        kawasan_resapan=assessment.lokasi.kawasan_resapan,
     )
 
 

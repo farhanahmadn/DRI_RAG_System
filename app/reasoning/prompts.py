@@ -350,6 +350,28 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "sarankan pemohon meninjau ulang proporsi KDB/KDH agar sesuai batas fisik persil."
         )
 
+    if poin.kawasan_resapan is True:
+        lines.append(
+            "\nKAWASAN_RESAPAN_AIR: YA. Lokasi berada di kawasan resapan air, jadi ketentuan khusus "
+            "kawasan resapan air berlaku (pengembangan baru wajib memastikan air tidak melimpas atau "
+            "zero delta Q, tidak mencemari air, dan menyediakan sumur atau kolam resapan). Jelaskan "
+            "ketentuan ini di reasoning dan kaitkan dengan saran, rujuk pasalnya dengan bahasa manusia."
+        )
+    elif poin.kawasan_resapan is False:
+        lines.append(
+            "\nKAWASAN_RESAPAN_AIR: TIDAK. Lokasi BUKAN kawasan resapan air. DILARANG menyebut "
+            "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) dan DILARANG menyatakan "
+            "lokasi berada di kawasan atau zona resapan air. Sumur atau kolam resapan, bila disebut, "
+            "hanya sebagai langkah teknis untuk menekan limpasan, BUKAN kewajiban dari ketentuan "
+            "kawasan resapan."
+        )
+    else:
+        lines.append(
+            "\nKAWASAN_RESAPAN_AIR: TIDAK DIKETAHUI. JANGAN menyatakan lokasi berada atau tidak "
+            "berada di kawasan resapan air, dan jangan menyebut ketentuan khusus kawasan resapan "
+            "sebagai berlaku."
+        )
+
     mitigasi = fakta.get("mitigasi") or {}
     if mitigasi.get("perlu_mitigasi"):
         lines.append("\nArah Mitigasi (FAKTA kualitatif, bukan angka pasti):")

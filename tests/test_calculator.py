@@ -521,3 +521,15 @@ class TestPemeliharaanDampakRendah:
         fakta = {"mitigasi": {"perlu_mitigasi": False, "arah": ["x"]},
                  "target_mitigasi": {"runoff_change_index_maks": 1.5}}
         assert pilih_target_dampak_poin(fakta) is None
+
+
+def test_langkah_sumur_resapan_dampak_ringan_mengikuti_status_resapan():
+    from app.reasoning.calculator import bangun_langkah_dampak_poin
+    mitigasi = {"perlu_mitigasi": False, "arah": ["x"], "pemeliharaan": {}}
+
+    def _sumur(status):
+        langkah = bangun_langkah_dampak_poin({"mitigasi": mitigasi, "kawasan_resapan": status})
+        return [l for l in langkah if l["parameter"] == "Sumur/Kolam Resapan"][0]["deskripsi"]
+
+    assert "ketentuan khusus kawasan resapan air" in _sumur(True)
+    assert "praktik baik" in _sumur(False) and "praktik baik" in _sumur(None)
