@@ -361,9 +361,9 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         lines.append(
             "\nKAWASAN_RESAPAN_AIR: TIDAK. Lokasi BUKAN kawasan resapan air. DILARANG menyebut "
             "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) dan DILARANG menyatakan "
-            "lokasi berada di kawasan atau zona resapan air. Sumur atau kolam resapan, bila disebut, "
-            "hanya sebagai langkah teknis untuk menekan limpasan, BUKAN kewajiban dari ketentuan "
-            "kawasan resapan."
+            "lokasi berada di kawasan atau zona resapan air. JANGAN menyarankan sumur atau kolam "
+            "resapan. Bila perlu menyebut fasilitas penahan limpasan, gunakan 'tampungan air hujan "
+            "(tandon atau kolam retensi)'."
         )
     else:
         lines.append(
