@@ -900,3 +900,42 @@ class TestAngkaDikutipDariSaranDiizinkan:
             _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Pantau dampak."))]
         hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Tidak Setuju")
         assert "861.6" in hasil.paragraf_gate_intensitas
+
+
+class TestCatatanBatasIntensitasVsDampak:
+    """APP-2026-UJI-4: lantai dasar maks 861,6 m² (intensitas) vs 1.077,00 m² (dampak)."""
+
+    @staticmethod
+    def _konteks(b_int, b_dam, r_int=359.0, r_dam=359.0, status="MELAMPAUI_BATAS"):
+        from app.schemas import PoinKonteks
+        inten = PoinKonteks(poin_id="intensitas", kategori="I", tipe_rekomendasi="numerik", status=status,
+                            fakta={"target": {"kdb": {"footprint_maks_m2": b_int}, "kdh": {"rth_dibutuhkan_m2": r_int}}})
+        damp = PoinKonteks(poin_id="dampak", kategori="D", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+                           fakta={"target_mitigasi": {"penyesuaian_lahan": {
+                               "luas_bangunan_maks_m2": b_dam, "luas_rth_min_m2": r_dam}}})
+        return [inten, damp]
+
+    def test_dampak_lebih_longgar_intensitas_menang(self):
+        c = assemble_module._catatan_batas_berbeda(self._konteks(861.6, 1077.0))
+        assert "861,60 m²" in c and "1.077,00 m²" in c and "yang harus diikuti adalah 861,60 m²" in c
+        assert "RTH" not in c  # RTH sama persis -> tak ada catatan
+
+    def test_dampak_lebih_ketat_dampak_menang(self):
+        c = assemble_module._catatan_batas_berbeda(self._konteks(1200.0, 1000.0))
+        assert "yang diikuti adalah 1.000,00 m²" in c
+
+    def test_rth_dampak_lebih_luas(self):
+        c = assemble_module._catatan_batas_berbeda(self._konteks(900.0, 900.0, r_int=200.0, r_dam=359.0))
+        assert "RTH lebih luas" in c and "359,00 m²" in c
+
+    def test_sama_atau_tidak_dinilai_tanpa_catatan(self):
+        assert assemble_module._catatan_batas_berbeda(self._konteks(900.0, 900.2)) is None
+        assert assemble_module._catatan_batas_berbeda(self._konteks(900.0, 1000.0, status="Tidak Dinilai")) is None
+
+    def test_disclaimer_dampak_diisi_dan_digabung(self):
+        dampak = _poin_output(poin_id="dampak", status="Tinggi", rekomendasi=RekomendasiOutput(
+            tipe="numerik-mitigasi", saran="x", disclaimer="Catatan lama."))
+        itbx = _poin_output(poin_id="itbx")
+        hasil = assemble_module._terapkan_catatan_batas([itbx, dampak], self._konteks(861.6, 1077.0))
+        assert hasil[0].rekomendasi.disclaimer == itbx.rekomendasi.disclaimer
+        assert hasil[1].rekomendasi.disclaimer.startswith("Catatan lama. Batas luas lantai dasar")

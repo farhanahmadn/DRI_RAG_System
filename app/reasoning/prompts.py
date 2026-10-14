@@ -441,7 +441,10 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
                 + ", ".join(detail) + ". Rekomendasi resmi poin ini SUDAH ditetapkan persis angka "
                 "ini — jelaskan di reasoning_pendek/panjang KENAPA mitigasi ini diperlukan (kategori "
                 f"{poin.status}), sebutkan angka-angka di atas APA ADANYA, JANGAN mengarang angka "
-                "lain atau menghitung ulang."
+                "lain atau menghitung ulang. Persentase KDB dan KDH pada rincian ini adalah TARGET untuk "
+                "menurunkan kategori dampak, BUKAN ambang intensitas ruang. JANGAN membandingkannya "
+                "dengan ambang KDB/KDH dari ketentuan intensitas (itu dibahas di poin lain) dan JANGAN "
+                "menulis 'batas KDB maksimum' atau 'ambang KDH' di poin dampak."
             )
 
     return lines

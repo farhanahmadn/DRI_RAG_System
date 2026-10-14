@@ -253,6 +253,8 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
         _tambah(penyesuaian.get("kdh_min_persen"))
         _tambah(target_mitigasi.get("luas_bangunan_saat_ini_m2"))
         _tambah(target_mitigasi.get("luas_rth_saat_ini_m2"))
+        _tambah(target_mitigasi.get("kdb_usulan_persen"))
+        _tambah(target_mitigasi.get("kdh_usulan_persen"))
         dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
         _tambah(dimensi.get("nilai"))
         # Dampak Rendah/Sedang: luas/KDB/KDH usulan pemohon utk saran pemeliharaan.
@@ -640,6 +642,37 @@ _RE_KLAIM_RESAPAN = re.compile(
 )
 
 
+_RE_PERSEN_KDB_KDH = re.compile(r"\b(KDB|KDH)\b[^.\d]{0,40}?(\d+(?:[.,]\d+)?)\s*%")
+
+
+def _cek_persen_intensitas_di_dampak(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """Poin dampak boleh menyebut persen KDB/KDH HANYA bila itu angka target mitigasi dampak (atau
+    usulan pemohon). Persen lain (mis. ambang intensitas 60%) berarti LLM mencampur dua konsep
+    (APP-2026-UJI-4: "batas KDB maksimum 60%" di poin dampak yang targetnya 75%)."""
+    if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
+        return []
+    mit = poin.fakta.get("mitigasi") or {}
+    penyesuaian = (poin.fakta.get("target_mitigasi") or {}).get("penyesuaian_lahan") or {}
+    pemeliharaan = mit.get("pemeliharaan") or {}
+    boleh = set()
+    tm = poin.fakta.get("target_mitigasi") or {}
+    for v in (penyesuaian.get("kdb_maks_persen"), penyesuaian.get("kdh_min_persen"),
+              pemeliharaan.get("kdb_persen"), pemeliharaan.get("kdh_persen"),
+              tm.get("kdb_usulan_persen"), tm.get("kdh_usulan_persen")):
+        if v is not None:
+            boleh.add(round(float(v), 2))
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang}"
+    for m in _RE_PERSEN_KDB_KDH.finditer(teks):
+        angka = round(float(m.group(2).replace(",", ".")), 2)
+        if angka not in boleh:
+            return [
+                f"poin dampak menyebut {m.group(1)} {m.group(2)}%, padahal itu bukan target mitigasi dampak "
+                "(kemungkinan ambang intensitas ruang). Persen KDB/KDH di poin dampak hanya boleh target "
+                "mitigasi dampak dari fakta, jangan dicampur dengan ketentuan intensitas."
+            ]
+    return []
+
+
 def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     """Lokasi yang BE nyatakan BUKAN kawasan resapan air tak boleh dijelaskan memakai ketentuan
     kawasan resapan (APP-2026-UJI-4)."""
@@ -770,6 +803,7 @@ def perbaiki_poin(
     masalah.extend(_cek_tanda_baca_dilarang(poin_bersih))
     masalah.extend(_cek_saran_dampak_tanpa_tindakan(poin_bersih, poin))
     masalah.extend(_cek_klaim_resapan(poin_bersih, poin))
+    masalah.extend(_cek_persen_intensitas_di_dampak(poin_bersih, poin))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 

@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
 from app.logging_util import log_precheck
 from app.reasoning import llm_client, observability
-from app.reasoning.calculator import normalisasi_kategori_dampak
+from app.reasoning.calculator import _fmt_id, normalisasi_kategori_dampak
 from app.reasoning.guardrail import (
     DiagnosaPoin,
     _dekat_dgn_pembulatan,
@@ -190,6 +190,64 @@ def _rakit_ringkasan_dampak(assessment: L2Assessment) -> RingkasanDampakOutput:
         kalimat += "."
 
     return RingkasanDampakOutput(impact_category=kategori, impact_score=impact.impact_score, kalimat=kalimat)
+
+
+_TOLERANSI_M2 = 0.5
+
+
+def _catatan_batas_berbeda(poin_konteks: list) -> str | None:
+    """Catatan deterministik bila batas luas dari ketentuan INTENSITAS dan dari syarat penurunan
+    kategori DAMPAK berbeda (APP-2026-UJI-4: lantai dasar maks 861,6 m² vs 1.077,00 m²). Keduanya
+    angka yang benar menurut aturannya masing-masing, tapi pemohon yang membaca keduanya akan
+    bingung mana yang harus diikuti. Yang diikuti = yang lebih ketat, supaya memenuhi keduanya."""
+    by_id = {p.poin_id: p for p in poin_konteks}
+    inten, damp = by_id.get("intensitas"), by_id.get("dampak")
+    if not inten or not damp or "Tidak Dinilai" in (inten.status, damp.status):
+        return None
+    target = inten.fakta.get("target") or {}
+    penyesuaian = (damp.fakta.get("target_mitigasi") or {}).get("penyesuaian_lahan") or {}
+    b_int = (target.get("kdb") or {}).get("footprint_maks_m2")
+    b_dam = penyesuaian.get("luas_bangunan_maks_m2")
+    r_int = (target.get("kdh") or {}).get("rth_dibutuhkan_m2")
+    r_dam = penyesuaian.get("luas_rth_min_m2")
+
+    kalimat: list[str] = []
+    if b_int is not None and b_dam is not None and abs(b_int - b_dam) > _TOLERANSI_M2:
+        if b_dam > b_int:
+            kalimat.append(
+                f"Batas luas lantai dasar menurut ketentuan intensitas ruang ({_fmt_id(b_int)} m²) lebih ketat "
+                f"daripada syarat penurunan kategori dampak ({_fmt_id(b_dam)} m²), sehingga yang harus diikuti "
+                f"adalah {_fmt_id(b_int)} m².")
+        else:
+            kalimat.append(
+                f"Syarat penurunan kategori dampak membatasi luas lantai dasar lebih ketat ({_fmt_id(b_dam)} m²) "
+                f"daripada ketentuan intensitas ruang ({_fmt_id(b_int)} m²), sehingga untuk memenuhi keduanya "
+                f"yang diikuti adalah {_fmt_id(b_dam)} m².")
+    if r_int is not None and r_dam is not None and abs(r_int - r_dam) > _TOLERANSI_M2:
+        if r_dam > r_int:
+            kalimat.append(
+                f"Syarat penurunan kategori dampak menuntut RTH lebih luas ({_fmt_id(r_dam)} m²) daripada "
+                f"ketentuan intensitas ruang ({_fmt_id(r_int)} m²), sehingga untuk memenuhi keduanya yang diikuti "
+                f"adalah {_fmt_id(r_dam)} m².")
+        else:
+            kalimat.append(
+                f"Ketentuan intensitas ruang menuntut RTH lebih luas ({_fmt_id(r_int)} m²) daripada syarat "
+                f"penurunan kategori dampak ({_fmt_id(r_dam)} m²), sehingga yang diikuti adalah {_fmt_id(r_int)} m².")
+    return " ".join(kalimat) or None
+
+
+def _terapkan_catatan_batas(poin_list: list[PoinOutput], poin_konteks: list) -> list[PoinOutput]:
+    catatan = _catatan_batas_berbeda(poin_konteks)
+    if not catatan:
+        return poin_list
+    hasil = []
+    for p in poin_list:
+        if p.poin_id == "dampak":
+            lama = (p.rekomendasi.disclaimer or "").strip()
+            gabung = f"{lama} {catatan}".strip()
+            p = p.model_copy(update={"rekomendasi": p.rekomendasi.model_copy(update={"disclaimer": gabung})})
+        hasil.append(p)
+    return hasil
 
 
 def _angka_tak_terlacak_ke_saran(teks: str, poin_list: list[PoinOutput]) -> str | None:
@@ -375,7 +433,7 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
         for poin in hasil_adaptasi.poin
     ]
     hasil_poin = [f.result() for f in futures]  # urutan submit == urutan hasil (itbx, intensitas, dampak)
-    poin_list = [p for p, _ in hasil_poin]
+    poin_list = _terapkan_catatan_batas([p for p, _ in hasil_poin], hasil_adaptasi.poin)
     diagnostik = [d for _, d in hasil_poin]
 
     output = OutputL3(

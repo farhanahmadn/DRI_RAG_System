@@ -276,6 +276,12 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment, kawasan_resapan: boo
             rth = breakdown.get("Taman/RTH")
             if isinstance(rth, dict) and rth.get("luas_m2") is not None:
                 hasil["luas_rth_saat_ini_m2"] = rth["luas_m2"]
+            # KDB/KDH USULAN pemohon (%), sah disebut di narasi dampak (lihat
+            # guardrail._cek_persen_intensitas_di_dampak) — beda dari ambang intensitas.
+            if breakdown.get("kdb_usulan_persen") is not None:
+                hasil["kdb_usulan_persen"] = _bulat2(breakdown["kdb_usulan_persen"])
+            if breakdown.get("kdh_usulan_persen") is not None:
+                hasil["kdh_usulan_persen"] = _bulat2(breakdown["kdh_usulan_persen"])
         dimensi = rekom.get("dimensi_minimum")
         if dimensi:
             hasil["dimensi_minimum_resapan"] = dimensi

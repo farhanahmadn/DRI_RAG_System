@@ -1737,3 +1737,29 @@ class TestKlaimResapanMengikutiStatusBE:
         for status in (True, None):
             _, masalah = perbaiki_poin(self._out("Wajib zero delta Q policy."), self._poin_dampak(status), [], a)
             assert not any("BUKAN kawasan resapan" in m for m in masalah)
+
+
+class TestPersenIntensitasDiDampak:
+    def _poin_dampak(self):
+        return _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+                     fakta={"dinilai": True, "mitigasi": {"perlu_mitigasi": True, "arah": ["x"]},
+                            "target_mitigasi": {
+                                "runoff_change_index_maks": 2.5, "kategori_target": "Sedang", "index_saat_ini": 2.67,
+                                "kdb_usulan_persen": 83.57,
+                                "penyesuaian_lahan": {"kdb_maks_persen": 75, "kdh_min_persen": 25}}})
+
+    def _out(self, teks):
+        return _poin_output(poin_id="dampak", status="Tinggi", reasoning_panjang=teks,
+                            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Kurangi luas bangunan."))
+
+    def test_persen_ambang_intensitas_ditolak(self):
+        a = _muat_assessment("l2_sample_lolos.json")
+        _, masalah = perbaiki_poin(self._out("Bangunan mendekati batas KDB maksimum 60 %."), self._poin_dampak(), [], a)
+        assert any("bukan target mitigasi dampak" in m for m in masalah)
+
+    def test_persen_target_dan_usulan_diizinkan(self):
+        a = _muat_assessment("l2_sample_lolos.json")
+        _, masalah = perbaiki_poin(
+            self._out("KDB usulan 83.57% perlu turun hingga KDB maks 75% dan KDH min 25%."),
+            self._poin_dampak(), [], a)
+        assert not any("bukan target mitigasi dampak" in m for m in masalah), masalah
