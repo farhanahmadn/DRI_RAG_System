@@ -425,6 +425,62 @@
   </table></div>
   <div class="peringatan"><b>Penyimpangan arah yang tercatat:</b><ul><li><code>APP-2026-INNER-01</code> &mdash; dampak/mitigasi: ['fakta=tak perlu, narasi=perlu']</li></ul></div>
 
+  
+  <h3>Ablasi prompt &mdash; kewajiban menyebut zona pemohon</h3>
+  <p class="cat">Jangkar <code>zona_pemohon</code> pada poin <code>intensitas</code> hanya kena
+  <b>27,3%</b> (3 dari 11) sementara pada <code>itbx</code> <b>100%</b>. Sebabnya ditelusuri ke
+  prompt, bukan ke model: <code>PoinKonteks.zona</code> terisi adapter untuk ketiga poin, tapi blok
+  fakta intensitas tak pernah membacanya &mdash; dan 3 narasi yang kebetulan kena hanya mencocoki
+  <b>kode</b> sub-zona yang sumbernya teks chunk RAG, bukan fakta permohonannya. Ini bermakna
+  karena ambang KDB/KLB/KDH adalah ketentuan <b>per zona</b>: narasi yang tak menyebut zonanya
+  tidak menjelaskan dari mana ambangnya datang, dan pembaca tak bisa memeriksa apakah ambang itu
+  memang milik zonanya.</p>
+  <p class="cat"><b>Berpasangan, bukan agregat campuran.</b> Mengukur ulang seluruh log setelah
+  prompt berubah menghasilkan angka campuran &mdash; sebagian narasi dari prompt lama, sebagian
+  dari yang baru &mdash; dan angka seperti itu tak bisa menyimpulkan apa pun. Di sini tiap
+  permohonan dibandingkan dengan <b>dirinya sendiri</b>: lengan &ldquo;sebelum&rdquo; dibaca dari
+  narasi yang benar-benar pernah diterbitkan prompt lama, lengan &ldquo;sesudah&rdquo; dijalankan
+  ulang atas fixture yang sama. Hanya permohonan yang <b>kedua</b> lengannya lewat jalur LLM masuk
+  ke angka ini. &ldquo;Kena&rdquo; pada lengan sesudah menuntut <b>seluruh</b> 3 jalan
+  menyebut zonanya &mdash; ambang paling ketat, karena generasi tak deterministik.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Jangkar zona, poin intensitas</th><th>Nilai</th></tr></thead>
+    <tbody>
+      <tr><td>prompt lama</td><td><b>3/7</b>
+        <span class="ci">42.9%</span></td></tr>
+      <tr class="sorot"><td><b>prompt baru</b></td>
+        <td><b>7/7</b>
+        <span class="ci">100.0%</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="cat">Membaik: APP-2026-3335, APP-2026-3468, APP-2026-5067, APP-2026-8376.
+  Memburuk: tidak ada.</p>
+  <div class="peringatan"><b>Efek samping yang terukur, dan belum tertutup.</b> Kode sub-zona
+  <code>P-1</code> MUNCUL di narasi meski back-end tak mengirimnya &mdash;
+  pada <code>APP-2026-8376</code> (Zona Pertanian, <code>rdtr_subzone</code> kosong), di 1 dari 2
+  jalan LLM-nya. Kewajiban menyebut zona karena itu memang berubah jadi tekanan mengarang presisi
+  pada sebagian kasus, yaitu persis kelas bug yang
+  <code>CAVEAT_SUBZONA_TAK_TERKONFIRMASI</code> ada untuk mencegah &mdash; walaupun prompt barunya
+  melarangnya secara eksplisit. Larangan tingkat-prompt terbukti <b>tidak cukup</b> di sini, dan
+  menutupnya menuntut gerbang deterministik, bukan kalimat tambahan.</div>
+  <div class="peringatan"><b>Cakupan jalan tidak seragam.</b> Kuota harian provider (TPD
+  200.000/kunci) habis di tengah run, sehingga sebagian permohonan hanya mendapat 1&ndash;2 jalan
+  LLM dari 3 yang direncanakan &mdash; kolom terakhir di tabel bawah mencantumkan penyebut
+  sebenarnya tiap permohonan. Dua permohonan mendapat 3 jalan penuh, satu hanya 1. Ambang
+  &ldquo;seluruh jalan&rdquo; karena itu lebih lemah daripada yang dirancang, dan angka
+  <b>7/7</b> harus dibaca dengan itu.</div>
+  <div class="kartu"><table>
+    <thead><tr><th>Permohonan</th><th>Zona / sub-zona</th><th>Status</th>
+    <th>prompt lama</th><th>prompt baru</th></tr></thead>
+    <tbody><tr><td><code>APP-2026-2428</code></td><td class='net'>Zona Pertanian / P-1</td><td class='net'>MELAMPAUI_BATAS</td><td>kena</td><td>3/3 jalan</td></tr><tr><td><code>APP-2026-3335</code></td><td class='net'>Zona Perumahan</td><td class='net'>MEMENUHI_SYARAT</td><td><b>miss</b></td><td>2/2 jalan</td></tr><tr><td><code>APP-2026-3468</code></td><td class='net'>Zona Perumahan</td><td class='net'>MEMENUHI_SYARAT</td><td><b>miss</b></td><td>1/1 jalan</td></tr><tr><td><code>APP-2026-5067</code></td><td class='net'>Zona Perumahan / R-3</td><td class='net'>MEMENUHI_SYARAT</td><td><b>miss</b></td><td>2/2 jalan</td></tr><tr><td><code>APP-2026-8090</code></td><td class='net'>Zona Pertanian / P-1</td><td class='net'>MELAMPAUI_BATAS</td><td>kena</td><td>3/3 jalan</td></tr><tr><td><code>APP-2026-8376</code></td><td class='net'>Zona Pertanian</td><td class='net'>MELAMPAUI_BATAS</td><td><b>miss</b></td><td>2/2 jalan</td></tr><tr><td><code>APP-2026-INNER-01</code></td><td class='net'>Zona Pertanian / P-1</td><td class='net'>MELAMPAUI_BATAS</td><td>kena</td><td>2/2 jalan</td></tr></tbody>
+  </table></div>
+  <p class="cat">Inputnya <b>fixture yang sudah di-commit</b> (<code>tests/fixtures/</code>), bukan
+  payload dari log, supaya siapa pun bisa menjalankan ulang
+  <code>python -m eval.replay_prompt_zona</code> dan mendapat himpunan input yang sama. Yang
+  disimpan ke <code>eval/replay_zona.json</code> hanya hasil ukur per permohonan &mdash; tanpa
+  narasi utuh dan tanpa koordinat, mengikuti prinsip yang sudah ditetapkan
+  <code>eval/replay_k.py</code>.</p>
+
   <h3>Boilerplate &mdash; apakah jawabannya khas permohonan?</h3>
   <p class="cat">Narasi yang nyaris identik untuk dua permohonan <b>berbeda</b> bukan jawaban
   tentang permohonannya. Diukur sebagai kemiripan 5-gram kata ke tetangga

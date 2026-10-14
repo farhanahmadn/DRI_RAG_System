@@ -879,6 +879,22 @@ def muat_atribusi(berkas: Path | None = None) -> dict | None:
         return None
 
 
+def muat_replay_zona(berkas: Path | None = None) -> dict | None:
+    """Baca hasil eval/replay_prompt_zona.py kalau sudah pernah dijalankan.
+
+    Sama seperti `muat_atribusi`/`muat_generasi`: siklus hidupnya terpisah (butuh kuota Groq), dan
+    kalau belum ada bagiannya TIDAK dicetak — laporan tanpa bagian itu lebih jujur daripada bagian
+    berisi angka basi.
+    """
+    berkas = berkas or (Path(__file__).parent / "replay_zona.json")
+    if not berkas.exists():
+        return None
+    try:
+        return json.loads(berkas.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 _LABEL_JALUR = {
     "template_low_confidence": "template low-confidence",
     "template_aman": "template aman",
@@ -1462,6 +1478,80 @@ def bangun_html(r: dict) -> str:
             '<p class="cat"><b>Jaring pengaman:</b> tidak ada narasi <code>llm</code> yang teksnya '
             "identik lintas-permohonan, jadi tak ada indikasi versi template lain yang masih "
             "lolos deteksi.</p>")
+        # --- Ablasi prompt: kewajiban menyebut zona pemohon (uji berpasangan) ---------------
+        rz = r.get("replay_zona") or muat_replay_zona()
+        blok_rz = ""
+        if rz and (rz.get("berpasangan") or {}).get("n"):
+            bp_rz = rz["berpasangan"]
+            baris_rz = "".join(
+                f"<tr><td><code>{_esc(b['permohonan'])}</code></td>"
+                f"<td class='net'>{_esc(str(b['zona']))}"
+                f"{' / ' + _esc(str(b['zona_subzone'])) if b.get('zona_subzone') else ''}</td>"
+                f"<td class='net'>{_esc(str(b['status']))}</td>"
+                f"<td>{'kena' if b['sebelum']['kena'] else '<b>miss</b>'}</td>"
+                f"<td>{b['sesudah']['jalan_kena']}/{b['sesudah']['jalan_llm']} jalan</td></tr>"
+                for b in rz["pasangan"])
+            dikarang = rz.get("kode_subzona_dikarang") or []
+            blok_rz = f"""
+  <h3>Ablasi prompt &mdash; kewajiban menyebut zona pemohon</h3>
+  <p class="cat">Jangkar <code>zona_pemohon</code> pada poin <code>intensitas</code> hanya kena
+  <b>27,3%</b> (3 dari 11) sementara pada <code>itbx</code> <b>100%</b>. Sebabnya ditelusuri ke
+  prompt, bukan ke model: <code>PoinKonteks.zona</code> terisi adapter untuk ketiga poin, tapi blok
+  fakta intensitas tak pernah membacanya &mdash; dan 3 narasi yang kebetulan kena hanya mencocoki
+  <b>kode</b> sub-zona yang sumbernya teks chunk RAG, bukan fakta permohonannya. Ini bermakna
+  karena ambang KDB/KLB/KDH adalah ketentuan <b>per zona</b>: narasi yang tak menyebut zonanya
+  tidak menjelaskan dari mana ambangnya datang, dan pembaca tak bisa memeriksa apakah ambang itu
+  memang milik zonanya.</p>
+  <p class="cat"><b>Berpasangan, bukan agregat campuran.</b> Mengukur ulang seluruh log setelah
+  prompt berubah menghasilkan angka campuran &mdash; sebagian narasi dari prompt lama, sebagian
+  dari yang baru &mdash; dan angka seperti itu tak bisa menyimpulkan apa pun. Di sini tiap
+  permohonan dibandingkan dengan <b>dirinya sendiri</b>: lengan &ldquo;sebelum&rdquo; dibaca dari
+  narasi yang benar-benar pernah diterbitkan prompt lama, lengan &ldquo;sesudah&rdquo; dijalankan
+  ulang atas fixture yang sama. Hanya permohonan yang <b>kedua</b> lengannya lewat jalur LLM masuk
+  ke angka ini. &ldquo;Kena&rdquo; pada lengan sesudah menuntut <b>seluruh</b> {rz['n_jalan']} jalan
+  menyebut zonanya &mdash; ambang paling ketat, karena generasi tak deterministik.</p>
+  <div class="kartu"><table>
+    <thead><tr><th>Jangkar zona, poin intensitas</th><th>Nilai</th></tr></thead>
+    <tbody>
+      <tr><td>prompt lama</td><td><b>{bp_rz['kena_prompt_lama']}/{bp_rz['n']}</b>
+        <span class="ci">{bp_rz['nilai_lama']:.1%}</span></td></tr>
+      <tr class="sorot"><td><b>prompt baru</b></td>
+        <td><b>{bp_rz['kena_prompt_baru']}/{bp_rz['n']}</b>
+        <span class="ci">{bp_rz['nilai_baru']:.1%}</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="cat">Membaik: {_esc(', '.join(bp_rz['membaik']) or '&mdash;')}.
+  Memburuk: {_esc(', '.join(bp_rz['memburuk'])) if bp_rz['memburuk'] else 'tidak ada'}.</p>
+  {f'''<div class="peringatan"><b>Efek samping yang terukur, dan belum tertutup.</b> Kode sub-zona
+  <code>{_esc(', '.join(dikarang))}</code> MUNCUL di narasi meski back-end tak mengirimnya &mdash;
+  pada <code>APP-2026-8376</code> (Zona Pertanian, <code>rdtr_subzone</code> kosong), di 1 dari 2
+  jalan LLM-nya. Kewajiban menyebut zona karena itu memang berubah jadi tekanan mengarang presisi
+  pada sebagian kasus, yaitu persis kelas bug yang
+  <code>CAVEAT_SUBZONA_TAK_TERKONFIRMASI</code> ada untuk mencegah &mdash; walaupun prompt barunya
+  melarangnya secara eksplisit. Larangan tingkat-prompt terbukti <b>tidak cukup</b> di sini, dan
+  menutupnya menuntut gerbang deterministik, bukan kalimat tambahan.</div>'''
+   if dikarang else
+   '''<p class="cat"><b>Kode sub-zona dikarang</b> saat back-end tak mengirimnya:
+  <b>tidak ada</b> &mdash; pemeriksaan ini ada karena kewajiban menyebut zona tidak boleh berubah
+  jadi tekanan mengarang presisi.</p>'''}
+  <div class="peringatan"><b>Cakupan jalan tidak seragam.</b> Kuota harian provider (TPD
+  200.000/kunci) habis di tengah run, sehingga sebagian permohonan hanya mendapat 1&ndash;2 jalan
+  LLM dari 3 yang direncanakan &mdash; kolom terakhir di tabel bawah mencantumkan penyebut
+  sebenarnya tiap permohonan. Dua permohonan mendapat 3 jalan penuh, satu hanya 1. Ambang
+  &ldquo;seluruh jalan&rdquo; karena itu lebih lemah daripada yang dirancang, dan angka
+  <b>{bp_rz['kena_prompt_baru']}/{bp_rz['n']}</b> harus dibaca dengan itu.</div>
+  <div class="kartu"><table>
+    <thead><tr><th>Permohonan</th><th>Zona / sub-zona</th><th>Status</th>
+    <th>prompt lama</th><th>prompt baru</th></tr></thead>
+    <tbody>{baris_rz}</tbody>
+  </table></div>
+  <p class="cat">Inputnya <b>fixture yang sudah di-commit</b> (<code>tests/fixtures/</code>), bukan
+  payload dari log, supaya siapa pun bisa menjalankan ulang
+  <code>python -m eval.replay_prompt_zona</code> dan mendapat himpunan input yang sama. Yang
+  disimpan ke <code>eval/replay_zona.json</code> hanya hasil ukur per permohonan &mdash; tanpa
+  narasi utuh dan tanpa koordinat, mengikuti prinsip yang sudah ditetapkan
+  <code>eval/replay_k.py</code>.</p>"""
+
         baris_mutu = ""
         if fn.get("terukur"):
             baris_mutu += (
@@ -1619,6 +1709,8 @@ def bangun_html(r: dict) -> str:
   </table></div>
   {f'<div class="peringatan"><b>Penyimpangan arah yang tercatat:</b><ul>{daftar_simpang}'
    f'</ul></div>' if daftar_simpang else ""}
+
+  {blok_rz}
 
   <h3>Boilerplate &mdash; apakah jawabannya khas permohonan?</h3>
   <p class="cat">Narasi yang nyaris identik untuk dua permohonan <b>berbeda</b> bukan jawaban

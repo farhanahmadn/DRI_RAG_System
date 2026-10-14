@@ -1,0 +1,264 @@
+{
+  "dibuat": "2026-10-13T06:35:11+00:00",
+  "n_jalan": 3,
+  "berpasangan": {
+    "n": 7,
+    "kena_prompt_lama": 3,
+    "kena_prompt_baru": 7,
+    "nilai_lama": 0.42857142857142855,
+    "nilai_baru": 1.0,
+    "membaik": [
+      "APP-2026-3335",
+      "APP-2026-3468",
+      "APP-2026-5067",
+      "APP-2026-8376"
+    ],
+    "memburuk": []
+  },
+  "kode_subzona_dikarang": [
+    "P-1"
+  ],
+  "pasangan": [
+    {
+      "permohonan": "APP-2026-2428",
+      "fixture": "l2_sample_amplop_2428.json",
+      "zona": "Zona Pertanian",
+      "zona_subzone": "P-1",
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 3,
+        "jalan_kena": 3,
+        "jalur": {
+          "llm": 3
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": true,
+        "token_cocok": "p 1",
+        "timestamp": "2026-08-31T10:10:30"
+      }
+    },
+    {
+      "permohonan": "APP-2026-3335",
+      "fixture": "l2_sample_tidak_lolos.json",
+      "zona": "Zona Perumahan",
+      "zona_subzone": null,
+      "status": "MEMENUHI_SYARAT",
+      "sesudah": {
+        "jalan_llm": 2,
+        "jalan_kena": 2,
+        "jalur": {
+          "llm": 2,
+          "template_low_confidence": 1
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": false,
+        "token_cocok": null,
+        "timestamp": "2026-08-03T07:10:25"
+      }
+    },
+    {
+      "permohonan": "APP-2026-3468",
+      "fixture": "l2_sample_lolos.json",
+      "zona": "Zona Perumahan",
+      "zona_subzone": null,
+      "status": "MEMENUHI_SYARAT",
+      "sesudah": {
+        "jalan_llm": 1,
+        "jalan_kena": 1,
+        "jalur": {
+          "template_low_confidence": 2,
+          "llm": 1
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": false,
+        "token_cocok": null,
+        "timestamp": "2026-08-03T07:06:47"
+      }
+    },
+    {
+      "permohonan": "APP-2026-5067",
+      "fixture": "l2_sample_amplop_5067.json",
+      "zona": "Zona Perumahan",
+      "zona_subzone": "R-3",
+      "status": "MEMENUHI_SYARAT",
+      "sesudah": {
+        "jalan_llm": 2,
+        "jalan_kena": 2,
+        "jalur": {
+          "llm": 2,
+          "template_low_confidence": 1
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": false,
+        "token_cocok": null,
+        "timestamp": "2026-09-21T16:38:46"
+      }
+    },
+    {
+      "permohonan": "APP-2026-8090",
+      "fixture": "l2_sample_amplop_8090.json",
+      "zona": "Zona Pertanian",
+      "zona_subzone": "P-1",
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 3,
+        "jalan_kena": 3,
+        "jalur": {
+          "llm": 3
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": true,
+        "token_cocok": "p 1",
+        "timestamp": "2026-08-18T07:08:54"
+      }
+    },
+    {
+      "permohonan": "APP-2026-8376",
+      "fixture": "l2_sample_amplop_8376.json",
+      "zona": "Zona Pertanian",
+      "zona_subzone": null,
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 2,
+        "jalan_kena": 2,
+        "jalur": {
+          "llm": 2,
+          "template_low_confidence": 1
+        }
+      },
+      "kode_subzona_dikarang": [
+        "P-1"
+      ],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": false,
+        "token_cocok": null,
+        "timestamp": "2026-08-11T10:32:21"
+      }
+    },
+    {
+      "permohonan": "APP-2026-INNER-01",
+      "fixture": "l2_sample_amplop_inner01.json",
+      "zona": "Zona Pertanian",
+      "zona_subzone": "P-1",
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 2,
+        "jalan_kena": 2,
+        "jalur": {
+          "template_low_confidence": 1,
+          "llm": 2
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": true,
+        "token_cocok": "p 1",
+        "timestamp": "2026-10-02T06:44:22"
+      }
+    }
+  ],
+  "tanpa_pembanding": [
+    {
+      "permohonan": "APP-2026-003",
+      "fixture": "l2_sample_itbx_x_tanpa_intensitas.json",
+      "zona": "Zona Perumahan",
+      "zona_subzone": null,
+      "status": "Tidak Dinilai",
+      "sesudah": {
+        "jalan_llm": 0,
+        "jalan_kena": 0,
+        "jalur": {
+          "template_low_confidence": 3
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": false,
+        "token_cocok": null,
+        "timestamp": "2026-08-13T08:23:02"
+      }
+    },
+    {
+      "permohonan": "APP-2026-6191",
+      "fixture": "l2_sample_amplop_6191.json",
+      "zona": "Zona Perumahan",
+      "zona_subzone": null,
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 1,
+        "jalan_kena": 1,
+        "jalur": {
+          "template_low_confidence": 2,
+          "llm": 1
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "template_low_confidence",
+        "kena": null,
+        "token_cocok": null,
+        "timestamp": "2026-09-08T08:32:03"
+      }
+    },
+    {
+      "permohonan": "APP-2026-8025",
+      "fixture": "l2_sample_amplop_8025.json",
+      "zona": "Zona Kawasan Peruntukan Industri",
+      "zona_subzone": "KPI",
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 3,
+        "jalan_kena": 3,
+        "jalur": {
+          "llm": 3
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "template_low_confidence",
+        "kena": null,
+        "token_cocok": null,
+        "timestamp": "2026-09-21T12:06:34"
+      }
+    },
+    {
+      "permohonan": "APP-2026-8913",
+      "fixture": "l2_sample_amplop_8913.json",
+      "zona": "Zona Perumahan",
+      "zona_subzone": null,
+      "status": "MELAMPAUI_BATAS",
+      "sesudah": {
+        "jalan_llm": 0,
+        "jalan_kena": 0,
+        "jalur": {
+          "template_low_confidence": 3
+        }
+      },
+      "kode_subzona_dikarang": [],
+      "sebelum": {
+        "jalur": "llm",
+        "kena": false,
+        "token_cocok": null,
+        "timestamp": "2026-08-17T18:33:09"
+      }
+    }
+  ]
+}
