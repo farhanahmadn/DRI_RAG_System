@@ -118,6 +118,24 @@ def normalisasi_kategori_dampak(raw: str | None) -> str | None:
     return raw.strip().title() if raw else None
 
 
+def _ambil_pemeliharaan_dampak(impact: ImpactAssessment) -> dict:
+    """Luas bangunan/RTH usulan pemohon (m²) + KDB/KDH (%) dari `detailed_surface_breakdown` BE,
+    apa adanya. Kosong kalau BE tak mengirimnya."""
+    breakdown = impact.detailed_surface_breakdown or {}
+    hasil: dict = {}
+    bangunan = breakdown.get("Bangunan/Atap")
+    if isinstance(bangunan, dict) and bangunan.get("luas_m2") is not None:
+        hasil["luas_bangunan_m2"] = _bulat2(bangunan["luas_m2"])
+    rth = breakdown.get("Taman/RTH")
+    if isinstance(rth, dict) and rth.get("luas_m2") is not None:
+        hasil["luas_rth_m2"] = _bulat2(rth["luas_m2"])
+    if breakdown.get("kdb_usulan_persen") is not None:
+        hasil["kdb_persen"] = _bulat2(breakdown["kdb_usulan_persen"])
+    if breakdown.get("kdh_usulan_persen") is not None:
+        hasil["kdh_persen"] = _bulat2(breakdown["kdh_usulan_persen"])
+    return hasil
+
+
 def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment) -> dict:
     """Arah mitigasi KUALITATIF. TIDAK menghitung ulang c_after/runoff_change_index/impact_score —
     rumus C masih volatile di back-end (sudah direvisi berkali-kali), DILARANG di-hardcode di sini.
@@ -128,7 +146,22 @@ def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment) -> dict:
 
     kategori = normalisasi_kategori_dampak(impact.impact_category)
     if kategori not in KATEGORI_DAMPAK_BERSYARAT:
-        return {"perlu_mitigasi": False, "arah": []}
+        # Dampak Rendah/Sedang: tak butuh mitigasi KOREKTIF, tapi sistem TETAP wajib memberi saran
+        # pencegahan/pemeliharaan konkret (permintaan user 2026-10-14: tak boleh lagi jatuh ke
+        # template "tidak diperlukan tindakan khusus"). Angka yang dipakai = usulan pemohon sendiri
+        # dari `detailed_surface_breakdown` (echo, bukan hitung ulang).
+        hasil_ringan: dict = {
+            "perlu_mitigasi": False,
+            "arah": [
+                "pertahankan luas RTH sesuai usulan",
+                "jaga luas bangunan tidak melebihi usulan",
+                "sumur atau kolam resapan sebagai praktik baik",
+            ],
+        }
+        pemeliharaan = _ambil_pemeliharaan_dampak(impact)
+        if pemeliharaan:
+            hasil_ringan["pemeliharaan"] = pemeliharaan
+        return hasil_ringan
 
     hasil: dict = {
         "perlu_mitigasi": True,
@@ -319,6 +352,71 @@ def bangun_langkah_konkret_intensitas(parameter: dict, target_map: dict) -> list
             "satuan": p.get("satuan"),
         })
     return langkah
+
+
+def bangun_langkah_pemeliharaan_dampak(mitigasi: dict) -> list[dict]:
+    """langkah_konkret utk dampak Rendah/Sedang (tanpa mitigasi korektif): menjaga kondisi yang
+    sudah baik tetap baik. Angka = usulan pemohon sendiri (`mitigasi['pemeliharaan']`), nilai
+    target sama dgn nilai saat ini karena yang diminta adalah MEMPERTAHANKAN, bukan mengubah."""
+    pemeliharaan = (mitigasi or {}).get("pemeliharaan") or {}
+    langkah: list[dict] = []
+    luas_rth = pemeliharaan.get("luas_rth_m2")
+    if luas_rth is not None:
+        langkah.append({
+            "parameter": "Luas RTH",
+            "deskripsi": (
+                f"Pertahankan luas RTH minimal {_fmt_angka(luas_rth)} m² sesuai usulan, "
+                "jangan dialihfungsikan agar daerah peresapan air tetap terjaga."
+            ),
+            "nilai_saat_ini": luas_rth,
+            "nilai_target": luas_rth,
+            "satuan": "m²",
+        })
+    luas_bangunan = pemeliharaan.get("luas_bangunan_m2")
+    if luas_bangunan is not None:
+        langkah.append({
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": (
+                f"Jaga luas bangunan tidak melebihi {_fmt_angka(luas_bangunan)} m² sesuai usulan. "
+                "Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya."
+            ),
+            "nilai_saat_ini": luas_bangunan,
+            "nilai_target": luas_bangunan,
+            "satuan": "m²",
+        })
+    langkah.append({
+        "parameter": "Sumur/Kolam Resapan",
+        "deskripsi": (
+            "Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik "
+            "baik pengelolaan limpasan, walaupun dampak tergolong ringan."
+        ),
+        "nilai_saat_ini": None,
+        "nilai_target": None,
+        "satuan": None,
+    })
+    return langkah
+
+
+def bangun_langkah_dampak_poin(fakta: dict) -> list[dict]:
+    """SATU pintu langkah_konkret poin dampak: mitigasi korektif (BE/threshold) kalau ada, kalau
+    tidak, langkah pemeliharaan utk dampak Rendah/Sedang. Dipakai generator, guardrail, templates —
+    tiga tempat yang HARUS selalu selaras."""
+    mitigasi = (fakta or {}).get("mitigasi") or {}
+    if mitigasi.get("perlu_mitigasi") is False:
+        # Gerbang yang SAMA dgn target (`pilih_target_dampak_poin`): poin yang tak butuh mitigasi
+        # korektif tak boleh bocor angka target walau kalkulator kebetulan menghasilkannya
+        # (APP-2026-8376) — yang tersisa hanya langkah pemeliharaan.
+        return bangun_langkah_pemeliharaan_dampak(mitigasi) if mitigasi.get("arah") else []
+    return bangun_langkah_konkret_dampak((fakta or {}).get("target_mitigasi") or {})
+
+
+def pilih_target_dampak_poin(fakta: dict) -> float | None:
+    """Target numerik poin dampak — None bila poin tak butuh mitigasi korektif (lihat
+    `bangun_langkah_dampak_poin`)."""
+    mitigasi = (fakta or {}).get("mitigasi") or {}
+    if mitigasi.get("perlu_mitigasi") is False:
+        return None
+    return pilih_target_mitigasi_dampak((fakta or {}).get("target_mitigasi") or {})
 
 
 def bangun_langkah_konkret_dampak(target_mitigasi: dict) -> list[dict]:

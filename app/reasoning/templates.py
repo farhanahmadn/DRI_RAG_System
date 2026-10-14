@@ -10,9 +10,9 @@ tidak punya skor per-poin lagi, jadi tidak ada `status_dari_skor` seperti versi 
 """
 
 from app.reasoning.calculator import (
-    bangun_langkah_konkret_dampak,
+    bangun_langkah_dampak_poin,
+    pilih_target_dampak_poin,
     bangun_langkah_konkret_intensitas,
-    pilih_target_mitigasi_dampak,
     pilih_target_utama_intensitas,
 )
 from app.reasoning.generator import _saran_tidak_dinilai
@@ -39,7 +39,7 @@ def _target_untuk_poin(poin: PoinKonteks) -> float | str | None:
     if poin.tipe_rekomendasi == "numerik":
         return pilih_target_utama_intensitas(poin.fakta.get("target") or {})
     if poin.tipe_rekomendasi == "numerik-mitigasi":
-        return pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
+        return pilih_target_dampak_poin(poin.fakta)
     return None
 
 
@@ -53,7 +53,7 @@ def _langkah_konkret_untuk_poin(poin: PoinKonteks) -> list[LangkahKonkretOutput]
             poin.fakta.get("parameter") or {}, poin.fakta.get("target") or {}
         )
     elif poin.tipe_rekomendasi == "numerik-mitigasi":
-        mentah = bangun_langkah_konkret_dampak(poin.fakta.get("target_mitigasi") or {})
+        mentah = bangun_langkah_dampak_poin(poin.fakta)
     else:
         mentah = []
     return [LangkahKonkretOutput(**item) for item in mentah]

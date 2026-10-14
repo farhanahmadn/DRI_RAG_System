@@ -26,9 +26,9 @@ from dataclasses import dataclass, field
 
 from app.adapter import cek_konsistensi_intensitas
 from app.reasoning.calculator import (
-    bangun_langkah_konkret_dampak,
+    bangun_langkah_dampak_poin,
+    pilih_target_dampak_poin,
     bangun_langkah_konkret_intensitas,
-    pilih_target_mitigasi_dampak,
     pilih_target_utama_intensitas,
 )
 from app.reasoning.generator import ambil_chunks_pendukung, apakah_aman, generate_poin
@@ -255,6 +255,10 @@ def _angka_fakta_poin(poin: PoinKonteks) -> list[str]:
         _tambah(target_mitigasi.get("luas_rth_saat_ini_m2"))
         dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
         _tambah(dimensi.get("nilai"))
+        # Dampak Rendah/Sedang: luas/KDB/KDH usulan pemohon utk saran pemeliharaan.
+        pemeliharaan = (fakta.get("mitigasi") or {}).get("pemeliharaan") or {}
+        for kunci in ("luas_bangunan_m2", "luas_rth_m2", "kdb_persen", "kdh_persen"):
+            _tambah(pemeliharaan.get(kunci))
 
     return angka
 
@@ -622,6 +626,27 @@ def _perbaiki_titik_koma(teks: str) -> str:
     return _RE_TITIK_KOMA.sub(", ", teks)
 
 
+_RE_SARAN_TANPA_TINDAKAN = re.compile(
+    r"tidak\s+(?:diperlukan|perlu|memerlukan)\s+(?:tindakan|langkah|mitigasi)|"
+    r"tanpa\s+(?:tindakan|mitigasi)\s+(?:khusus|tambahan|lanjutan)",
+    re.IGNORECASE,
+)
+
+
+def _cek_saran_dampak_tanpa_tindakan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """Permintaan user 2026-10-14: dampak yang dinilai (termasuk Rendah) WAJIB tetap punya saran
+    pencegahan/pemeliharaan konkret, bukan "tidak diperlukan tindakan"."""
+    if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
+        return []
+    if _RE_SARAN_TANPA_TINDAKAN.search(poin_output.rekomendasi.saran):
+        return [
+            "saran dampak berbunyi 'tidak diperlukan tindakan' — DILARANG. Walau dampak rendah, "
+            "saran WAJIB berisi langkah pencegahan/pemeliharaan konkret (pertahankan RTH, jaga luas "
+            "bangunan, sumur/kolam resapan)."
+        ]
+    return []
+
+
 def _cek_tanda_baca_dilarang(poin_output: PoinOutput) -> list[str]:
     teks = (
         f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} "
@@ -672,8 +697,8 @@ def perbaiki_poin(
                 poin.fakta.get("parameter") or {}, poin.fakta.get("target") or {}
             )
         elif poin.tipe_rekomendasi == "numerik-mitigasi":
-            target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
-            langkah_konkret = bangun_langkah_konkret_dampak(poin.fakta.get("target_mitigasi") or {})
+            target = pilih_target_dampak_poin(poin.fakta)
+            langkah_konkret = bangun_langkah_dampak_poin(poin.fakta)
 
     poin_bersih = poin_output.model_copy(
         update={
@@ -721,6 +746,7 @@ def perbaiki_poin(
     masalah.extend(_cek_konsistensi_numerik(poin_bersih, poin, chunks))
     masalah.extend(_cek_citation_id_bocor(poin_bersih, poin, chunks))
     masalah.extend(_cek_tanda_baca_dilarang(poin_bersih))
+    masalah.extend(_cek_saran_dampak_tanpa_tindakan(poin_bersih, poin))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 

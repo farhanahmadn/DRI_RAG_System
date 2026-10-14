@@ -10,9 +10,9 @@ import logging
 
 from app.reasoning import llm_client
 from app.reasoning.calculator import (
-    bangun_langkah_konkret_dampak,
+    bangun_langkah_dampak_poin,
+    pilih_target_dampak_poin,
     bangun_langkah_konkret_intensitas,
-    pilih_target_mitigasi_dampak,
     pilih_target_utama_intensitas,
 )
 from app.reasoning.prompts import (
@@ -413,8 +413,10 @@ def apakah_aman(poin: PoinKonteks) -> bool:
     if poin.poin_id == "intensitas":
         return not poin.fakta.get("target")
     if poin.poin_id == "dampak":
-        mitigasi = poin.fakta.get("mitigasi") or {}
-        return not mitigasi.get("perlu_mitigasi")
+        # Permintaan user 2026-10-14: dampak yang DINILAI (Rendah/Sedang/Tinggi...) tak pernah
+        # "aman tanpa saran" lagi — selalu lewat LLM + saran/langkah konkret. Hanya "Tidak Dinilai"
+        # yang tetap tanpa saran (ditangani cabang tersendiri di generate_poin/perbaiki_poin).
+        return poin.status == "Tidak Dinilai"
     return False
 
 
@@ -496,8 +498,8 @@ def generate_poin(
             poin.fakta.get("parameter") or {}, poin.fakta.get("target") or {}
         )
     elif poin.tipe_rekomendasi == "numerik-mitigasi":
-        target = pilih_target_mitigasi_dampak(poin.fakta.get("target_mitigasi") or {})
-        langkah_konkret = bangun_langkah_konkret_dampak(poin.fakta.get("target_mitigasi") or {})
+        target = pilih_target_dampak_poin(poin.fakta)
+        langkah_konkret = bangun_langkah_dampak_poin(poin.fakta)
 
     saran = llm_out["saran"]
     if poin.status == "Tidak Dinilai":

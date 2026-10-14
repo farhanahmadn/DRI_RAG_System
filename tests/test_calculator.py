@@ -156,11 +156,13 @@ class TestSarankanArahMitigasiDampak:
 
     def test_kategori_rendah_tidak_perlu_mitigasi(self):
         hasil = sarankan_arah_mitigasi_dampak(self._impact(impact_category="RENDAH"))
-        assert hasil == {"perlu_mitigasi": False, "arah": []}
+        assert hasil["perlu_mitigasi"] is False
+        assert hasil["arah"], "dampak Rendah tetap punya arah pemeliharaan (bukan kosong)"
 
     def test_kategori_sedang_tidak_perlu_mitigasi(self):
         hasil = sarankan_arah_mitigasi_dampak(self._impact(impact_category="SEDANG"))
-        assert hasil == {"perlu_mitigasi": False, "arah": []}
+        assert hasil["perlu_mitigasi"] is False
+        assert hasil["arah"]
 
     def test_kategori_tinggi_perlu_mitigasi(self):
         hasil = sarankan_arah_mitigasi_dampak(self._impact(impact_category="TINGGI"))
@@ -474,3 +476,48 @@ class TestBangunLangkahKonkretDampak:
         hasil = bangun_langkah_konkret_dampak(target_mitigasi)
         assert len(hasil) == 1
         assert hasil[0]["parameter"] == "Indeks Limpasan (Runoff)"
+
+
+class TestPemeliharaanDampakRendah:
+    """Permintaan user 2026-10-14: dampak Rendah tetap wajib punya saran & langkah konkret."""
+
+    def _impact_rendah(self):
+        return ImpactAssessment(
+            dinilai=True, impact_category="RENDAH",
+            detailed_surface_breakdown={
+                "Bangunan/Atap": {"luas_m2": 300.0}, "Taman/RTH": {"luas_m2": 800.0},
+                "kdb_usulan_persen": 20.89, "kdh_usulan_persen": 55.71,
+            },
+        )
+
+    def test_pemeliharaan_memuat_luas_usulan_apa_adanya(self):
+        hasil = sarankan_arah_mitigasi_dampak(self._impact_rendah())
+        assert hasil["perlu_mitigasi"] is False
+        assert hasil["pemeliharaan"] == {
+            "luas_bangunan_m2": 300.0, "luas_rth_m2": 800.0, "kdb_persen": 20.89, "kdh_persen": 55.71,
+        }
+
+    def test_langkah_konkret_tiga_item_dengan_angka_usulan(self):
+        from app.reasoning.calculator import bangun_langkah_dampak_poin
+        fakta = {"mitigasi": sarankan_arah_mitigasi_dampak(self._impact_rendah()), "target_mitigasi": {}}
+        langkah = bangun_langkah_dampak_poin(fakta)
+        assert [item["parameter"] for item in langkah] == ["Luas RTH", "Luas Bangunan (Atap)", "Sumur/Kolam Resapan"]
+        assert langkah[0]["nilai_target"] == 800.0 and langkah[1]["nilai_target"] == 300.0
+        assert all(";" not in item["deskripsi"] for item in langkah)
+
+    def test_tanpa_breakdown_tetap_ada_langkah_sumur_resapan(self):
+        from app.reasoning.calculator import bangun_langkah_dampak_poin
+        impact = ImpactAssessment(dinilai=True, impact_category="RENDAH")
+        langkah = bangun_langkah_dampak_poin({"mitigasi": sarankan_arah_mitigasi_dampak(impact)})
+        assert [item["parameter"] for item in langkah] == ["Sumur/Kolam Resapan"]
+
+    def test_tidak_dinilai_tanpa_langkah(self):
+        from app.reasoning.calculator import bangun_langkah_dampak_poin
+        impact = ImpactAssessment(dinilai=False)
+        assert bangun_langkah_dampak_poin({"mitigasi": sarankan_arah_mitigasi_dampak(impact)}) == []
+
+    def test_target_tidak_bocor_untuk_poin_tanpa_mitigasi_korektif(self):
+        from app.reasoning.calculator import pilih_target_dampak_poin
+        fakta = {"mitigasi": {"perlu_mitigasi": False, "arah": ["x"]},
+                 "target_mitigasi": {"runoff_change_index_maks": 1.5}}
+        assert pilih_target_dampak_poin(fakta) is None

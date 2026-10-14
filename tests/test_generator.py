@@ -75,13 +75,19 @@ class TestApakahAman:
         )
         assert apakah_aman(poin) is False
 
-    def test_dampak_aman_tanpa_mitigasi(self):
+    def test_dampak_dinilai_tanpa_mitigasi_tetap_tidak_aman(self):
+        """Permintaan user 2026-10-14: dampak Rendah/Sedang tak lagi jatuh ke template aman."""
         poin = _poin(
             poin_id="dampak",
             tipe_rekomendasi="numerik-mitigasi",
             status="Sedang",
             fakta={"mitigasi": {"perlu_mitigasi": False, "arah": []}},
         )
+        assert apakah_aman(poin) is False
+
+    def test_dampak_tidak_dinilai_tetap_aman(self):
+        poin = _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tidak Dinilai",
+                     fakta={"dinilai": False})
         assert apakah_aman(poin) is True
 
     def test_dampak_tidak_aman_dengan_mitigasi(self):

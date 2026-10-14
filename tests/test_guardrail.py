@@ -1657,3 +1657,49 @@ class TestNormalisasiDanReferensi:
         from app.reasoning.llm_client import _normalisasi_karakter
         hasil = _normalisasi_karakter({"a": "sub\u2011zona P\u20111", "b": ["10\u202fm"], "c": 5})
         assert hasil == {"a": "sub-zona P-1", "b": ["10 m"], "c": 5}
+
+
+class TestSaranDampakWajibAdaTindakan:
+    """Permintaan user 2026-10-14: dampak Rendah tak boleh berakhir 'tidak diperlukan tindakan'."""
+
+    def _poin_rendah(self):
+        return _poin(
+            poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Rendah",
+            fakta={"dinilai": True,
+                   "mitigasi": {"perlu_mitigasi": False,
+                                "arah": ["pertahankan luas RTH sesuai usulan"],
+                                "pemeliharaan": {"luas_rth_m2": 800.0, "luas_bangunan_m2": 300.0}},
+                   "target_mitigasi": {}},
+        )
+
+    def test_saran_tanpa_tindakan_ditolak(self):
+        output = _poin_output(
+            poin_id="dampak", status="Rendah",
+            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Tidak diperlukan tindakan khusus."),
+        )
+        _, masalah = perbaiki_poin(output, self._poin_rendah(), [], _muat_assessment("l2_sample_lolos.json"))
+        assert any("tidak diperlukan tindakan" in m for m in masalah)
+
+    def test_saran_pemeliharaan_lolos_dan_langkah_konkret_terisi(self):
+        output = _poin_output(
+            poin_id="dampak", status="Rendah",
+            rekomendasi=RekomendasiOutput(
+                tipe="numerik-mitigasi",
+                saran="Pertahankan luas RTH minimal 800 m², jaga luas bangunan tidak melebihi 300 m², dan sediakan sumur resapan."),
+        )
+        poin_bersih, masalah = perbaiki_poin(output, self._poin_rendah(), [], _muat_assessment("l2_sample_lolos.json"))
+        assert not any("tindakan" in m for m in masalah)
+        assert not any("angka" in m for m in masalah), masalah
+        assert [l.parameter for l in poin_bersih.rekomendasi.langkah_konkret] == [
+            "Luas RTH", "Luas Bangunan (Atap)", "Sumur/Kolam Resapan"]
+        assert poin_bersih.rekomendasi.target is None
+
+    def test_tidak_dinilai_tak_kena_cek(self):
+        poin = _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tidak Dinilai",
+                     fakta={"dinilai": False})
+        output = _poin_output(
+            poin_id="dampak", status="Tidak Dinilai",
+            rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Tidak dievaluasi, tidak perlu tindakan."),
+        )
+        _, masalah = perbaiki_poin(output, poin, [], _muat_assessment("l2_sample_lolos.json"))
+        assert not any("DILARANG" in m and "tindakan" in m for m in masalah)

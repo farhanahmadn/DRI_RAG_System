@@ -354,6 +354,23 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     if mitigasi.get("perlu_mitigasi"):
         lines.append("\nArah Mitigasi (FAKTA kualitatif, bukan angka pasti):")
         lines.extend(f"- {arah}" for arah in mitigasi.get("arah", []))
+    elif poin.status != "Tidak Dinilai" and mitigasi.get("arah"):
+        # Dampak Rendah/Sedang (permintaan user 2026-10-14): tak ada mitigasi KOREKTIF, tapi saran
+        # TETAP wajib berisi langkah pencegahan/pemeliharaan — bukan "tidak diperlukan tindakan".
+        pemeliharaan = mitigasi.get("pemeliharaan") or {}
+        butir = []
+        if pemeliharaan.get("luas_rth_m2") is not None:
+            butir.append(f"pertahankan luas RTH minimal {_angka_prompt(pemeliharaan['luas_rth_m2'])} m² sesuai usulan")
+        if pemeliharaan.get("luas_bangunan_m2") is not None:
+            butir.append(f"jaga luas bangunan tidak melebihi {_angka_prompt(pemeliharaan['luas_bangunan_m2'])} m² sesuai usulan")
+        butir.append("sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik")
+        lines.append(
+            f"\nSARAN_PEMELIHARAAN (WAJIB): dampak tergolong {poin.status}, jadi TIDAK perlu mitigasi "
+            "korektif. Namun saran WAJIB tetap berisi langkah pencegahan dan pemeliharaan yang konkret. "
+            "DILARANG menulis 'tidak diperlukan tindakan khusus', 'tidak perlu tindakan', atau kalimat "
+            "senada di saran. Muat langkah berikut di saran: " + ", ".join(butir) + ". "
+            "Sebutkan angka luas di atas APA ADANYA, JANGAN mengarang atau menghitung angka lain."
+        )
 
     # Target kuantitatif (ambang runoff_change_index, dari app/reasoning/calculator.py) — BEDA dgn
     # skor invers yang dilarang Aturan #2 di atas (skor TINGGI = dampak RENDAH): angka di sini arahnya
