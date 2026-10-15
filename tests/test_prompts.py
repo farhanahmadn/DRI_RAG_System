@@ -630,7 +630,7 @@ class TestAngkaPromptDibulatkan:
 
     def test_float_pendek_tidak_diubah(self):
         assert _angka_prompt(1.8) == "1.8"
-        assert _angka_prompt(60.0) == "60.0"
+        assert _angka_prompt(60.0) == "60"
 
     def test_nilai_kecil_tidak_dibulatkan_jadi_nol(self):
         # 0.004 -> 0.0 akan MENGHILANGKAN angkanya; lebih baik apa adanya.

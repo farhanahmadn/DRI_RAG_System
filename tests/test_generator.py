@@ -1254,7 +1254,7 @@ class TestSitasiResapanMengikutiStatusBE:
     def test_non_resapan_membuang_pasal_53(self):
         from app.reasoning.generator import _sesuaikan_dgn_status_resapan
         p53 = self._chunk("p53-a3", "53", "Ketentuan khusus kawasan resapan air ... zero delta Q")
-        lain = self._chunk("vi-r-3", "", "Lampiran VI intensitas, resapan/non-resapan")
+        lain = self._chunk("vi-r-3", "", "Ketentuan umum drainase lingkungan")
         hasil = _sesuaikan_dgn_status_resapan([p53, lain], self._poin(False), self._Retriever([]), 3)
         assert [c.id for c in hasil] == ["vi-r-3"]
 
@@ -1288,7 +1288,7 @@ def test_pasal_50_kekeringan_dibuang_apa_pun_status_resapan():
     p50 = Chunk(id="p50-a11", level="ayat", dokumen="Perbup", pasal="50",
                 teks="(11) kawasan rawan bencana kekeringan: memastikan air tidak melimpas (zero delta Q policy) dengan pembuatan sumur")
     p50_gempa = Chunk(id="p50-a3", level="ayat", dokumen="Perbup", pasal="50", teks="(3) kawasan rawan bencana gempa bumi")
-    biasa = Chunk(id="vi-r-3", level="tabel", dokumen="Perbup", pasal="", teks="Lampiran VI R-3")
+    biasa = Chunk(id="vi-r-3", level="tabel", dokumen="Perbup", pasal="", teks="Ketentuan umum drainase lingkungan")
     zdq_lain = Chunk(id="x", level="ayat", dokumen="Perbup", pasal="12", teks="kebijakan zero delta Q umum")
     assert chunk_rawan_kekeringan(p50) and not chunk_rawan_kekeringan(p50_gempa)
     for status in (True, False, None):

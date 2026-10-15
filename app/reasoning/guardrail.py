@@ -372,7 +372,12 @@ def _angka_terlacak_ke_sumber(
     sumber += " " + _teks_chunk_disitasi(poin_output, chunks)
     if re.search(rf"\b{re.escape(angka)}\b", sumber) is not None:
         return True
-    return _dekat_dgn_pembulatan(angka, sumber)
+    # LLM menulis desimal Indonesia ("4,8", "20,89") sedangkan sumber memakai titik ("4.8"), atau
+    # sebaliknya — format, bukan angka karangan (APP-2026-UJI-3: dua percobaan terbuang sia-sia).
+    alt = angka.replace(",", ".") if "," in angka else angka.replace(".", ",")
+    if alt != angka and re.search(rf"\b{re.escape(alt)}\b", sumber) is not None:
+        return True
+    return _dekat_dgn_pembulatan(angka.replace(",", "."), sumber)
 
 
 def _cek_konsistensi_numerik(
@@ -687,6 +692,106 @@ def _cek_persen_intensitas_di_dampak(poin_output: PoinOutput, poin: PoinKonteks)
     return []
 
 
+_RE_SEBAB_DAMPAK_LOKASI = re.compile(
+    r"(?:dampak|kategori)[^.\n]{0,80}(?:disebabkan|diakibatkan|dikarenakan|akibat\s+dari)[^.\n]{0,60}"
+    r"(?:lokasi|berada|terletak)[^.\n]{0,40}resapan",
+    re.IGNORECASE,
+)
+_RE_KEHARUSAN = re.compile(r"mengharuskan|diharuskan|diwajibkan|wajib|menuntut|\bharus\b", re.IGNORECASE)
+_RE_FASILITAS_RESAPAN = re.compile(r"\bsumur\b|kolam\s+resapan", re.IGNORECASE)
+_RE_SIFAT_OPSIONAL = re.compile(
+    r"rekomendasi|disarankan|dianjurkan|opsi|alternatif|praktik\s+baik|bukan\s+kewajiban|"
+    r"tidak\s+diwajibkan|\bdapat\b|\bboleh\b",
+    re.IGNORECASE,
+)
+_RE_MEMANFAATKAN_PASAL53 = re.compile(
+    r"memanfaatkan[^.\n]{0,40}pasal\s+53|pasal\s+53[^.\n]{0,40}memanfaatkan", re.IGNORECASE
+)
+
+
+def _cek_penjelasan_dampak(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """APP-2026-UJI-2/-4: (a) sebab dampak dibalik jadi "disebabkan oleh lokasi di kawasan resapan";
+    (b) di lokasi non-resapan, penjelasan menyebut sumur/kolam resapan sebagai keharusan padahal saran
+    menyebutnya rekomendasi; (c) "tidak dapat memanfaatkan Pasal 53"."""
+    if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
+        return []
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang}"
+    masalah = []
+    if _RE_SEBAB_DAMPAK_LOKASI.search(teks):
+        masalah.append(
+            "penjelasan dampak menyebut kategori dampak 'disebabkan' oleh lokasi di kawasan resapan air. "
+            "Sebab kategori dampak adalah indeks limpasan (luas bangunan dan RTH usulan), bukan lokasi."
+        )
+    if poin.kawasan_resapan is False:
+        for kalimat in _RE_PISAH_KALIMAT.split(teks):
+            if (_RE_FASILITAS_RESAPAN.search(kalimat) and _RE_KEHARUSAN.search(kalimat)
+                    and not _RE_SIFAT_OPSIONAL.search(kalimat)):
+                masalah.append(
+                    "penjelasan dampak menyebut sumur/kolam resapan sebagai keharusan, padahal lokasi bukan "
+                    "kawasan resapan air. Tulis sebagai rekomendasi atau opsi mitigasi, bukan kewajiban."
+                )
+                break
+        if _RE_MEMANFAATKAN_PASAL53.search(teks):
+            masalah.append(
+                "jangan menulis lokasi 'tidak dapat memanfaatkan' Pasal 53. Tulis bahwa ketentuan itu tidak "
+                "berlaku karena lokasi di luar kawasan resapan air."
+            )
+    return masalah
+
+
+_POLA_SYARAT_KELOMPOK_LAIN = (
+    ("jam operasional", re.compile(r"jam\s+(?:operasional|buka)|\bpukul\s+22|\b22[.:]00", re.IGNORECASE)),
+    ("dokumen lingkungan", re.compile(r"dokumen\s+(?:perizinan\s+)?lingkungan", re.IGNORECASE)),
+    ("pengelolaan limbah", re.compile(r"pengelolaan\s+(?:limbah|sampah)|limbah", re.IGNORECASE)),
+    ("tidak mencemari", re.compile(r"mencemari|pencemaran", re.IGNORECASE)),
+    ("peternakan", re.compile(r"peternakan|ternak", re.IGNORECASE)),
+)
+
+
+def _cek_syarat_kelompok_lain(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """APP-2026-UJI: ITBX akomodasi mengutip jam operasional 22.00, dokumen lingkungan, dan "tidak
+    mencemari" — syarat kelompok jasa lain/pertanian dari Lampiran V.B yang sama. Syarat sah hanya bila
+    tertulis di fakta kegiatan pemohon (keterangan_ketentuan/reason BE)."""
+    if poin.poin_id != "itbx":
+        return []
+    sumber = " ".join((poin.fakta.get("keterangan_ketentuan") or []) + [str(poin.fakta.get("reason") or "")])
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
+    asing = [nama for nama, pola in _POLA_SYARAT_KELOMPOK_LAIN
+             if pola.search(teks) and not pola.search(sumber)]
+    if asing:
+        return [
+            "syarat " + ", ".join(asing) + " tidak tercantum pada ketentuan kegiatan pemohon (itu syarat "
+            "kelompok kegiatan lain di Lampiran V.B). Sebut hanya syarat yang ada di Keterangan Ketentuan."
+        ]
+    return []
+
+
+_RE_PROSEDUR_KARANGAN = re.compile(
+    r"(?:mengajukan|ajukan|pengajuan)\s+(?:permohonan\s+|usulan\s+)?(?:penyesuaian|perubahan|pengecualian|"
+    r"dispensasi|izin\s+khusus|zona|sub-?zona)|permohonan\s+(?:penyesuaian|perubahan|pengecualian|dispensasi)|"
+    r"izin\s+khusus|dispensasi",
+    re.IGNORECASE,
+)
+_PENANDA_PROSEDUR_DI_SUMBER = ("dispensasi", "izin khusus", "pengecualian", "permohonan penyesuaian", "perubahan zona")
+
+
+def _cek_prosedur_karangan(poin_output: PoinOutput, poin: PoinKonteks, chunks: list[Chunk] | None) -> list[str]:
+    """APP-2026-UJI-2: saran "ajukan permohonan penyesuaian intensitas ruang" tak ada di dokumen mana pun.
+    Prosedur administratif hanya boleh bila tertulis di fakta atau teks pasal yang disodorkan."""
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
+    if not _RE_PROSEDUR_KARANGAN.search(teks):
+        return []
+    sumber = " ".join((poin.fakta.get("keterangan_ketentuan") or []) + [str(poin.fakta.get("reason") or "")])
+    sumber += " " + " ".join(c.teks for c in (chunks or []))
+    sumber += " " + " ".join(d.kutipan for d in poin.dasar_hukum)
+    if any(p in sumber.lower() for p in _PENANDA_PROSEDUR_DI_SUMBER):
+        return []
+    return [
+        "saran memuat prosedur administratif (mengajukan permohonan penyesuaian/pengecualian/dispensasi/izin "
+        "khusus/perubahan zona) yang tidak tertulis di fakta maupun pasal. DILARANG mengarang prosedur."
+    ]
+
+
 def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     """Lokasi yang BE nyatakan BUKAN kawasan resapan air tak boleh dijelaskan memakai ketentuan
     kawasan resapan (APP-2026-UJI-4)."""
@@ -820,6 +925,9 @@ def perbaiki_poin(
     masalah.extend(_cek_saran_dampak_tanpa_tindakan(poin_bersih, poin))
     masalah.extend(_cek_klaim_resapan(poin_bersih, poin))
     masalah.extend(_cek_persen_intensitas_di_dampak(poin_bersih, poin))
+    masalah.extend(_cek_penjelasan_dampak(poin_bersih, poin))
+    masalah.extend(_cek_syarat_kelompok_lain(poin_bersih, poin))
+    masalah.extend(_cek_prosedur_karangan(poin_bersih, poin, chunks))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)
 

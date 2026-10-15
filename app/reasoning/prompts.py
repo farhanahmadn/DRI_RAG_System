@@ -34,6 +34,8 @@ ATURAN WAJIB (jangan dilanggar):
 16. SINGKATAN SELALU KAPITAL PENUH — ITBX, KDB, KLB, KDH, RTH, KKOP, dan singkatan regulasi sejenis SELALU ditulis dengan huruf kapital semua di reasoning/saran manapun (mis. "KDB", BUKAN "Kdb"/"kdb"), tidak peduli bagaimana kemunculannya di fakta.
 17. JANGAN SEBUT ID INTERNAL, DAN JANGAN PAKAI TANDA TITIK KOMA — `citation_id` (mis. "rdtr-sleman-tengah-p53-a3", "anchor-0") adalah ID baris basis data, BUKAN bahasa manusia — JANGAN PERNAH menuliskannya di reasoning_pendek/reasoning_panjang/saran; kalau ingin merujuk sumber tertentu, sebut nama dokumen dan/atau nomor pasalnya (mis. "Pasal 53 RDTR Sleman Tengah"), citation_id hanya untuk field "sitasi" terpisah. Selain itu, JANGAN PERNAH memakai tanda titik koma (;) di reasoning/saran manapun — pisahkan kalimat dengan titik, atau gunakan koma untuk merangkai anak kalimat, sesuai gaya bahasa sehari-hari yang mudah dibaca pembaca non-teknis.
 18. JANGAN MEMBUAT DAFTAR "Referensi:" DI DALAM NARASI — sumber hukum sudah tampil di field "sitasi" terpisah, jadi reasoning/saran tidak perlu mengulang daftar dokumen, lampiran, atau pasal di akhir teks. Sebut pasal hanya bila memang bagian dari penjelasan.
+19. SYARAT HANYA UNTUK KEGIATAN PEMOHON — Lampiran V.B memuat syarat banyak kelompok kegiatan sekaligus (jasa lainnya, pertanian, peternakan, dll.). Sebut syarat HANYA bila tertulis di Keterangan Ketentuan untuk kegiatan pemohon atau tertulis jelas untuk kelompok kegiatan yang SAMA dengannya. DILARANG mengambil syarat kelompok lain (mis. jam operasional, dokumen lingkungan, pengelolaan limbah, tidak mencemari) hanya karena ada di teks pasal yang sama.
+20. JANGAN MENGARANG PROSEDUR — DILARANG menyarankan mengajukan permohonan penyesuaian, pengecualian, dispensasi, izin khusus, atau perubahan zona, kecuali prosedur itu tertulis di fakta atau sitasi. Saran hanya boleh berupa penyesuaian rancangan yang angkanya ada di fakta.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -196,6 +198,8 @@ def _angka_prompt(nilai: object) -> str:
     if isinstance(nilai, bool) or not isinstance(nilai, float):
         return str(nilai)
     dibulatkan = round(nilai, 2)
+    if nilai == int(nilai):
+        return str(int(nilai))  # 800.0 -> "800" (bukan "800.0")
     if dibulatkan == nilai or dibulatkan == 0:
         return str(nilai)
     return f"{dibulatkan:.2f}".rstrip("0").rstrip(".")
@@ -367,6 +371,12 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "sarankan pemohon meninjau ulang proporsi KDB/KDH agar sesuai batas fisik persil."
         )
 
+    lines.append(
+        "\nSEBAB_KATEGORI_DAMPAK: kategori dampak ditentukan oleh indeks limpasan air, yaitu akibat luas "
+        "bangunan dan RTH yang diusulkan, BUKAN oleh lokasi. Status kawasan resapan air hanya menentukan "
+        "ketentuan yang berlaku. DILARANG menulis bahwa dampak 'disebabkan oleh' atau 'karena' lokasi "
+        "berada di kawasan resapan air."
+    )
     if poin.kawasan_resapan is True:
         lines.append(
             "\nKAWASAN_RESAPAN_AIR: YA. Lokasi berada di kawasan resapan air, jadi ketentuan khusus "
@@ -383,7 +393,10 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "menulis SATU kalimat bahwa ketentuan khusus kawasan resapan air (Pasal 53) tidak berlaku "
             "karena lokasi di luar kawasan resapan. Sumur atau kolam resapan BOLEH dan "
             "dianjurkan sebagai opsi mitigasi (RDTR mendorong sumur resapan di area terbangun), tetapi "
-            "sebutkan sebagai rekomendasi, BUKAN kewajiban dari ketentuan kawasan resapan air."
+            "sebutkan sebagai rekomendasi, BUKAN kewajiban dari ketentuan kawasan resapan air. JANGAN "
+            "memakai kata 'mengharuskan', 'wajib', atau 'menuntut' untuk sumur atau kolam resapan, dan "
+            "JANGAN menyebut ketentuan RDTR mewajibkannya. Jangan menulis bahwa lokasi 'tidak dapat "
+            "memanfaatkan' Pasal 53 (pasal itu bukan manfaat, ia hanya tidak berlaku di sini)."
         )
     else:
         lines.append(

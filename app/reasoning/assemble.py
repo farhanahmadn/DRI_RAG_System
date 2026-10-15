@@ -284,7 +284,8 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> K
             schema_name="kesimpulan",
             system=SYSTEM_PROMPT_KESIMPULAN,
         )
-        langkah = hasil.get("langkah_berdampak") or []
+        # Nomor "1." di awal butir dibuang: FE sudah memberi penomoran (APP-2026-UJI-1: nomor terulang).
+        langkah = [re.sub(r"^\s*\d+[.)]\s*", "", str(l)) for l in (hasil.get("langkah_berdampak") or [])]
         catatan = hasil.get("catatan_lokasi")
         gabungan = " ".join(langkah) + " " + (catatan or "")
         asing = _angka_tak_terlacak_ke_saran(gabungan, poin_list)
@@ -436,13 +437,22 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     poin_list = _terapkan_catatan_batas([p for p, _ in hasil_poin], hasil_adaptasi.poin)
     diagnostik = [d for _, d in hasil_poin]
 
+    # Batas yang lebih ketat (intensitas vs dampak) harus terbaca di NARASI dan KESIMPULAN juga, bukan
+    # hanya di disclaimer: pembaca ringkasan akan mengikuti angka dampak yang lebih longgar.
+    catatan_batas = _catatan_batas_berbeda(hasil_adaptasi.poin)
+    narasi = _rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem)
+    kesimpulan = _rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem)
+    if catatan_batas:
+        narasi = narasi.model_copy(update={"paragraf_dampak": f"{narasi.paragraf_dampak} {catatan_batas}".strip()})
+        kesimpulan = kesimpulan.model_copy(update={"langkah_berdampak": [*kesimpulan.langkah_berdampak, catatan_batas]})
+
     output = OutputL3(
         ringkasan_gate=_rakit_ringkasan_gate(assessment, itbx_fallback),
         ringkasan_dampak=_rakit_ringkasan_dampak(assessment),
         poin=poin_list,
         rekomendasi_sistem=hasil_adaptasi.rekomendasi_sistem,
-        narasi_rekomendasi=_rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem),
-        kesimpulan=_rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem),
+        narasi_rekomendasi=narasi,
+        kesimpulan=kesimpulan,
         catatan_global=_rakit_catatan_global(assessment, itbx_fallback, poin_list,
                                              di_luar_wilayah, subzona_tak_pasti),
         # Di luar cakupan = seluruh dasar hukum patut diragukan -> tandai low_confidence walau

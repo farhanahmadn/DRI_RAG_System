@@ -306,6 +306,26 @@ def chunk_rawan_kekeringan(chunk: Chunk) -> bool:
     return (chunk.pasal or "").strip() == "50" and "kekeringan" in (chunk.teks or "").lower()
 
 
+def chunk_pengisi_dampak(chunk: Chunk) -> bool:
+    """Chunk yang bukan dasar hukum hidrologi: definisi Pasal 1 (mis. "Jaringan Drainase Lokal") dan
+    tabel intensitas Lampiran VI (dibahas poin intensitas). Pada APP-2026-UJI-3/-4 keduanya jadi satu-
+    satunya sitasi dampak non-resapan: sekadar pengisi, bukan dasar."""
+    teks = (chunk.teks or "").lstrip()
+    return (chunk.pasal or "").strip() == "1" or "-vi-" in (chunk.id or "") or teks.startswith("Lampiran VI")
+
+
+def _berlaku_utk_subzona(chunk: Chunk, subzona: str | None) -> bool:
+    """Pasal 53 ayat (2) dan (3) memuat daftar kode zona yang berbeda. Hanya ayat yang menyebut kode
+    sub-zona pemohon yang berlaku (APP-2026-UJI-2 mengutip ayat 2 untuk R-3 padahal ayat 2 hanya untuk
+    BA, PS, RTH-3, RTH-4, RTH-7)."""
+    if not subzona or (chunk.pasal or "").strip() != "53":
+        return True
+    teks = (chunk.teks or "").lstrip()
+    if not (teks.startswith("(2)") or teks.startswith("(3)")):
+        return True
+    return f"kode {subzona.strip().lower()}" in teks.lower()
+
+
 def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retriever: Retriever,
                                   top_k: int) -> list[Chunk]:
     """Poin dampak: sitasi ketentuan resapan air mengikuti `kawasan_resapan` dari BE.
@@ -318,6 +338,7 @@ def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retrie
         return chunks
     if poin.rawan_kekeringan is not True:
         chunks = [c for c in chunks if not chunk_rawan_kekeringan(c)]
+    chunks = [c for c in chunks if not chunk_pengisi_dampak(c) and _berlaku_utk_subzona(c, poin.zona_subzone)]
     if poin.kawasan_resapan is None:
         return chunks[:top_k] if len(chunks) > top_k else chunks
     if poin.kawasan_resapan is False:
@@ -329,7 +350,7 @@ def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retrie
     filters = (RetrievalFilters(zona=poin.zona_subzone) if poin.zona_subzone
                else RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona)))
     tambahan = [c for c in retriever.search(_QUERY_KETENTUAN_RESAPAN, filters, top_k=4)
-                if chunk_ketentuan_resapan(c)][:1]
+                if chunk_ketentuan_resapan(c) and _berlaku_utk_subzona(c, poin.zona_subzone)][:1]
     return (tambahan + chunks)[: max(top_k, len(tambahan))]
 
 
@@ -518,7 +539,9 @@ def generate_poin(
                     dokumen=anchor.dokumen,
                     pasal=anchor.pasal or "",
                     halaman=0,
-                    kutipan=kutipan or anchor.kutipan,
+                    # SELALU teks BE apa adanya; kutipan dari LLM hanya cadangan bila BE kosong
+                    # (APP-2026-UJI-1: LLM menambah awalan ke kutipan jangkar).
+                    kutipan=anchor.kutipan or kutipan,
                     terverifikasi=True,
                 )
             )

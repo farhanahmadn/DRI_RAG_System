@@ -231,11 +231,24 @@ _PETA_KARAKTER = str.maketrans({
 })
 
 
+# Label enum teknis yang kadang disalin LLM ke narasi (APP-2026-UJI: "Intensitas MELAMPAUI_BATAS"),
+# dan salah-ekspansi "RTH" -> "ruang terbuka terbuka". Diganti di satu pintu keluaran LLM.
+_PETA_LABEL_TEKNIS = (
+    (re.compile(r"\bMELAMPAUI_BATAS\b"), "melampaui batas"),
+    (re.compile(r"\bMEMENUHI_SYARAT\b"), "memenuhi syarat"),
+    (re.compile(r"\bTIDAK_DIEVALUASI\b"), "tidak dievaluasi"),
+    (re.compile(r"ruang\s+terbuka\s+terbuka", re.IGNORECASE), "ruang terbuka hijau"),
+)
+
+
 def _normalisasi_karakter(nilai):
     if isinstance(nilai, str):
         # Model kadang menulis dua karakter backslash+n alih-alih baris baru di dalam string JSON
         # (APP-2026-UJI-4: "...turun ke 60%.\\n2. Menambah RTH" tampil mentah di saran/narasi).
-        return nilai.translate(_PETA_KARAKTER).replace("\\n", "\n")
+        teks = nilai.translate(_PETA_KARAKTER).replace("\\n", "\n")
+        for pola, pengganti in _PETA_LABEL_TEKNIS:
+            teks = pola.sub(pengganti, teks)
+        return teks
     if isinstance(nilai, list):
         return [_normalisasi_karakter(v) for v in nilai]
     if isinstance(nilai, dict):
