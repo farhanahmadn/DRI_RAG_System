@@ -1763,3 +1763,34 @@ class TestPersenIntensitasDiDampak:
             self._out("KDB usulan 83.57% perlu turun hingga KDB maks 75% dan KDH min 25%."),
             self._poin_dampak(), [], a)
         assert not any("bukan target mitigasi dampak" in m for m in masalah), masalah
+
+
+class TestNegasiPasal53DiLokasiNonResapan:
+    """Pasal 53 boleh DISEBUT sebagai tidak berlaku di lokasi non-resapan; dilarang dipakai sebagai
+    ketentuan yang berlaku."""
+
+    def _poin(self):
+        return _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+                     fakta={"dinilai": True, "mitigasi": {"perlu_mitigasi": True, "arah": ["x"]}},
+                     kawasan_resapan=False)
+
+    def _masalah(self, teks):
+        out = _poin_output(poin_id="dampak", status="Tinggi", reasoning_panjang=teks,
+                           rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Kurangi luas bangunan."))
+        _, masalah = perbaiki_poin(out, self._poin(), [], _muat_assessment("l2_sample_lolos.json"))
+        return masalah
+
+    def test_pernyataan_tidak_berlaku_diizinkan(self):
+        for teks in (
+            "Ketentuan khusus kawasan resapan air (Pasal 53) tidak berlaku karena lokasi di luar kawasan resapan.",
+            "Pasal 53 tidak mengikat lokasi ini.",
+            "Lokasi bukan kawasan resapan sehingga zero delta Q tidak diwajibkan.",
+        ):
+            assert not any("sebagai ketentuan yang berlaku" in m for m in self._masalah(teks)), teks
+
+    def test_penerapan_sebagai_ketentuan_berlaku_ditolak(self):
+        for teks in (
+            "Pemohon wajib memenuhi zero delta Q sesuai Pasal 53.",
+            "Lokasi berada di kawasan resapan air.",
+        ):
+            assert any("sebagai ketentuan yang berlaku" in m for m in self._masalah(teks)), teks

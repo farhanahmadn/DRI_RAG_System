@@ -296,13 +296,14 @@ def chunk_ketentuan_resapan(chunk: Chunk) -> bool:
     return (chunk.pasal or "").strip() == "53" and "resapan" in (chunk.teks or "").lower()
 
 
-def chunk_terkait_resapan(chunk: Chunk) -> bool:
-    """Lebih luas dari `chunk_ketentuan_resapan`: juga chunk pasal LAIN yang memuat kebijakan
-    "zero delta Q" (mis. Pasal 50 ayat 11, kawasan rawan kekeringan, ikut tampil di APP-2026-UJI-4
-    padahal lokasi non-resapan dan bukan kawasan rawan kekeringan). Hanya dipakai utk MEMBUANG pada
-    lokasi non-resapan."""
-    teks = (chunk.teks or "").lower()
-    return chunk_ketentuan_resapan(chunk) or "zero delta q" in teks
+def chunk_rawan_kekeringan(chunk: Chunk) -> bool:
+    """Chunk Pasal 50 yang mengatur kawasan rawan bencana kekeringan (ayat 10 dan 11).
+
+    Berlaku HANYA di SWP E Blok I.E.1 dan I.E.2, dan tak ada hubungannya dgn status resapan air
+    (keduanya kebetulan memuat "zero delta Q"). Payload belum membawa ID blok, jadi berlaku-tidaknya
+    pasal ini tak bisa dipastikan -> tak dikutip sebagai dasar poin dampak (APP-2026-UJI-4 mengutipnya
+    di lokasi yang bukan kawasan rawan kekeringan)."""
+    return (chunk.pasal or "").strip() == "50" and "kekeringan" in (chunk.teks or "").lower()
 
 
 def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retriever: Retriever,
@@ -313,10 +314,15 @@ def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retrie
     R-3 ada di daftar zonanya; pasal itu berlaku per blok resapan, bukan per zona).
     True  -> pastikan ada (tak boleh bergantung pada untung-untungan retrieval).
     None  -> perilaku lama."""
-    if poin.poin_id != "dampak" or poin.kawasan_resapan is None:
+    if poin.poin_id != "dampak":
         return chunks
+    chunks = [c for c in chunks if not chunk_rawan_kekeringan(c)]
+    if poin.kawasan_resapan is None:
+        return chunks[:top_k] if len(chunks) > top_k else chunks
     if poin.kawasan_resapan is False:
-        return [c for c in chunks if not chunk_terkait_resapan(c)][:top_k]
+        # Pasal 53 bukan dasar kewajiban utk lokasi non-resapan. (LLM tetap boleh MENYEBUT bahwa
+        # pasal itu tidak berlaku — lihat guardrail._cek_klaim_resapan.)
+        return [c for c in chunks if not chunk_ketentuan_resapan(c)][:top_k]
     if any(chunk_ketentuan_resapan(c) for c in chunks):
         return chunks
     filters = (RetrievalFilters(zona=poin.zona_subzone) if poin.zona_subzone
@@ -346,7 +352,7 @@ def ambil_chunks_pendukung(
     top_k = top_k_utk(poin.poin_id, top_k_dukungan)
     chunks = _pilih_chunks_referensi(chunks, poin, top_k)
     # Over-fetch sedikit kalau chunk resapan akan dibuang, supaya jatah top_k tak habis percuma.
-    top_k_cari = top_k + 2 if (poin.poin_id == "dampak" and poin.kawasan_resapan is False) else top_k
+    top_k_cari = top_k + 2 if poin.poin_id == "dampak" else top_k
     if not chunks:
         query_fallback = _QUERY_FALLBACK_PER_POIN.get(poin.poin_id, poin.kategori)
         if poin.poin_id == "intensitas":

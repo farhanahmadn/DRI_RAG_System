@@ -705,5 +705,6 @@ def test_fakta_dampak_memuat_status_kawasan_resapan():
         return "\n".join(_bangun_fakta_dampak(p))
 
     assert "KAWASAN_RESAPAN_AIR: YA" in _teks(True)
-    assert "KAWASAN_RESAPAN_AIR: TIDAK." in _teks(False) and "DILARANG menyebut" in _teks(False)
+    assert "KAWASAN_RESAPAN_AIR: TIDAK." in _teks(False) and "DILARANG menerapkan" in _teks(False)
+    assert "tidak berlaku" in _teks(False)
     assert "TIDAK DIKETAHUI" in _teks(None)

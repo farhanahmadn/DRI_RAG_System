@@ -342,6 +342,9 @@ def _angka_terlacak_ke_sumber(
     sumber += " " + " ".join(_angka_fakta_poin(poin))
     sumber += " " + " ".join(d.pasal or "" for d in poin.dasar_hukum)
     sumber += " " + " ".join(d.dokumen or "" for d in poin.dasar_hukum)
+    if poin.poin_id == "dampak" and poin.kawasan_resapan is not None:
+        # Status resapan diketahui -> narasi sah menyebut "Pasal 53" (berlaku atau tidak berlaku).
+        sumber += " Pasal 53"
     # APP-2026-0095: `REASON` BE disuntikkan ke prompt ITBX (prompts._bangun_fakta_itbx) sehingga LLM
     # sah mengutip angkanya (mis. "Zona Pertanian (743.5 m2: Status X)"), tapi dulu tak termasuk
     # `sumber` -> guardrail menolak angka yg ia sendiri suruh LLM baca. Teks mentah, tanpa reformat.
@@ -640,6 +643,15 @@ _RE_KLAIM_RESAPAN = re.compile(
     r"berada\s+(?:di|pada|dalam)\s+(?:kawasan|zona|daerah|area|wilayah)\s+resapan",
     re.IGNORECASE,
 )
+# Kalimat yang MENYATAKAN ketentuan itu tak berlaku boleh menyebut Pasal 53 / zero delta Q
+# ("Ketentuan khusus kawasan resapan air (Pasal 53) tidak berlaku karena lokasi di luar kawasan
+# resapan") — itu informatif bagi petugas. Yang dilarang: memakainya sbg ketentuan yang berlaku.
+_RE_PENYATAAN_TIDAK_BERLAKU = re.compile(
+    r"tidak\s+(?:berlaku|mengikat|diwajibkan|termasuk|berada)|"
+    r"bukan\s+(?:merupakan\s+)?(?:kawasan|kewajiban)|di\s+luar\s+(?:kawasan|blok)",
+    re.IGNORECASE,
+)
+_RE_PISAH_KALIMAT = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
 _RE_PERSEN_KDB_KDH = re.compile(r"\b(KDB|KDH)\b[^.\d]{0,40}?(\d+(?:[.,]\d+)?)\s*%")
@@ -679,12 +691,14 @@ def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     if poin.poin_id != "dampak" or poin.kawasan_resapan is not False:
         return []
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
-    if _RE_KLAIM_RESAPAN.search(teks):
-        return [
-            "narasi dampak memakai ketentuan/klaim kawasan resapan air (zero delta Q, Pasal 53, atau "
-            "'berada di kawasan resapan'), padahal lokasi BUKAN kawasan resapan air — DILARANG. Sumur "
-            "atau kolam resapan boleh disebut, tetapi sebagai rekomendasi, bukan kewajiban kawasan resapan."
-        ]
+    for kalimat in _RE_PISAH_KALIMAT.split(teks):
+        if _RE_KLAIM_RESAPAN.search(kalimat) and not _RE_PENYATAAN_TIDAK_BERLAKU.search(kalimat):
+            return [
+                "narasi dampak memakai ketentuan/klaim kawasan resapan air (zero delta Q, Pasal 53, atau "
+                "'berada di kawasan resapan') sebagai ketentuan yang berlaku, padahal lokasi BUKAN kawasan "
+                "resapan air — DILARANG. Boleh menyebut bahwa ketentuan itu TIDAK berlaku. Sumur atau "
+                "kolam resapan boleh disebut sebagai rekomendasi, bukan kewajiban kawasan resapan."
+            ]
     return []
 
 

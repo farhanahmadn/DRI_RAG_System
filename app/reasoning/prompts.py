@@ -360,9 +360,11 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         )
     elif poin.kawasan_resapan is False:
         lines.append(
-            "\nKAWASAN_RESAPAN_AIR: TIDAK. Lokasi BUKAN kawasan resapan air. DILARANG menyebut "
-            "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) dan DILARANG menyatakan "
-            "lokasi berada di kawasan atau zona resapan air. Sumur atau kolam resapan BOLEH dan "
+            "\nKAWASAN_RESAPAN_AIR: TIDAK. Lokasi BUKAN kawasan resapan air. DILARANG menerapkan "
+            "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) sebagai ketentuan yang "
+            "berlaku dan DILARANG menyatakan lokasi berada di kawasan atau zona resapan air. Anda BOLEH "
+            "menulis SATU kalimat bahwa ketentuan khusus kawasan resapan air (Pasal 53) tidak berlaku "
+            "karena lokasi di luar kawasan resapan. Sumur atau kolam resapan BOLEH dan "
             "dianjurkan sebagai opsi mitigasi (RDTR mendorong sumur resapan di area terbangun), tetapi "
             "sebutkan sebagai rekomendasi, BUKAN kewajiban dari ketentuan kawasan resapan air."
         )

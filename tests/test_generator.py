@@ -1280,31 +1280,22 @@ class TestSitasiResapanMengikutiStatusBE:
         assert _sesuaikan_dgn_status_resapan([p53], poin, self._Retriever([]), 3) == [p53]
 
 
-def test_non_resapan_juga_membuang_chunk_zero_delta_q_pasal_lain():
-    """APP-2026-UJI-4: Pasal 50 ayat 11 (kawasan rawan kekeringan, memuat zero delta Q) ikut
-    tersitasi di lokasi non-resapan."""
+def test_pasal_50_kekeringan_dibuang_apa_pun_status_resapan():
+    """Pasal 50 ayat 10-11 (rawan kekeringan, SWP E Blok I.E.1-2) tak ada hubungannya dgn status
+    resapan; tanpa ID blok, berlakunya tak bisa dipastikan -> tak dikutip utk poin dampak."""
     from app.retrieval.base import Chunk
-    from app.reasoning.generator import _sesuaikan_dgn_status_resapan, chunk_terkait_resapan
+    from app.reasoning.generator import _sesuaikan_dgn_status_resapan, chunk_rawan_kekeringan
     p50 = Chunk(id="p50-a11", level="ayat", dokumen="Perbup", pasal="50",
                 teks="(11) kawasan rawan bencana kekeringan: memastikan air tidak melimpas (zero delta Q policy) dengan pembuatan sumur")
+    p50_gempa = Chunk(id="p50-a3", level="ayat", dokumen="Perbup", pasal="50", teks="(3) kawasan rawan bencana gempa bumi")
     biasa = Chunk(id="vi-r-3", level="tabel", dokumen="Perbup", pasal="", teks="Lampiran VI R-3")
-    assert chunk_terkait_resapan(p50) and not chunk_terkait_resapan(biasa)
-    poin = TestSitasiResapanMengikutiStatusBE()._poin(False)
-    hasil = _sesuaikan_dgn_status_resapan([p50, biasa], poin, TestSitasiResapanMengikutiStatusBE._Retriever([]), 3)
-    assert [c.id for c in hasil] == ["vi-r-3"]
-
-
-def test_saran_be_dampak_diberi_kerangka_hukum_sesuai_status_resapan():
-    from app.reasoning.generator import _saran_mitigasi_dampak
-    dasar = "Pemohon disarankan menyediakan sumur/kolam resapan air hujan."
-
-    def _saran(status):
-        poin = _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
-                     fakta={"target_mitigasi": {"saran_be": dasar}}, kawasan_resapan=status)
-        return _saran_mitigasi_dampak(poin)
-
-    assert _saran(True).startswith(dasar) and "ketentuan khusus kawasan resapan air berlaku" in _saran(True)
-    assert "zero delta Q" in _saran(True)
-    assert _saran(False).startswith(dasar) and "bukan kewajiban" in _saran(False)
-    assert "zero delta Q" not in _saran(False)
-    assert _saran(None) == dasar
+    zdq_lain = Chunk(id="x", level="ayat", dokumen="Perbup", pasal="12", teks="kebijakan zero delta Q umum")
+    assert chunk_rawan_kekeringan(p50) and not chunk_rawan_kekeringan(p50_gempa)
+    for status in (True, False, None):
+        poin = TestSitasiResapanMengikutiStatusBE()._poin(status)
+        hasil = _sesuaikan_dgn_status_resapan(
+            [p50, biasa, zdq_lain], poin, TestSitasiResapanMengikutiStatusBE._Retriever([]), 3)
+        ids = [c.id for c in hasil]
+        assert "p50-a11" not in ids, status
+        # Chunk lain yang kebetulan menyebut zero delta Q TIDAK lagi dibuang hanya karena frasa itu.
+        assert "x" in ids and "vi-r-3" in ids, status
