@@ -42,6 +42,7 @@ load_dotenv()
 _ENV_KUNCI_LLM_CLIENT = (
     "GROQ_API_KEY", "GROQ_API_KEYS", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_S", "LLM_MAX_RETRIES",
     "GROQ_RATE_LIMIT_MAKS_TUNGGU_PER_KUNCI", "GROQ_RATE_LIMIT_TUNGGU_MAKS_S", "GROQ_RATE_LIMIT_TUNGGU_DEFAULT_S",
+    "GROQ_KARANTINA_TPD_S", "GROQ_KARANTINA_RESTRICTED_S",
 )
 for _k, _v in dotenv_values().items():
     if _k in _ENV_KUNCI_LLM_CLIENT:
@@ -50,6 +51,18 @@ for _k, _v in dotenv_values().items():
 logger = logging.getLogger(__name__)
 
 _TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "30"))
+
+# Karantina kunci (insiden 2026-10-15): kunci yang BARU SAJA terbukti mati tak dicoba lagi sampai
+# masa karantina habis. Tanpa ini setiap generate() baru menemukan ulang kunci mati lewat satu
+# round-trip yang terbuang, dan `organization_restricted` meledak ke guardrail menghabiskan percobaan.
+_KARANTINA_TPD_S = float(os.getenv("GROQ_KARANTINA_TPD_S", "900"))
+_KARANTINA_RESTRICTED_S = float(os.getenv("GROQ_KARANTINA_RESTRICTED_S", "3600"))
+
+
+class LayananTidakTersediaError(RuntimeError):
+    """Infrastruktur LLM tak bisa melayani SAMA SEKALI saat ini (semua kunci Groq habis kuota harian
+    atau organisasinya dibatasi). Beda dari kegagalan isi: mengulang percobaan tak berguna sampai
+    operator memperbaiki akun/kuota. guardrail.py berhenti mencoba begitu menangkap ini."""
 _MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
 # Rotasi rate-limit — SEMUA opsional, default masuk akal (pola sama spt LLM_TIMEOUT_S/dst).
@@ -113,17 +126,57 @@ class _RotasiKunciGroq:
         self._counter = 0
         self._lock = threading.Lock()
         self._clients: dict[int, OpenAI] = {}
+        self._karantina: dict[int, float] = {}  # index kunci -> waktu monotonic karantina berakhir
 
     def jumlah_kunci(self) -> int:
         return len(self._keys)
 
+    def _tersedia_nolock(self, idx: int) -> bool:
+        sampai = self._karantina.get(idx)
+        if sampai is None:
+            return True
+        if time.monotonic() >= sampai:
+            del self._karantina[idx]  # masa karantina habis -> boleh dicoba lagi
+            return True
+        return False
+
+    def karantina(self, idx: int, detik: float, alasan: str) -> None:
+        """Tandai kunci mati sementara. Yang dicatat HANYA nomor urut, tidak pernah isi kunci."""
+        with self._lock:
+            baru = idx not in self._karantina
+            self._karantina[idx % len(self._keys)] = time.monotonic() + detik
+        if baru:
+            logger.warning("Kunci Groq index %d dikarantina %.0f detik (alasan: %s)", idx, detik, alasan)
+
+    def jumlah_tersedia(self) -> int:
+        with self._lock:
+            return sum(1 for i in range(len(self._keys)) if self._tersedia_nolock(i))
+
+    def kunci_berikutnya(self, idx: int) -> int | None:
+        """Kunci tersedia berikutnya SESUDAH `idx` (melingkar, tidak termasuk `idx`), atau None."""
+        n = len(self._keys)
+        with self._lock:
+            for langkah in range(1, n):
+                kandidat = (idx + langkah) % n
+                if self._tersedia_nolock(kandidat):
+                    return kandidat
+        return None
+
     def kunci_awal(self) -> int:
         """Index kunci AWAL utk satu panggilan generate() baru — round-robin (increment atomik),
-        BUKAN selalu kunci pertama. Inilah yang menyebarkan beban ke semua kunci sejak awal."""
+        BUKAN selalu kunci pertama. Kunci yang sedang dikarantina dilewati; kalau SEMUA mati, langsung
+        gagal dgn pesan jelas (tanpa membuang satu round-trip pun)."""
         with self._lock:
-            idx = self._counter % len(self._keys)
-            self._counter += 1
-            return idx
+            n = len(self._keys)
+            for _ in range(n):
+                idx = self._counter % n
+                self._counter += 1
+                if self._tersedia_nolock(idx):
+                    return idx
+        raise LayananTidakTersediaError(
+            f"Semua {len(self._keys)} kunci Groq sedang dikarantina (kuota harian habis atau organisasi "
+            "dibatasi). Periksa akun Groq (python -m scripts.check_api_keys)."
+        )
 
     def client_utk(self, idx: int) -> OpenAI:
         idx = idx % len(self._keys)
@@ -186,6 +239,12 @@ def _ekstrak_tunggu_detik(pesan: str) -> float:
         return _TUNGGU_DEFAULT_S
 
 
+def _org_dibatasi(exc: Exception) -> bool:
+    """Groq 400 `organization_restricted`: akun/organisasi kunci ini dibatasi. Masalah kunci, bukan isi."""
+    pesan = str(exc).lower()
+    return "organization_restricted" in pesan or "has been restricted" in pesan
+
+
 def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict, schema_name: str,
                          temperature: float, max_tokens: int):
     """Satu percobaan panggilan (strict json_schema, fallback json_object kalau ditolak) — TIDAK
@@ -202,7 +261,9 @@ def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict,
                 "json_schema": {"name": schema_name, "schema": json_schema, "strict": True},
             },
         )
-    except BadRequestError:
+    except BadRequestError as exc:
+        if _org_dibatasi(exc):
+            raise  # fallback json_object akan gagal identik; hemat satu round-trip
         fallback_messages = list(messages)
         fallback_messages.append(
             {
@@ -321,6 +382,20 @@ def generate(
                 completion = _panggil_llm_sekali(client, messages, json_schema, schema_name, temperature, max_tokens)
                 break
             except BadRequestError as exc:
+                if _org_dibatasi(exc):
+                    rotator.karantina(idx, _KARANTINA_RESTRICTED_S, "organization_restricted")
+                    berikutnya = rotator.kunci_berikutnya(idx)
+                    if berikutnya is None or kunci_berbeda_dicoba >= rotator.jumlah_kunci():
+                        raise LayananTidakTersediaError(
+                            "Tak ada kunci Groq yang bisa dipakai: organisasi kunci dibatasi "
+                            "(organization_restricted) atau kuota habis. Hubungi support Groq / ganti kunci."
+                        ) from exc
+                    logger.warning("Rotasi GROQ_API_KEY: index %d -> %d (alasan: organization_restricted)",
+                                   idx, berikutnya)
+                    idx = berikutnya
+                    kunci_berbeda_dicoba += 1
+                    tunggu_di_kunci_ini = 0
+                    continue
                 if sudah_eskalasi_token or max_tokens >= _MAKS_TOKEN_EKSKALASI or not _keluaran_kosong_token_habis(exc):
                     raise
                 sudah_eskalasi_token = True
@@ -335,6 +410,7 @@ def generate(
                 pindah_kunci = False
                 if jenis == "tpd":
                     # Kuota harian tak akan reset dlm sesi ini -> lompat segera, tanpa nunggu.
+                    rotator.karantina(idx, _KARANTINA_TPD_S, "tpd")
                     pindah_kunci = True
                 else:
                     # TPM/RPM (atau format tak dikenali, diperlakukan spt TPM demi aman) -> tunggu
@@ -353,12 +429,13 @@ def generate(
                         continue
 
                 if pindah_kunci:
-                    if kunci_berbeda_dicoba >= rotator.jumlah_kunci():
-                        # Semua kunci yang ada sudah dicoba & masih limit -> tak ada lagi yg bisa
-                        # dirotasi, menyerah (guardrail.py akan menangkap ini spt exception biasa).
+                    berikutnya = rotator.kunci_berikutnya(idx)
+                    if kunci_berbeda_dicoba >= rotator.jumlah_kunci() or berikutnya is None:
+                        # Semua kunci yang ada sudah dicoba/dikarantina & masih limit -> tak ada lagi
+                        # yg bisa dirotasi, menyerah (guardrail.py akan menangkap ini spt biasa).
                         raise
                     idx_lama = idx
-                    idx = (idx + 1) % rotator.jumlah_kunci()
+                    idx = berikutnya
                     kunci_berbeda_dicoba += 1
                     tunggu_di_kunci_ini = 0
                     logger.warning(

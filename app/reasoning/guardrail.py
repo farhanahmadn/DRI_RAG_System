@@ -32,6 +32,7 @@ from app.reasoning.calculator import (
     pilih_target_utama_intensitas,
 )
 from app.reasoning.generator import ambil_chunks_pendukung, apakah_aman, generate_poin
+from app.reasoning.llm_client import LayananTidakTersediaError
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk, Retriever
 from app.schemas import L2Assessment, LangkahKonkretOutput, PoinKonteks, PoinOutput
@@ -1013,6 +1014,8 @@ class DiagnosaPoin:
         if self.exception_terakhir:
             if "Panggilan provider '" in self.exception_terakhir:
                 return "retrieval_provider_gagal"
+            if self.exception_terakhir.startswith("LayananTidakTersediaError"):
+                return "llm_tidak_tersedia"
             # percobaan == 0: gagal SEBELUM loop LLM mulai (ambil_chunks_pendukung raise selain
             # error provider, mis. Postgres/pgvector mati: ConnectionTimeout ke localhost:5432,
             # 2026-10-14). Bukan salah LLM, jangan dilabeli begitu.
@@ -1110,6 +1113,10 @@ def generate_poin_terdiagnosis(
                 "masalah": [],  # lihat DiagnosaPoin.riwayat_percobaan: pesan exception bukan temuan guardrail
                 "exception": diagnosa.exception_terakhir,
             })
+            if isinstance(exc, LayananTidakTersediaError):
+                # Semua kunci mati: mengulang tak mungkin berhasil sampai operator memperbaiki akun.
+                logger.error("LLM tidak tersedia, percobaan dihentikan utk poin %r: %s", poin.poin_id, exc)
+                break
             if bonus_tersedia and type(exc).__name__ != "PIIDetectedError":
                 bonus_tersedia -= 1  # percobaan ini tak memakan jatah guardrail
             else:
