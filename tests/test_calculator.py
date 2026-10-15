@@ -524,24 +524,23 @@ class TestPemeliharaanDampakRendah:
 
 
 def test_langkah_sumur_resapan_dampak_ringan_mengikuti_status_resapan():
+    """RDTR Pasal 53: di kawasan resapan sumur/kolam resapan sejalan dengan kewajiban; di luar itu
+    tetap direkomendasikan (program RDTR mendorong sumur resapan), tapi bukan kewajiban."""
     from app.reasoning.calculator import bangun_langkah_dampak_poin
     mitigasi = {"perlu_mitigasi": False, "arah": ["x"], "pemeliharaan": {}}
 
     def _fasilitas(status):
-        langkah = bangun_langkah_dampak_poin({"mitigasi": mitigasi, "kawasan_resapan": status})
-        return langkah[-1]
+        return bangun_langkah_dampak_poin({"mitigasi": mitigasi, "kawasan_resapan": status})[-1]
 
-    assert _fasilitas(True)["parameter"] == "Sumur/Kolam Resapan"
+    for status in (True, False, None):
+        assert _fasilitas(status)["parameter"] == "Sumur/Kolam Resapan"
     assert "ketentuan khusus kawasan resapan air" in _fasilitas(True)["deskripsi"]
-    assert _fasilitas(None)["parameter"] == "Sumur/Kolam Resapan"
+    assert "bukan kewajiban" in _fasilitas(False)["deskripsi"]
     assert "praktik baik" in _fasilitas(None)["deskripsi"]
-    # Lokasi non-resapan: bukan sumur resapan, tapi tampungan air hujan.
-    assert _fasilitas(False)["parameter"] == "Tampungan Air Hujan"
-    assert "sumur" not in _fasilitas(False)["deskripsi"].lower()
 
 
-class TestMitigasiTinggiNonResapan:
-    """APP-2026-UJI-4: lokasi non-resapan tak boleh disarankan sumur resapan."""
+class TestMitigasiTinggiResapanVsNonResapan:
+    """Fasilitas yang disarankan SAMA (sumur/kolam resapan, angka BE); yang beda kerangka hukumnya."""
 
     def _impact(self):
         return ImpactAssessment(
@@ -555,25 +554,23 @@ class TestMitigasiTinggiNonResapan:
                 "saran": "... atau menyediakan fasilitas sumur/kolam resapan air hujan ..."},
         )
 
-    def test_saran_dirakit_ulang_tanpa_sumur_resapan_dengan_angka_be(self):
-        hasil = hitung_target_mitigasi_dampak(self._impact(), False)
-        saran = hasil["saran_be"]
-        assert "sumur" not in saran.lower()
-        assert "1.077,00 m²" in saran and "359,00 m²" in saran and "0.62 m³" in saran
-        assert "tampungan air hujan" in saran and "bukan kawasan resapan air" in saran
-        assert hasil["jenis_fasilitas"] == "tampungan"
-
-    def test_langkah_konkret_tampungan(self):
-        hasil = hitung_target_mitigasi_dampak(self._impact(), False)
-        nama = [l["parameter"] for l in bangun_langkah_konkret_dampak(hasil)]
-        assert nama[-1] == "Kapasitas Minimum Tampungan Air Hujan"
-
-    def test_resapan_dan_tak_diketahui_tetap_saran_be_apa_adanya(self):
-        for status in (True, None):
+    def test_saran_be_diteruskan_apa_adanya_untuk_semua_status(self):
+        for status in (True, False, None):
             hasil = hitung_target_mitigasi_dampak(self._impact(), status)
             assert "sumur/kolam resapan" in hasil["saran_be"]
-            assert "jenis_fasilitas" not in hasil
+            assert "tampungan" not in hasil["saran_be"]
 
-    def test_arah_mitigasi_tinggi_non_resapan(self):
-        arah = sarankan_arah_mitigasi_dampak(self._impact(), False)["arah"]
-        assert "sumur resapan" not in arah and any("tampungan" in a for a in arah)
+    def test_langkah_dimensi_sama_parameter_beda_kerangka(self):
+        def _dim(status):
+            langkah = bangun_langkah_konkret_dampak(hitung_target_mitigasi_dampak(self._impact(), status))
+            return langkah[-1]
+        for status in (True, False, None):
+            assert _dim(status)["parameter"] == "Dimensi Minimum Sumur Resapan"
+            assert _dim(status)["nilai_target"] == 0.62
+        assert "sejalan dengan ketentuan khusus kawasan resapan air" in _dim(True)["deskripsi"]
+        assert "bukan kewajiban" in _dim(False)["deskripsi"]
+        assert "Alternatif" in _dim(None)["deskripsi"]
+
+    def test_arah_mitigasi_tinggi_selalu_sumur_resapan(self):
+        for status in (True, False, None):
+            assert "sumur resapan" in sarankan_arah_mitigasi_dampak(self._impact(), status)["arah"]

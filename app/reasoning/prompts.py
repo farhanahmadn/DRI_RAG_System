@@ -354,16 +354,17 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         lines.append(
             "\nKAWASAN_RESAPAN_AIR: YA. Lokasi berada di kawasan resapan air, jadi ketentuan khusus "
             "kawasan resapan air berlaku (pengembangan baru wajib memastikan air tidak melimpas atau "
-            "zero delta Q, tidak mencemari air, dan menyediakan sumur atau kolam resapan). Jelaskan "
-            "ketentuan ini di reasoning dan kaitkan dengan saran, rujuk pasalnya dengan bahasa manusia."
+            "zero delta Q, tidak mencemari air, dan untuk zona tertentu menyediakan sumur atau kolam "
+            "resapan). Jelaskan ketentuan ini di reasoning dan kaitkan dengan saran, rujuk pasalnya dengan "
+            "bahasa manusia."
         )
     elif poin.kawasan_resapan is False:
         lines.append(
             "\nKAWASAN_RESAPAN_AIR: TIDAK. Lokasi BUKAN kawasan resapan air. DILARANG menyebut "
             "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) dan DILARANG menyatakan "
-            "lokasi berada di kawasan atau zona resapan air. JANGAN menyarankan sumur atau kolam "
-            "resapan. Bila perlu menyebut fasilitas penahan limpasan, gunakan 'tampungan air hujan "
-            "(tandon atau kolam retensi)'."
+            "lokasi berada di kawasan atau zona resapan air. Sumur atau kolam resapan BOLEH dan "
+            "dianjurkan sebagai opsi mitigasi (RDTR mendorong sumur resapan di area terbangun), tetapi "
+            "sebutkan sebagai rekomendasi, BUKAN kewajiban dari ketentuan kawasan resapan air."
         )
     else:
         lines.append(
@@ -385,8 +386,10 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             butir.append(f"pertahankan luas RTH minimal {_angka_prompt(pemeliharaan['luas_rth_m2'])} m² sesuai usulan")
         if pemeliharaan.get("luas_bangunan_m2") is not None:
             butir.append(f"jaga luas bangunan tidak melebihi {_angka_prompt(pemeliharaan['luas_bangunan_m2'])} m² sesuai usulan")
-        if poin.kawasan_resapan is False:
-            butir.append("sediakan tampungan air hujan (tandon atau kolam kecil) dan rawat saluran drainase sebagai praktik baik")
+        if poin.kawasan_resapan is True:
+            butir.append("sediakan sumur atau kolam resapan air hujan sesuai ketentuan khusus kawasan resapan air dan rawat saluran drainase")
+        elif poin.kawasan_resapan is False:
+            butir.append("sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai rekomendasi praktik baik, bukan kewajiban kawasan resapan")
         else:
             butir.append("sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik")
         lines.append(
@@ -428,10 +431,8 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         dimensi = target_mitigasi.get("dimensi_minimum_resapan") or {}
         if dimensi.get("nilai") is not None:
             detail.append(
-                ("ATAU tampungan air hujan (tandon atau kolam retensi) kapasitas minimum "
-                 if target_mitigasi.get("jenis_fasilitas") == "tampungan"
-                 else "ATAU sumur/kolam resapan dimensi minimum ")
-                + f"{_angka_prompt(dimensi['nilai'])} {dimensi.get('satuan') or ''}"
+                "ATAU sumur/kolam resapan dimensi minimum "
+                f"{_angka_prompt(dimensi['nilai'])} {dimensi.get('satuan') or ''}"
             )
         if detail:
             # ", " BUKAN "; " — item permintaan user 2026-09-21: DILARANG tanda titik koma di

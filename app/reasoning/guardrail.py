@@ -636,7 +636,7 @@ _RE_SARAN_TANPA_TINDAKAN = re.compile(
 
 
 _RE_KLAIM_RESAPAN = re.compile(
-    r"zero\s+delta\s+q|pasal\s+53|sumur\s+(?:atau\s+kolam\s+|dan/atau\s+kolam\s+)?resapan|kolam\s+resapan|"
+    r"zero\s+delta\s+q|pasal\s+53|"
     r"berada\s+(?:di|pada|dalam)\s+(?:kawasan|zona|daerah|area|wilayah)\s+resapan",
     re.IGNORECASE,
 )
@@ -681,9 +681,9 @@ def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
     if _RE_KLAIM_RESAPAN.search(teks):
         return [
-            "narasi dampak memakai ketentuan/klaim kawasan resapan air (zero delta Q, Pasal 53, sumur "
-            "atau kolam resapan, atau 'berada di kawasan resapan'), padahal lokasi BUKAN kawasan resapan "
-            "air — DILARANG. Gunakan 'tampungan air hujan (tandon atau kolam retensi)' sebagai gantinya."
+            "narasi dampak memakai ketentuan/klaim kawasan resapan air (zero delta Q, Pasal 53, atau "
+            "'berada di kawasan resapan'), padahal lokasi BUKAN kawasan resapan air — DILARANG. Sumur "
+            "atau kolam resapan boleh disebut, tetapi sebagai rekomendasi, bukan kewajiban kawasan resapan."
         ]
     return []
 

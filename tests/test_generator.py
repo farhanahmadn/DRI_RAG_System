@@ -1292,3 +1292,19 @@ def test_non_resapan_juga_membuang_chunk_zero_delta_q_pasal_lain():
     poin = TestSitasiResapanMengikutiStatusBE()._poin(False)
     hasil = _sesuaikan_dgn_status_resapan([p50, biasa], poin, TestSitasiResapanMengikutiStatusBE._Retriever([]), 3)
     assert [c.id for c in hasil] == ["vi-r-3"]
+
+
+def test_saran_be_dampak_diberi_kerangka_hukum_sesuai_status_resapan():
+    from app.reasoning.generator import _saran_mitigasi_dampak
+    dasar = "Pemohon disarankan menyediakan sumur/kolam resapan air hujan."
+
+    def _saran(status):
+        poin = _poin(poin_id="dampak", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
+                     fakta={"target_mitigasi": {"saran_be": dasar}}, kawasan_resapan=status)
+        return _saran_mitigasi_dampak(poin)
+
+    assert _saran(True).startswith(dasar) and "ketentuan khusus kawasan resapan air berlaku" in _saran(True)
+    assert "zero delta Q" in _saran(True)
+    assert _saran(False).startswith(dasar) and "bukan kewajiban" in _saran(False)
+    assert "zero delta Q" not in _saran(False)
+    assert _saran(None) == dasar

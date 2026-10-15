@@ -77,7 +77,14 @@ def _saran_mitigasi_dampak(poin: PoinKonteks) -> str | None:
     if poin.poin_id != "dampak":
         return None
     target_mitigasi = (poin.fakta or {}).get("target_mitigasi") or {}
-    return target_mitigasi.get("saran_be") or None
+    saran = target_mitigasi.get("saran_be") or None
+    if saran and poin.kawasan_resapan is True:
+        saran = (saran.rstrip() + " Lokasi berada di kawasan resapan air, sehingga ketentuan khusus "
+                 "kawasan resapan air berlaku, antara lain memastikan air tidak melimpas (zero delta Q).")
+    elif saran and poin.kawasan_resapan is False:
+        saran = (saran.rstrip() + " Lokasi bukan kawasan resapan air, sehingga sumur atau kolam resapan "
+                 "di sini merupakan rekomendasi mitigasi, bukan kewajiban dari ketentuan kawasan resapan air.")
+    return saran
 
 
 _LLM_RESPONSE_SCHEMA = {
