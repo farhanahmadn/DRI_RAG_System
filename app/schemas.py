@@ -152,7 +152,10 @@ class ImpactAssessment(BaseModel):
     calculation_details: str | None = None
     threshold_bands: dict[str, str] | None = None
     existing_surface_details: dict[str, Any] | None = None
-    proposed_surface_details: dict[str, float] | None = None
+    # `Any`, BUKAN `float` (BE 2026-10-15, APP-2026-0014): BE menyelipkan label teks
+    # ("kawasan_hidrologi", "kode_kawasan", "status_kawasan") berdampingan dgn persentase numerik —
+    # `dict[str, float]` membuat SELURUH payload ditolak 422.
+    proposed_surface_details: dict[str, Any] | None = None
     # `Any`, BUKAN `float` (APP-2026-8913/-7012/-5397): back-end mulai selipkan field label
     # string di sini juga (mis. "Kelas_Atap": "Perdagangan Sekeliling Pusat Kota") berdampingan dgn
     # koefisien numerik (mis. "C_Atap_KBLI": 0.7) dalam SATU dict yang sama -> `dict[str, float]`
@@ -161,6 +164,15 @@ class ImpactAssessment(BaseModel):
     # ulang secara aritmatika di kode kita), jadi longgarkan tipe value-nya aman.
     c_coefficients: dict[str, Any] | None = None
     luas_lahan_m2: float | None = None
+    # BE 2026-10-15: kawasan (zona) yang dipakai untuk penilaian hidrologi, mis. "Zona Pertanian",
+    # kode "P", status ITBX zona itu "B". `is_kawasan_resapan` = salah satu sumber status resapan
+    # (lihat app/ketentuan_khusus.py). Narasi BE (`reasoning_*`, `ringkasan_dampak`) dan
+    # `dasar_regulasi` SENGAJA tidak dimodelkan: L3 menyusun narasinya sendiri.
+    kawasan_hidrologi: str | None = None
+    kode_kawasan: str | None = None
+    status_kawasan: str | None = None
+    is_kawasan_resapan: bool | None = None
+    kawasan_label: str | None = None
     data_confidence: str | None = None
     limitations: str | None = None
     # APP-2026-2428 (validasi batas persil, BE): `dinilai=False` sekarang punya penyebab BARU

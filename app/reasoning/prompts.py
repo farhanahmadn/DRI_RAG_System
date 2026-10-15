@@ -371,6 +371,14 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "sarankan pemohon meninjau ulang proporsi KDB/KDH agar sesuai batas fisik persil."
         )
 
+    kawasan = fakta.get("kawasan_hidrologi") or {}
+    if kawasan.get("nama"):
+        lines.append(
+            f"\nKawasan yang dinilai pada perhitungan hidrologi (dari back-end): {kawasan['nama']}"
+            + (f" (kode {kawasan['kode']})" if kawasan.get("kode") else "")
+            + (f", status ITBX kegiatan di kawasan itu {kawasan['status_itbx']}" if kawasan.get("status_itbx") else "")
+            + "."
+        )
     lines.append(
         "\nSEBAB_KATEGORI_DAMPAK: kategori dampak ditentukan oleh indeks limpasan air, yaitu akibat luas "
         "bangunan dan RTH yang diusulkan, BUKAN oleh lokasi. Status kawasan resapan air hanya menentukan "

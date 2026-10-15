@@ -240,6 +240,12 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "limitations": impact.limitations,
             "luas_usulan_melebihi_persil": impact.luas_usulan_melebihi_persil,
             "kawasan_resapan": kawasan_resapan,
+            "kawasan_hidrologi": {
+                k: v for k, v in {
+                    "nama": impact.kawasan_hidrologi, "kode": impact.kode_kawasan,
+                    "status_itbx": impact.status_kawasan,
+                }.items() if v is not None
+            },
             # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
             "mitigasi": sarankan_arah_mitigasi_dampak(impact, kawasan_resapan),
             # Target kuantitatif (ambang runoff_change_index utk turun 1 kategori) — murni aritmatika

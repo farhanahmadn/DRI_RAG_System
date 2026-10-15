@@ -1,0 +1,223 @@
+{
+  "statusCode": 200,
+  "message": "L2 Spatial Risk Assessment completed successfully",
+  "data": {
+    "application_id": "9ec6c25e-8fa9-436c-ac2e-db117509db28",
+    "application_number": "APP-2026-0014",
+    "is_revision": false,
+    "previous_decision": null,
+    "previous_decision_raw": null,
+    "previous_decided_at": null,
+    "revision_count": 0,
+    "riwayat_revisi": [],
+    "pemohon": {
+      "nama": "Pras Urban",
+      "email": "urbanpras001@gmail.com",
+      "kontak": "+6287166118372 / gojosatoru@gmail.com",
+      "alamat": "Jl. Maulana Hasanudin, Kalurahan Caturharjo, Kapanewon Sleman, Sleman",
+      "status": "RISK_ANALYSIS",
+      "tanggal_pengajuan": {},
+      "usulan_teknis": {
+        "luas_tanah": 1024, "luas_bangunan": 700, "luas_rth": 324, "jumlah_lantai": 2,
+        "kdb": 68.36, "klb": 1.37, "kdh": 31.64
+      }
+    },
+    "keputusan": {
+      "ada": false,
+      "final_decision": "MENUNGGU KEPUTUSAN",
+      "is_compliant": null,
+      "is_sesuai_sistem": null,
+      "status_kesesuaian": "-",
+      "persentase_kesesuaian": null,
+      "kesimpulan_kesesuaian": "MENUNGGU_KEPUTUSAN",
+      "keterangan_kesesuaian": "Menunggu penetapan keputusan resmi oleh Decision Maker.",
+      "detail_kesesuaian": null,
+      "decision_notes": "Menunggu penetapan keputusan resmi dari Decision Maker.",
+      "conditions": null,
+      "zone_decisions": null,
+      "decided_at": null,
+      "decided_by": null,
+      "is_revision": false,
+      "previous_decision": null,
+      "previous_decision_raw": null,
+      "previous_decided_at": null
+    },
+    "timestamp": "2026-10-15T08:08:01.476Z",
+    "lokasi": {
+      "koordinat": {"lat": -7.689104947036048, "lon": 110.33005950193805},
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [[
+          [110.330015678, -7.688911396], [110.329859088, -7.689195265],
+          [110.330130255, -7.689289888], [110.330244833, -7.689013589],
+          [110.330015678, -7.688911396]
+        ]]
+      },
+      "rdtr_zone": "Zona Pertanian",
+      "rdtr_subzone": "P-1",
+      "rdtr_subzone_source": "geojson_overlay",
+      "swp": "B",
+      "blok": "I.B.3",
+      "blok_list": ["I.B.3"],
+      "kawasan_resapan": true,
+      "ketentuan_khusus": {
+        "kawasan_resapan_air": true,
+        "rawan_kekeringan": false,
+        "rawan_gempa_bumi": false,
+        "rawan_gunung_api": false,
+        "rawan_banjir_lahar": false,
+        "cagar_budaya": false,
+        "sempadan": false,
+        "kkop": true,
+        "hankam": false,
+        "tempat_evakuasi": false
+      },
+      "luas_lahan_m2": 1024
+    },
+    "gate_hukum": {
+      "final_gate_status": "Lolos Bersyarat",
+      "rekomendasi_sistem": "Setuju Bersyarat",
+      "decisive_stage": "intensitas",
+      "conflict_flag": false,
+      "is_multi_zone": false,
+      "total_zones": 1,
+      "pemberitahuan": null,
+      "keputusan_sistem_per_zona": [
+        {
+          "nama_zona": "Zona Pertanian", "kode_zona": "P", "luas_m2": 1017.7, "persentase": 100,
+          "status_keputusan": "LOLOS_BERSYARAT", "rekomendasi_sistem": "Setuju Bersyarat",
+          "itbx_status": "B", "intensitas_status": "MELAMPAUI_BATAS",
+          "catatan": "Kegiatan bersyarat (B) di Zona Pertanian."
+        }
+      ],
+      "itbx_zones": [
+        {
+          "nama_zona": "Zona Pertanian", "kode_zona": "P", "luas_m2": 1017.7, "persentase": 100,
+          "status": "B", "status_keputusan": "LOLOS_BERSYARAT", "rekomendasi_sistem": "Setuju Bersyarat",
+          "lolos": true, "kbli_diusulkan": "Rumah", "kegiatan_diusulkan": "Rumah Tinggal",
+          "kegiatan_diizinkan": [], "kegiatan_terbatas": [], "kegiatan_bersyarat": ["Rumah Tinggal"],
+          "keterangan_ketentuan": [
+            "Diperbolehkan untuk bangunan eksisting yang telah terbangun atau rumah tinggal tunggal untuk masyarakat lokal/petani dengan luas maksimal persil yang diperbolehkan 300 m².",
+            "Pembatasan pengambilan air tanah.",
+            "Pemeliharaan fungsi irigasi.",
+            "Tidak mengganggu fungsi usaha tani."
+          ],
+          "reason": "Lolos Bersyarat (B) di Zona Pertanian seluas 1.017,7 m",
+          "dasar_hukum": [{"dokumen": "RDTR Sleman", "pasal": "Matriks ITBX (P)", "kutipan": "Data KBLI referensi"}]
+        }
+      ],
+      "intensitas_zones": [
+        {
+          "nama_zona": "Zona Pertanian", "kode_zona": "P-1", "hierarki_jalan": "lokal", "kawasan_resapan": true,
+          "luas_irisan_m2": 1017.7, "persentase": 100, "status": "MELAMPAUI_BATAS", "lolos": false,
+          "parameter": {
+            "kdb": {"usulan": 68.36, "ambang_maks": 10, "memenuhi": false, "satuan": "persen"},
+            "klb": {"usulan": 1.37, "ambang_maks": 1, "memenuhi": false, "satuan": "rasio"},
+            "kdh": {"usulan": 31.64, "ambang_min": 88, "memenuhi": false, "satuan": "persen"}
+          },
+          "luas_tapak_m2": 700, "jumlah_lantai": 2, "luas_rth_usulan_m2": 324,
+          "reason": "Melanggar Aturan: KDB (68.36 ) melebihi batas maksimal Zona Pertanian (10.00 ), KDH (31.64 ) berada di bawah ketentuan minimal Zona Pertanian (88.00 ), KLB (1.37) melebihi batas maksimal Zona Pertanian (1.00)",
+          "dasar_hukum": [{"dokumen": "RDTR Sleman", "pasal": "Ketentuan Intensitas Ruang (P)", "kutipan": "KDB maks 10 , KLB maks 1, KDH min 88"}]
+        }
+      ],
+      "tahapan": {
+        "itbx": {
+          "nama_zona": "Zona Pertanian", "kode_zona": "P", "status": "B", "lolos": true,
+          "kbli_diusulkan": "Rumah", "kegiatan_diusulkan": "Rumah Tinggal",
+          "kegiatan_diizinkan": [], "kegiatan_terbatas": [], "kegiatan_bersyarat": ["Rumah Tinggal"],
+          "keterangan_ketentuan": [
+            "Diperbolehkan untuk bangunan eksisting yang telah terbangun atau rumah tinggal tunggal untuk masyarakat lokal/petani dengan luas maksimal persil yang diperbolehkan 300 m².",
+            "Pembatasan pengambilan air tanah.",
+            "Pemeliharaan fungsi irigasi.",
+            "Tidak mengganggu fungsi usaha tani."
+          ],
+          "reason": "Lolos Bersyarat (B) di Zona Pertanian seluas 1.017,7 m",
+          "dasar_hukum": [{"dokumen": "RDTR Sleman", "pasal": "Matriks ITBX (P)", "kutipan": "Data KBLI referensi"}]
+        },
+        "lp2b": {"status": "AMAN", "lolos": true, "reason": null},
+        "sempadan": {"status": "AMAN", "lolos": true, "reason": null},
+        "intensitas": {
+          "status": "MELAMPAUI_BATAS", "lolos": false,
+          "nama_zona": "Zona Pertanian", "kode_zona": "P-1", "hierarki_jalan": "lokal", "kawasan_resapan": true,
+          "zona_evaluasi": "Zona Pertanian",
+          "keterangan_kawasan": "Evaluasi intensitas mencakup seluruh zona permohonan.",
+          "parameter": {
+            "kdb": {"usulan": 68.36, "ambang_maks": 10, "memenuhi": false, "satuan": "persen"},
+            "klb": {"usulan": 1.37, "ambang_maks": 1, "memenuhi": false, "satuan": "rasio"},
+            "kdh": {"usulan": 31.64, "ambang_min": 88, "memenuhi": false, "satuan": "persen"}
+          },
+          "luas_tapak_m2": 700, "jumlah_lantai": 2, "luas_rth_usulan_m2": 324,
+          "reason": "Melanggar Aturan: KDB (68.36 ) melebihi batas maksimal Zona Pertanian (10.00 ), KDH (31.64 ) berada di bawah ketentuan minimal Zona Pertanian (88.00 ), KLB (1.37) melebihi batas maksimal Zona Pertanian (1.00)",
+          "dasar_hukum": [{"dokumen": "RDTR Sleman", "pasal": "Ketentuan Intensitas Ruang (P)", "kutipan": "KDB maks 10 , KLB maks 1, KDH min 88"}]
+        }
+      }
+    },
+    "impact_assessment": {
+      "dinilai": true,
+      "kawasan_hidrologi": "Zona Pertanian",
+      "kode_kawasan": "P",
+      "status_kawasan": "B",
+      "is_kawasan_resapan": true,
+      "kawasan_label": "Kawasan Resapan Air",
+      "c_before": 0.3,
+      "c_after": 0.314,
+      "delta_c": 0.014,
+      "runoff_change_index": 1.047,
+      "impact_category": "RENDAH",
+      "calculation_details": "C_Sebelum = (Proporsi_Sisa x C_Taman) + (Proporsi_Permohonan x C_Taman) = (0.947 x 0.3) + (0.053 x 0.3) = 0.3\nC_Sesudah = (Proporsi_Sisa x C_Taman) + (Proporsi_Permohonan x ((Proporsi_Terbangun x C_Atap) + (Proporsi_Taman x C_Taman))) = (0.947 x 0.3) + (0.053 x ((0.684 x 0.7) + (0.316 x 0.3))) = 0.314 (Luas Persil: 19440.84 m², Permohonan: 1024 m²)",
+      "threshold_bands": {"Rendah": "index < 1.5", "Sedang": "1.5-2.5", "Tinggi": "2.5-4.0", "Sangat Tinggi": "> 4.0"},
+      "reasoning_pendek": "Rencana kegiatan berpotensi meningkatkan dampak banjir lokal sebesar 1.047x dengan kategori dampak Rendah berdasarkan rumus perhitungan limpasan pada Kawasan Resapan Air.",
+      "reasoning_panjang": "Berdasarkan rumus perhitungan hidrologi (perubahan koefisien C dari 0.3 menjadi 0.314), kegiatan ini berpotensi meningkatkan dampak banjir lokal sebesar 1.047x dengan kategori dampak Rendah (). Karena berada di zona resapan air yang diatur Pasal 53 Peraturan Bupati Sleman No. 80 Tahun 2023 (RDTR Sleman), kegiatan dapat berjalan tanpa mitigasi resapan masif tambahan dengan tetap mematuhi ketentuan mempertahankan peresapan air (zero delta Q policy) dan tidak menyebabkan pencemaran air tanah.",
+      "ringkasan_dampak": "Rencana kegiatan berpotensi meningkatkan dampak banjir lokal sebesar 1.047x dengan kategori dampak Rendah berdasarkan rumus perhitungan limpasan pada Kawasan Resapan Air (kategori aman).",
+      "rekomendasi_mitigasi": null,
+      "dasar_regulasi": [
+        {
+          "judul": "Peraturan Bupati Sleman No. 80 Tahun 2023 (RDTR Sleman)",
+          "pasal": "Pasal 53 & Pasal 20",
+          "deskripsi": "Ketentuan khusus zona resapan air, kewajiban penerapan zero delta Q policy (debit limpasan tidak bertambah), dan larangan kegiatan yang menyebabkan pencemaran air tanah.",
+          "kategori": "Regulasi Daerah"
+        },
+        {
+          "judul": "FHWA HEC-22 Urban Drainage Design Manual, 4th Edition",
+          "pasal": "Section 3.2.2.1 Runoff Coefficient",
+          "deskripsi": "Metode perhitungan komposit koefisien limpasan (C) dan pereduksian debit puncak.",
+          "kategori": "Standar Teknis Internasional"
+        }
+      ],
+      "existing_surface_details": {
+        "kelas": "Daerah tak Terbangun / RTH", "kawasan_hidrologi": "Zona Pertanian", "kode_kawasan": "P",
+        "status_kawasan": "B", "luas_persil_m2": 19440.84, "luas_persil_source": "persil",
+        "c_before_source": "rth_baseline_taman", "proporsi": 1, "C": 0.3
+      },
+      "proposed_surface_details": {
+        "kawasan_hidrologi": "Zona Pertanian", "kode_kawasan": "P", "status_kawasan": "B",
+        "Bangunan/Atap": 3.6, "Taman/RTH": 1.7, "Sisa Persil Eksisting": 94.7
+      },
+      "detailed_surface_breakdown": {
+        "kawasan_hidrologi": "Zona Pertanian", "kode_kawasan": "P", "status_kawasan": "B",
+        "luas_persil_m2": 19440.84, "luas_persil_source": "persil", "luas_permohonan_m2": 1024,
+        "luas_sisa_m2": 18416.84, "zona_x_diexclude": false,
+        "proporsi_sisa": 0.947, "proporsi_permohonan": 0.053, "proporsi_terbangun": 0.684, "proporsi_taman": 0.316,
+        "is_persil_found": true, "is_multi_persil": true, "persil_count": 4, "persil_unioned": true,
+        "luas_usulan_melebihi_persil": false, "kdb_usulan_persen": 68.36, "kdh_usulan_persen": 31.64,
+        "Bangunan/Atap": {"luas_m2": 700, "proporsi": 0.036, "proporsi_dlm_permohonan": 0.684, "C": 0.7, "kelas": "Perdagangan Sekeliling Pusat Kota"},
+        "Taman/RTH": {"luas_m2": 324, "proporsi": 0.017, "proporsi_dlm_permohonan": 0.316, "C": 0.3, "kelas": "Taman / RTH"},
+        "Sisa Persil Eksisting": {"luas_m2": 18416.84, "proporsi": 0.947, "C": 0.3, "kelas": "Daerah tak Terbangun / RTH"}
+      },
+      "c_coefficients": {
+        "Kawasan_Hidrologi": "Zona Pertanian", "Kode_Kawasan": "P", "C_Atap_KBLI": 0.7,
+        "Kelas_Atap": "Perdagangan Sekeliling Pusat Kota", "C_Taman": 0.3, "C_Sisa_Persil": 0.3,
+        "Kelas_Eksisting": "Daerah tak Terbangun / RTH", "Luas_Persil_m2": 19440.84, "Luas_Permohonan_m2": 1024,
+        "Proporsi_Sisa": 0.947, "Proporsi_Permohonan": 0.053, "Proporsi_Terbangun": 0.684, "Proporsi_Taman": 0.316,
+        "Luas_Persil_Source": "persil", "C_Before_Source": "rth_baseline_taman"
+      },
+      "luas_lahan_m2": 1024,
+      "luas_persil_source": "persil",
+      "c_before_source": "rth_baseline_taman",
+      "luas_usulan_melebihi_persil": false,
+      "data_confidence": null,
+      "limitations": null,
+      "multi_persil": true
+    }
+  }
+}

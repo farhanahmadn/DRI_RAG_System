@@ -8,7 +8,8 @@ BE (permintaan 2026-10-15, docs/PERMINTAAN_BE_L2_2026-10-15.md) mengirim ID blok
 peta Lampiran VII. Urutan keputusan, dari yang paling otoritatif:
 
 1. Hasil overlay BE yang eksplisit (`lokasi.ketentuan_khusus.*` lalu `lokasi.kawasan_resapan`).
-2. Dasar ambang intensitas dari BE (`tahapan.intensitas.kawasan_resapan`), khusus resapan.
+2. Dasar ambang intensitas dari BE (`tahapan.intensitas.kawasan_resapan`), lalu
+   `impact_assessment.is_kawasan_resapan`, khusus resapan.
 3. Daftar blok dari teks peraturan (hanya bila wilayah yang dilayani Sleman Tengah, karena daftar blok
    itu milik dokumen Sleman Tengah).
 4. Tidak diketahui (None) -> perilaku lama, TIDAK menebak.
@@ -87,6 +88,7 @@ def tentukan_kawasan_resapan(assessment: L2Assessment) -> bool | None:
         lokasi.kawasan_resapan,
         getattr(assessment.gate_hukum.tahapan.intensitas, "kawasan_resapan", None)
         if assessment.gate_hukum.tahapan.intensitas else None,
+        assessment.impact_assessment.is_kawasan_resapan,
     ]
     eksplisit = next((k for k in kandidat if k is not None), None)
     turunan = _dari_blok(assessment, BLOK_RESAPAN_SLEMAN_TENGAH)

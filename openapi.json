@@ -328,9 +328,7 @@
           "proposed_surface_details": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "type": "number"
-                },
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -361,6 +359,61 @@
               }
             ],
             "title": "Luas Lahan M2"
+          },
+          "kawasan_hidrologi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kawasan Hidrologi"
+          },
+          "kode_kawasan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kode Kawasan"
+          },
+          "status_kawasan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Kawasan"
+          },
+          "is_kawasan_resapan": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Kawasan Resapan"
+          },
+          "kawasan_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kawasan Label"
           },
           "data_confidence": {
             "anyOf": [
