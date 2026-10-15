@@ -13,6 +13,7 @@ from app.reasoning.calculator import (
     normalisasi_kategori_dampak,
     sarankan_arah_mitigasi_dampak,
 )
+from app.ketentuan_khusus import tentukan_kawasan_resapan, tentukan_rawan_kekeringan
 from app.reasoning.rekomendasi import turunkan_rekomendasi
 from app.schemas import AdapterResult, L2Assessment, Lokasi, PoinKonteks
 
@@ -113,6 +114,10 @@ def _zona_pemilik_ambang(assessment: L2Assessment) -> tuple[str | None, str | No
     `intensitas_zones`; kalau tak ada, entri tunggal yang status & ambangnya sama persis.
     """
     intensitas = assessment.gate_hukum.tahapan.intensitas
+    # Permintaan BE 2026-10-15: kalau BE menyebut zona pemilik ambang secara eksplisit, itu yang
+    # dipakai (tak perlu menebak dari intensitas_zones).
+    if intensitas is not None and intensitas.nama_zona:
+        return intensitas.nama_zona, intensitas.kode_zona
     zona_list = assessment.gate_hukum.intensitas_zones or []
     if intensitas is None or len(zona_list) < 2:
         return None, None
@@ -156,11 +161,12 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
         zona_subzone=assessment.lokasi.rdtr_subzone,
         )
     zona, zona_subzone = assessment.lokasi.rdtr_zone, assessment.lokasi.rdtr_subzone
-    nama_pemilik, _ = _zona_pemilik_ambang(assessment)
+    nama_pemilik, kode_pemilik = _zona_pemilik_ambang(assessment)
     if nama_pemilik and nama_pemilik.strip().lower() != (zona or "").strip().lower():
         # Sub-zona lokasi (mis. P-1) milik zona LAIN, bukan pemilik ambang -> jangan dibawa.
-        # Sub-zona pemilik ambang tak dikirim BE, jadi caveat sub-zona tak terkonfirmasi berlaku.
-        zona, zona_subzone = nama_pemilik, None
+        # Sub-zona pemilik ambang hanya dipakai bila BE mengirim kodenya berbentuk sub-zona ("R-3").
+        zona = nama_pemilik
+        zona_subzone = kode_pemilik if kode_pemilik and re.match(r"^[A-Za-z]+-\d", kode_pemilik) else None
     return PoinKonteks(
         poin_id="intensitas",
         kategori="Intensitas Bangunan (KDB/KLB/KDH)",
@@ -183,6 +189,15 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
                 }
                 for nama, p in intensitas.parameter.items()
             },
+            "dasar_ambang": {
+                k: v for k, v in {
+                    "nama_zona": intensitas.nama_zona,
+                    "kode_zona": intensitas.kode_zona,
+                    "hierarki_jalan": intensitas.hierarki_jalan,
+                    "kawasan_resapan": (intensitas.kawasan_resapan if intensitas.kawasan_resapan is not None
+                                        else tentukan_kawasan_resapan(assessment)),
+                }.items() if v is not None
+            },
             "luas_tapak_m2": intensitas.luas_tapak_m2,
             "jumlah_lantai": intensitas.jumlah_lantai,
             "luas_rth_usulan_m2": intensitas.luas_rth_usulan_m2,
@@ -198,6 +213,7 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
 
 def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
     impact = assessment.impact_assessment
+    kawasan_resapan = tentukan_kawasan_resapan(assessment)
     kategori_dampak = normalisasi_kategori_dampak(impact.impact_category)
     return PoinKonteks(
         poin_id="dampak",
@@ -223,17 +239,18 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "data_confidence": impact.data_confidence,
             "limitations": impact.limitations,
             "luas_usulan_melebihi_persil": impact.luas_usulan_melebihi_persil,
-            "kawasan_resapan": assessment.lokasi.kawasan_resapan,
+            "kawasan_resapan": kawasan_resapan,
             # Arah mitigasi kualitatif — app/reasoning/calculator.py, TIDAK menghitung ulang C/index.
-            "mitigasi": sarankan_arah_mitigasi_dampak(impact, assessment.lokasi.kawasan_resapan),
+            "mitigasi": sarankan_arah_mitigasi_dampak(impact, kawasan_resapan),
             # Target kuantitatif (ambang runoff_change_index utk turun 1 kategori) — murni aritmatika
             # threshold_bands vs index yang SUDAH diberi back-end, bukan hitung ulang rumus C.
-            "target_mitigasi": hitung_target_mitigasi_dampak(impact, assessment.lokasi.kawasan_resapan),
+            "target_mitigasi": hitung_target_mitigasi_dampak(impact, kawasan_resapan),
         },
         dasar_hukum=[],
         zona=assessment.lokasi.rdtr_zone,
         zona_subzone=assessment.lokasi.rdtr_subzone,
-        kawasan_resapan=assessment.lokasi.kawasan_resapan,
+        kawasan_resapan=kawasan_resapan,
+        rawan_kekeringan=tentukan_rawan_kekeringan(assessment),
     )
 
 

@@ -345,6 +345,8 @@ def _angka_terlacak_ke_sumber(
     if poin.poin_id == "dampak" and poin.kawasan_resapan is not None:
         # Status resapan diketahui -> narasi sah menyebut "Pasal 53" (berlaku atau tidak berlaku).
         sumber += " Pasal 53"
+    if poin.poin_id == "dampak" and poin.rawan_kekeringan:
+        sumber += " Pasal 50"
     # APP-2026-0095: `REASON` BE disuntikkan ke prompt ITBX (prompts._bangun_fakta_itbx) sehingga LLM
     # sah mengutip angkanya (mis. "Zona Pertanian (743.5 m2: Status X)"), tapi dulu tak termasuk
     # `sumber` -> guardrail menolak angka yg ia sendiri suruh LLM baca. Teks mentah, tanpa reformat.

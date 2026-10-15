@@ -39,9 +39,17 @@
       },
       "rdtr_zone": "Zona Perumahan",
       "rdtr_subzone": "R-3",
-      "kawasan_resapan": true,
       "rdtr_subzone_source": "geojson_overlay",
-      "luas_lahan_m2": 1436.0
+      "luas_lahan_m2": 1436.0,
+      "swp": "B",
+      "blok": "I.B.2",
+      "blok_list": [
+        "I.B.2"
+      ],
+      "ketentuan_khusus": {
+        "kawasan_resapan_air": true,
+        "rawan_kekeringan": false
+      }
     },
     "gate_hukum": {
       "final_gate_status": "Tidak Lolos",
@@ -114,7 +122,11 @@
               "pasal": "Ketentuan Intensitas Ruang (R-3)",
               "kutipan": "KDB maks 50%, KLB maks 3.0, KDH min 30% (kawasan resapan air)"
             }
-          ]
+          ],
+          "nama_zona": "Zona Perumahan",
+          "kode_zona": "R-3",
+          "hierarki_jalan": "lokal",
+          "kawasan_resapan": true
         }
       }
     },

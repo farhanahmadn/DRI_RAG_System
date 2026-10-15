@@ -54,6 +54,7 @@ ALLOWED_FAKTA_FIELDS: dict[str, frozenset[str]] = {
     }),
     "intensitas": frozenset({
         "dinilai", "parameter", "luas_tapak_m2", "jumlah_lantai", "luas_rth_usulan_m2", "target",
+        "dasar_ambang",
     }),
     "dampak": frozenset({
         "dinilai", "impact_score", "runoff_change_index", "c_before", "c_after", "threshold_bands",

@@ -275,6 +275,23 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
     lines = [f"STATUS_INTENSITAS: {poin.status}"]
     lines.extend(_baris_zona_intensitas(poin, bool(fakta.get("parameter"))))
 
+    dasar = fakta.get("dasar_ambang") or {}
+    if dasar:
+        bagian = []
+        if dasar.get("nama_zona"):
+            bagian.append(f"zona {dasar['nama_zona']}" + (f" ({dasar['kode_zona']})" if dasar.get("kode_zona") else ""))
+        if dasar.get("hierarki_jalan"):
+            bagian.append(f"hierarki jalan {dasar['hierarki_jalan']}")
+        if dasar.get("kawasan_resapan") is True:
+            bagian.append("lokasi di kawasan resapan air")
+        elif dasar.get("kawasan_resapan") is False:
+            bagian.append("lokasi bukan kawasan resapan air")
+        if bagian:
+            lines.append(
+                "Dasar pemilihan ambang (dari back-end): " + ", ".join(bagian) + ". Saat menjelaskan "
+                "dari mana ambang berasal, sebut dasar ini apa adanya."
+            )
+
     target_map = fakta.get("target") or {}
     for nama, param in (fakta.get("parameter") or {}).items():
         # Satuan disertakan di SETIAP angka (usulan DAN ambang) — sebelumnya cuma "usulan" yang

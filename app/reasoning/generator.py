@@ -316,7 +316,8 @@ def _sesuaikan_dgn_status_resapan(chunks: list[Chunk], poin: PoinKonteks, retrie
     None  -> perilaku lama."""
     if poin.poin_id != "dampak":
         return chunks
-    chunks = [c for c in chunks if not chunk_rawan_kekeringan(c)]
+    if poin.rawan_kekeringan is not True:
+        chunks = [c for c in chunks if not chunk_rawan_kekeringan(c)]
     if poin.kawasan_resapan is None:
         return chunks[:top_k] if len(chunks) > top_k else chunks
     if poin.kawasan_resapan is False:
