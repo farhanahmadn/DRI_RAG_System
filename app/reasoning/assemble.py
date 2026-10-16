@@ -10,13 +10,17 @@ menunggu socket, jadi threading beri speedup nyata tanpa perlu menulis ulang sel
 async (yang akan memaksa ubah SEAM Retriever Protocol, kontrak dengan teman).
 """
 
+import contextvars
 import logging
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
 from app.logging_util import log_precheck
+from app import batas_waktu
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import _fmt_id, normalisasi_kategori_dampak
 from app.reasoning.guardrail import (
@@ -75,6 +79,21 @@ _LABEL_TAHAP = {"itbx": "klasifikasi kegiatan (ITBX)", "intensitas": "intensitas
 
 _MAX_WORKERS = int(os.getenv("REASONING_MAX_WORKERS", "8"))
 _executor = ThreadPoolExecutor(max_workers=_MAX_WORKERS, thread_name_prefix="reasoning-poin")
+
+
+# Tambahan waktu tunggu (detik) atas sisa anggaran saat menunggu thread poin: thread yang taat anggaran
+# berhenti sendiri, tunggu sebentar agar fallback mereka (yang lebih informatif) sempat terkumpul.
+_TOLERANSI_TUNGGU_S = 4.0
+# Sisa anggaran minimum (detik) agar satu panggilan sintesis LLM masih layak.
+_MIN_SISA_SINTESIS_S = 10.0
+
+
+def _poin_batas_waktu(poin: PoinKonteks) -> tuple[PoinOutput, DiagnosaPoin]:
+    diagnosa = DiagnosaPoin(
+        poin_id=poin.poin_id, berhasil=False,
+        exception_terakhir="BatasWaktuTerlampaui: poin belum selesai saat anggaran waktu permintaan habis",
+    )
+    return template_low_confidence(poin), diagnosa
 
 
 def _generate_poin_defensif(
@@ -282,6 +301,7 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
     """SATU panggilan LLM (bukan retry loop) — gagal atau melanggar aturan angka -> fallback
     deterministik dari saran per-poin."""
     try:
+        batas_waktu.periksa(_MIN_SISA_SINTESIS_S, "sintesis kesimpulan")
         prompt = build_kesimpulan_prompt(poin_list, rekomendasi_sistem)
         hasil = llm_client.generate(
             prompt,
@@ -333,6 +353,7 @@ def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: s
     Lingkungan/Hidrologi). Gagal/melanggar aturan angka -> fallback deterministik dari saran per-poin
     (pola identik `_rakit_kesimpulan` di atas — jaga konsistensi 2 panggilan sintesis ini)."""
     try:
+        batas_waktu.periksa(_MIN_SISA_SINTESIS_S, "sintesis narasi")
         prompt = build_narasi_rekomendasi_prompt(poin_list, rekomendasi_sistem)
         hasil = llm_client.generate(
             prompt,
@@ -430,8 +451,23 @@ def _rakit_catatan_global(
     return catatan
 
 
+CATATAN_BATAS_WAKTU = (
+    "Batas waktu pemrosesan tercapai, sehingga sebagian penjelasan tidak sempat dihasilkan otomatis dan "
+    "perlu ditinjau manual atau permohonan diulang."
+)
+
+
 def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL3:
-    """Jalankan precheck penuh: generate tiap poin PARALEL (dengan guardrail), rakit output dua-jalur."""
+    """Jalankan precheck penuh: generate tiap poin PARALEL (dengan guardrail), rakit output dua-jalur.
+
+    Seluruh pemrosesan berjalan dalam anggaran waktu (`app/batas_waktu.py`, REASONING_DEADLINE_S, bawaan
+    85 detik) supaya respons tiba sebelum batas 100 detik Cloudflare."""
+    with batas_waktu.anggaran():
+        return _jalankan_precheck_inti(assessment, retriever)
+
+
+def _jalankan_precheck_inti(assessment: L2Assessment, retriever: Retriever) -> OutputL3:
+    mulai = time.perf_counter()
     hasil_adaptasi = adaptasi(assessment)
     itbx_fallback = deteksi_fallback_itbx(assessment.gate_hukum.tahapan.itbx.reason)
     # Dihitung SEKALI di sini (bukan per poin): ini properti permohonan, bukan properti poin.
@@ -443,11 +479,19 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     # keluarga zona (lihat generator._QUERY_INTENSITAS_TAJAM).
     subzona_tak_pasti = not (assessment.lokasi.rdtr_subzone or "").strip()
 
+    # Konteks (anggaran waktu) disalin per thread: ContextVar tidak otomatis ikut ke thread pool.
     futures = [
-        _executor.submit(_generate_poin_defensif, poin, retriever, assessment)
+        _executor.submit(contextvars.copy_context().run, _generate_poin_defensif, poin, retriever, assessment)
         for poin in hasil_adaptasi.poin
     ]
-    hasil_poin = [f.result() for f in futures]  # urutan submit == urutan hasil (itbx, intensitas, dampak)
+    hasil_poin = []
+    for f, poin in zip(futures, hasil_adaptasi.poin):  # urutan submit == urutan hasil (itbx, intensitas, dampak)
+        sisa = batas_waktu.sisa()
+        try:
+            hasil_poin.append(f.result(timeout=None if sisa is None else max(0.5, sisa + _TOLERANSI_TUNGGU_S)))
+        except FuturesTimeoutError:
+            logger.error("Poin %r tak selesai dalam anggaran waktu — fallback low_confidence.", poin.poin_id)
+            hasil_poin.append(_poin_batas_waktu(poin))
     poin_list = _terapkan_catatan_batas([p for p, _ in hasil_poin], hasil_adaptasi.poin)
     diagnostik = [d for _, d in hasil_poin]
 
@@ -455,8 +499,12 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     # hanya di disclaimer: pembaca ringkasan akan mengikuti angka dampak yang lebih longgar.
     catatan_batas = _catatan_batas_berbeda(hasil_adaptasi.poin)
     sintesis: dict = {}
-    narasi = _rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem, sintesis)
-    kesimpulan = _rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem, sintesis)
+    # Narasi dan kesimpulan saling bebas: dijalankan PARALEL (menghemat satu panggilan LLM berurutan).
+    f_narasi = _executor.submit(contextvars.copy_context().run, _rakit_narasi_rekomendasi,
+                                poin_list, hasil_adaptasi.rekomendasi_sistem, sintesis)
+    f_kesimpulan = _executor.submit(contextvars.copy_context().run, _rakit_kesimpulan,
+                                    poin_list, hasil_adaptasi.rekomendasi_sistem, sintesis)
+    narasi, kesimpulan = f_narasi.result(), f_kesimpulan.result()
     if catatan_batas:
         narasi = narasi.model_copy(update={"paragraf_dampak": f"{narasi.paragraf_dampak} {catatan_batas}".strip()})
         kesimpulan = kesimpulan.model_copy(update={"langkah_berdampak": [*kesimpulan.langkah_berdampak, catatan_batas]})
@@ -474,9 +522,14 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
         # ketiga poin sendiri lolos guardrail dgn mulus.
         low_confidence_keseluruhan=any(p.low_confidence for p in poin_list) or di_luar_wilayah,
     )
+    if any(d.sebab() == "melewati_batas_waktu" for d in diagnostik) or any(
+            "BatasWaktuTerlampaui" in str(v) for v in sintesis.values()):
+        output.catatan_global.append(CATATAN_BATAS_WAKTU)
+        output.low_confidence_keseluruhan = True
 
     try:
-        log_precheck(assessment, output, diagnostik=_serialisasi_diagnostik(diagnostik), sintesis=sintesis)
+        log_precheck(assessment, output, diagnostik=_serialisasi_diagnostik(diagnostik), sintesis=sintesis,
+                     durasi_detik=round(time.perf_counter() - mulai, 2))
     except Exception:
         logger.exception("Gagal menulis log precheck — melanjutkan tanpa menggagalkan respons.")
 

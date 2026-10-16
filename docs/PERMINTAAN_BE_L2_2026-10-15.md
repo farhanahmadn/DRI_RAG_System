@@ -110,8 +110,12 @@ Pertanyaan untuk BE:
   `low_confidence` dan teks "peninjauan manual". Kami mempertimbangkan membalas **HTTP 503** untuk kondisi
   infrastruktur seperti itu. Mohon konfirmasi apakah BE dapat menangani 503 dengan mengulang (retry dengan
   backoff) dan tidak menyimpannya sebagai hasil akhir.
-- Satu panggilan L3 memanggil LLM beberapa kali dan bisa memakan puluhan detik. Mohon pastikan timeout klien dari
-  BE ke L3 tidak kurang dari 120 detik. Kami masih menyelidiki 504 pada lingkungan VPS.
+- Satu panggilan L3 memanggil LLM beberapa kali. Karena Cloudflare memutus permintaan yang tidak dibalas
+  dalam 100 detik, L3 kini menjamin membalas dalam sekitar 85 detik (bisa diatur lewat `REASONING_DEADLINE_S`).
+  Bila waktu habis, poin yang belum selesai dikembalikan dengan `low_confidence: true` dan `catatan_global`
+  memuat kalimat batas waktu. Mohon timeout klien dari BE ke L3 diatur sekitar 100 detik (jangan lebih
+  pendek dari 90 detik), dan perlakukan hasil dengan `low_confidence_keseluruhan: true` sebagai hasil
+  parsial yang boleh diulang.
 
 ## Ringkasan
 

@@ -27,6 +27,7 @@ import time
 from dotenv import dotenv_values, load_dotenv
 from openai import BadRequestError, OpenAI, RateLimitError
 
+from app import batas_waktu
 from app.reasoning import observability
 
 load_dotenv()
@@ -245,6 +246,21 @@ def _org_dibatasi(exc: Exception) -> bool:
     return "organization_restricted" in pesan or "has been restricted" in pesan
 
 
+# Sisa anggaran minimum (detik) agar satu panggilan LLM masih layak dimulai.
+_MIN_SISA_PANGGILAN_S = 5.0
+
+
+def _batasi_client(client: OpenAI) -> OpenAI:
+    """Dengan anggaran waktu aktif: timeout per panggilan dibatasi sisa anggaran dan retry internal SDK
+    dimatikan (retry semantik ditangani guardrail, dan tiap retry SDK memakan waktu yang tak terhitung).
+    Tanpa anggaran aktif, client dikembalikan apa adanya."""
+    sisa = batas_waktu.sisa()
+    if sisa is None:
+        return client
+    batas_waktu.periksa(_MIN_SISA_PANGGILAN_S, "panggilan LLM")
+    return client.with_options(timeout=min(_TIMEOUT_S, sisa - 1.0), max_retries=0)
+
+
 def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict, schema_name: str,
                          temperature: float, max_tokens: int):
     """Satu percobaan panggilan (strict json_schema, fallback json_object kalau ditolak) — TIDAK
@@ -377,7 +393,7 @@ def generate(
         kunci_berbeda_dicoba = 1
         sudah_eskalasi_token = False
         while True:
-            client = rotator.client_utk(idx)
+            client = _batasi_client(rotator.client_utk(idx))
             try:
                 completion = _panggil_llm_sekali(client, messages, json_schema, schema_name, temperature, max_tokens)
                 break
@@ -425,6 +441,7 @@ def generate(
                             "Rate limit TPM/RPM (kunci index %d) — tunggu %.1fs lalu ulang (percobaan %d/%d): %s",
                             idx, detik, tunggu_di_kunci_ini, _MAKS_TUNGGU_PER_KUNCI, exc,
                         )
+                        batas_waktu.periksa(detik + _MIN_SISA_PANGGILAN_S, "menunggu rate limit Groq")
                         time.sleep(detik)
                         continue
 

@@ -82,12 +82,19 @@ def post_json(
     ada N panggilan in-flight, tidak menambah beban ke provider yang sedang sibuk."""
     import httpx
 
+    from app import batas_waktu
+
     _check_circuit(name)
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
+        # Anggaran waktu permintaan (app/batas_waktu.py): jangan mulai panggilan yang tak mungkin selesai,
+        # dan jangan biarkan timeout per panggilan melampaui sisa anggaran.
+        batas_waktu.periksa(2.0, f"panggilan provider {name}")
+        sisa = batas_waktu.sisa()
+        timeout_efektif = timeout_s if sisa is None else max(1.0, min(timeout_s, sisa - 1.0))
         try:
             with _semaphore:
-                with httpx.Client(timeout=timeout_s) as client:
+                with httpx.Client(timeout=timeout_efektif) as client:
                     resp = client.post(url, headers=headers, json=json_body)
             resp.raise_for_status()
             _record_success(name)
@@ -96,7 +103,9 @@ def post_json(
             last_exc = exc
             _record_failure(name)
             if attempt < max_retries:
-                time.sleep(min(2 ** attempt, 8))
+                jeda = min(2 ** attempt, 8)
+                batas_waktu.periksa(jeda + 3.0, f"ulang panggilan provider {name}")
+                time.sleep(jeda)
     raise RuntimeError(
         f"Panggilan provider '{name}' gagal setelah {max_retries + 1} percobaan: {last_exc}"
     ) from last_exc

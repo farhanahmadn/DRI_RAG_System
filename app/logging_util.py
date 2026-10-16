@@ -20,6 +20,7 @@ def log_precheck(
     *,
     diagnostik: list[dict] | None = None,
     sintesis: dict | None = None,
+    durasi_detik: float | None = None,
     log_path: Path | str = DEFAULT_LOG_PATH,
 ) -> None:
     """Append satu baris JSON (request + response [+ diagnostik]) ke berkas log JSONL.
@@ -53,6 +54,9 @@ def log_precheck(
         # Hasil sintesis narasi/kesimpulan: "llm" atau "fallback: <sebab>". Sebelumnya penyebab
         # fallback hanya muncul di konsol (APP-2026-UJI-2: narasi jadi gabungan mentah tanpa jejak).
         "sintesis": sintesis if sintesis is not None else {},
+        # Lama pemrosesan satu permintaan (detik). Sebelumnya tak tercatat sama sekali, sehingga dugaan
+        # "lambat sampai kena batas 100 detik Cloudflare" tak bisa diukur dari log.
+        "durasi_detik": durasi_detik,
     }
 
     with path.open("a", encoding="utf-8") as f:

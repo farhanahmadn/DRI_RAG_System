@@ -24,7 +24,9 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+from app import batas_waktu
 from app.adapter import cek_konsistensi_intensitas
+from app.batas_waktu import BatasWaktuTerlampaui
 from app.reasoning.calculator import (
     bangun_langkah_dampak_poin,
     pilih_target_dampak_poin,
@@ -38,6 +40,9 @@ from app.retrieval.base import Chunk, Retriever
 from app.schemas import L2Assessment, LangkahKonkretOutput, PoinKonteks, PoinOutput
 
 logger = logging.getLogger(__name__)
+
+# Sisa anggaran minimum (detik) agar satu percobaan generate+validasi masih layak dimulai.
+_MIN_SISA_PERCOBAAN_S = 8.0
 
 CAVEAT_FALLBACK_ITBX_LOLOS = (
     "diloloskan otomatis karena data matriks RDTR kosong, bukan kepatuhan terverifikasi"
@@ -1167,6 +1172,8 @@ class DiagnosaPoin:
                 return "retrieval_provider_gagal"
             if self.exception_terakhir.startswith("LayananTidakTersediaError"):
                 return "llm_tidak_tersedia"
+            if self.exception_terakhir.startswith("BatasWaktuTerlampaui"):
+                return "melewati_batas_waktu"
             # percobaan == 0: gagal SEBELUM loop LLM mulai (ambil_chunks_pendukung raise selain
             # error provider, mis. Postgres/pgvector mati: ConnectionTimeout ke localhost:5432,
             # 2026-10-14). Bukan salah LLM, jangan dilabeli begitu.
@@ -1233,6 +1240,12 @@ def generate_poin_terdiagnosis(
     percobaan = -1
     while sisa_jatah > 0:
         percobaan += 1
+        if batas_waktu.habis(_MIN_SISA_PERCOBAAN_S):
+            diagnosa.exception_terakhir = (
+                diagnosa.exception_terakhir
+                or f"BatasWaktuTerlampaui: anggaran waktu habis sebelum percobaan ke-{percobaan + 1}")
+            logger.warning("Anggaran waktu habis, percobaan dihentikan utk poin %r", poin.poin_id)
+            break
         catatan = "; ".join(masalah) if percobaan > 0 else None
         suhu = 0.4 if percobaan > 0 else 0.0
         diagnosa.percobaan = percobaan + 1
@@ -1264,7 +1277,7 @@ def generate_poin_terdiagnosis(
                 "masalah": [],  # lihat DiagnosaPoin.riwayat_percobaan: pesan exception bukan temuan guardrail
                 "exception": diagnosa.exception_terakhir,
             })
-            if isinstance(exc, LayananTidakTersediaError):
+            if isinstance(exc, (LayananTidakTersediaError, BatasWaktuTerlampaui)):
                 # Semua kunci mati: mengulang tak mungkin berhasil sampai operator memperbaiki akun.
                 logger.error("LLM tidak tersedia, percobaan dihentikan utk poin %r: %s", poin.poin_id, exc)
                 break
