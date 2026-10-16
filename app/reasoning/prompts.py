@@ -316,6 +316,29 @@ def _bangun_fakta_intensitas(poin: PoinKonteks) -> list[str]:
             baris += f"  [TARGET PATUH: {format_target_parameter(target_map[nama])}]"
         lines.append(baris)
 
+    # Usulan vs batas ditulis sebagai dua kalimat terpisah (APP-2026-UJI-4: LLM menulis "KDB 83,57%
+    # setara dengan kebutuhan lantai dasar maksimal 861,6 m2", menyamakan persentase USULAN dengan luas
+    # BATAS).
+    info_kdb, info_kdh = target_map.get("kdb") or {}, target_map.get("kdh") or {}
+    param_kdb, param_kdh = (fakta.get("parameter") or {}).get("kdb") or {}, (fakta.get("parameter") or {}).get("kdh") or {}
+    if "footprint_maks_m2" in info_kdb and fakta.get("luas_tapak_m2") is not None:
+        lines.append(
+            f"Luas lantai dasar USULAN pemohon: {_angka_prompt(fakta['luas_tapak_m2'])} m2 "
+            f"(KDB {_angka_prompt(param_kdb.get('usulan'))}%). Luas lantai dasar MAKSIMAL yang diperbolehkan: "
+            f"{_angka_prompt(info_kdb['footprint_maks_m2'])} m2 (KDB {_angka_prompt(info_kdb.get('target_kdb'))}%)."
+        )
+    if "rth_dibutuhkan_m2" in info_kdh and fakta.get("luas_rth_usulan_m2") is not None:
+        lines.append(
+            f"RTH USULAN pemohon: {_angka_prompt(fakta['luas_rth_usulan_m2'])} m2 "
+            f"(KDH {_angka_prompt(param_kdh.get('usulan'))}%). RTH MINIMAL yang dibutuhkan: "
+            f"{_angka_prompt(info_kdh['rth_dibutuhkan_m2'])} m2 (KDH {_angka_prompt(info_kdh.get('target_kdh'))}%)."
+        )
+    if info_kdb or info_kdh:
+        lines.append(
+            "Usulan dan batas adalah dua hal berbeda: JANGAN menulis persentase usulan 'setara' dengan luas "
+            "batas, dan JANGAN menukar keduanya."
+        )
+
     if fakta.get("luas_tapak_m2") is not None:
         lines.append(f"luas_tapak_m2: {_angka_prompt(fakta['luas_tapak_m2'])}")
     if fakta.get("jumlah_lantai") is not None:

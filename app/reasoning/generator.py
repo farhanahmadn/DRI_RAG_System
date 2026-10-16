@@ -311,7 +311,22 @@ def chunk_pengisi_dampak(chunk: Chunk) -> bool:
     tabel intensitas Lampiran VI (dibahas poin intensitas). Pada APP-2026-UJI-3/-4 keduanya jadi satu-
     satunya sitasi dampak non-resapan: sekadar pengisi, bukan dasar."""
     teks = (chunk.teks or "").lstrip()
-    return (chunk.pasal or "").strip() == "1" or "-vi-" in (chunk.id or "") or teks.startswith("Lampiran VI")
+    return ((chunk.pasal or "").strip() in ("1", "44") or "-vi-" in (chunk.id or "")
+            or teks.startswith("Lampiran VI"))
+
+
+def _saring_pengisi_poin(chunks: list[Chunk], poin: PoinKonteks) -> list[Chunk]:
+    """ITBX tak butuh tabel intensitas (Lampiran VI), intensitas tak butuh syarat kegiatan (Lampiran V.B)
+    — masing-masing hanya pengisi di poin yang lain (APP-2026-UJI-1..4), dan sumber kontradiksi antar poin
+    (UJI-2: ITBX menyuruh KDB 60% dari rentang "50-60%" tabel intensitas). Bila penyaringan mengosongkan
+    daftar, daftar asli dipertahankan: lebih baik sitasi kurang tepat drpd tanpa sitasi sama sekali."""
+    if poin.poin_id == "itbx":
+        sisa = [c for c in chunks if "-vi-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran VI")]
+    elif poin.poin_id == "intensitas":
+        sisa = [c for c in chunks if "-vb-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran V.B")]
+    else:
+        return chunks
+    return sisa or chunks
 
 
 def _berlaku_utk_subzona(chunk: Chunk, subzona: str | None) -> bool:
@@ -393,7 +408,7 @@ def ambil_chunks_pendukung(
             filters = RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona))
         chunks = retriever.search(query_fallback, filters, top_k=top_k_cari,
                                   tanpa_lexical=poin.poin_id in _TANPA_LEXICAL_PER_POIN)
-    return _sesuaikan_dgn_status_resapan(chunks, poin, retriever, top_k)
+    return _saring_pengisi_poin(_sesuaikan_dgn_status_resapan(chunks, poin, retriever, top_k), poin)
 
 
 # Batas ekspansi small-to-big. Diukur dari korpus nyata (2026-09-08): 137 pasal induk, median 1.449

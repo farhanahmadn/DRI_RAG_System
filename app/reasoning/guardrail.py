@@ -828,6 +828,63 @@ def _cek_kewajiban_administratif_karangan(poin_output: PoinOutput, poin: PoinKon
     return []
 
 
+_RE_SETARA_KELIRU = re.compile(r"setara\s+dengan\s+kebutuhan", re.IGNORECASE)
+_RE_ISTILAH_ITBX = re.compile(r"\bbersyarat\b", re.IGNORECASE)
+_RE_LAMPIRAN_VB = re.compile(r"lampiran\s+v\.?\s*b\b", re.IGNORECASE)
+_RE_ANGKA_BIASA = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _cek_intensitas_dan_istilah(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """APP-2026-UJI-1/-4: (a) intensitas "memenuhi syarat" dilabeli "Bersyarat" (istilah ITBX);
+    (b) "KDB 83,57% setara dengan kebutuhan lantai dasar maksimal 861,6 m2" menyamakan usulan dengan batas."""
+    if poin.poin_id != "intensitas":
+        return []
+    teks = _teks_poin(poin_output)
+    masalah = []
+    if _RE_ISTILAH_ITBX.search(teks):
+        masalah.append(
+            "kata 'Bersyarat' adalah istilah ITBX. Status intensitas hanya 'memenuhi syarat' atau "
+            "'melampaui batas'."
+        )
+    if _RE_SETARA_KELIRU.search(teks):
+        masalah.append(
+            "jangan menulis persentase usulan 'setara dengan kebutuhan' luas batas. Tulis usulan dan batas "
+            "sebagai dua hal terpisah (usulan X m2 dengan KDB Y%, batas maksimal Z m2 dengan KDB W%)."
+        )
+    return masalah
+
+
+def _cek_atribusi_lampiran_vb(poin_output: PoinOutput, chunks: list[Chunk] | None) -> list[str]:
+    """APP-2026-UJI-1: syarat 20% luas blok ditulis "menurut Lampiran V.B", padahal berasal dari keterangan
+    ketentuan BE (teks V.B yang dikutip tidak memuat angka itu). Angka pada kalimat yang menyebut Lampiran
+    V.B harus ada di teks Lampiran V.B yang disodorkan."""
+    vb = " ".join(c.teks for c in (chunks or []) if "-vb-" in (c.id or "")
+                  or (c.teks or "").lstrip().startswith("Lampiran V.B"))
+    if not vb:
+        return []
+    for kalimat in _RE_PISAH_KALIMAT.split(_teks_poin(poin_output)):
+        if not _RE_LAMPIRAN_VB.search(kalimat):
+            continue
+        kalimat_tanpa_rujukan = _RE_LAMPIRAN_VB.sub(" ", kalimat)
+        for angka in _RE_ANGKA_BIASA.findall(kalimat_tanpa_rujukan):
+            # `(?!\d|[.,]\d)`: "20" TIDAK boleh dianggap ada hanya karena teks memuat "20.000".
+            if re.search(rf"(?<![\d.,]){re.escape(angka)}(?!\d|[.,]\d)", vb) is None:
+                return [
+                    f"kalimat merujuk 'Lampiran V.B' tetapi angka {angka!r} tidak ada di teks Lampiran V.B. "
+                    "Syarat dari Keterangan Ketentuan berasal dari data back-end, jangan diatribusikan ke Lampiran V.B."
+                ]
+    return []
+
+
+def _perbaiki_bold(teks: str) -> str:
+    """`**` yang tidak berpasangan (jumlah ganjil) merusak tampilan di FE (APP-2026-UJI-1: "**" menggantung
+    di akhir kalimat). Buang yang terakhir."""
+    if teks.count("**") % 2 == 1:
+        i = teks.rfind("**")
+        teks = (teks[:i] + teks[i + 2:]).rstrip()
+    return teks
+
+
 _POLA_SYARAT_KELOMPOK_LAIN = (
     ("jam operasional", re.compile(r"jam\s+(?:operasional|buka)|\bpukul\s+22|\b22[.:]00", re.IGNORECASE)),
     ("dokumen lingkungan", re.compile(r"dokumen\s+(?:perizinan\s+)?lingkungan", re.IGNORECASE)),
@@ -985,10 +1042,11 @@ def perbaiki_poin(
     )
 
     poin_bersih = poin_bersih.model_copy(update={
-        "reasoning_pendek": _perbaiki_titik_koma(poin_bersih.reasoning_pendek),
-        "reasoning_panjang": _perbaiki_titik_koma(_buang_referensi_inline(poin_bersih.reasoning_panjang)),
+        "reasoning_pendek": _perbaiki_bold(_perbaiki_titik_koma(poin_bersih.reasoning_pendek)),
+        "reasoning_panjang": _perbaiki_bold(
+            _perbaiki_titik_koma(_buang_referensi_inline(poin_bersih.reasoning_panjang))),
         "rekomendasi": poin_bersih.rekomendasi.model_copy(update={
-            "saran": _perbaiki_titik_koma(poin_bersih.rekomendasi.saran),
+            "saran": _perbaiki_bold(_perbaiki_titik_koma(poin_bersih.rekomendasi.saran)),
             "disclaimer": (
                 _perbaiki_titik_koma(poin_bersih.rekomendasi.disclaimer)
                 if poin_bersih.rekomendasi.disclaimer else poin_bersih.rekomendasi.disclaimer
@@ -1019,6 +1077,8 @@ def perbaiki_poin(
     masalah.extend(_cek_itbx_bahas_intensitas(poin_bersih, poin))
     masalah.extend(_cek_itbx_klaim_terpenuhi(poin_bersih, poin))
     masalah.extend(_cek_kewajiban_administratif_karangan(poin_bersih, poin, chunks))
+    masalah.extend(_cek_intensitas_dan_istilah(poin_bersih, poin))
+    masalah.extend(_cek_atribusi_lampiran_vb(poin_bersih, chunks))
     masalah.extend(_cek_prosedur_karangan(poin_bersih, poin, chunks))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)

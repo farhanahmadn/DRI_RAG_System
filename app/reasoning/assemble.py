@@ -273,7 +273,12 @@ def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput]) -> KesimpulanOutput:
     return KesimpulanOutput(langkah_berdampak=langkah, catatan_lokasi=None)
 
 
-def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> KesimpulanOutput:
+def _alasan_fallback(exc: Exception) -> str:
+    return f"fallback: {type(exc).__name__}: {str(exc)[:240]}"
+
+
+def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
+                      catatan_diag: dict | None = None) -> KesimpulanOutput:
     """SATU panggilan LLM (bukan retry loop) — gagal atau melanggar aturan angka -> fallback
     deterministik dari saran per-poin."""
     try:
@@ -294,9 +299,13 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> K
                 f"Kesimpulan LLM menyebutkan angka {asing!r} yang tak ada di saran poin — dilarang "
                 "(SYSTEM_PROMPT_KESIMPULAN aturan #3)."
             )
+        if catatan_diag is not None:
+            catatan_diag["kesimpulan"] = "llm"
         return KesimpulanOutput(langkah_berdampak=langkah, catatan_lokasi=catatan)
-    except Exception:
+    except Exception as exc:
         logger.exception("Sintesis kesimpulan via LLM gagal/melanggar aturan — fallback deterministik.")
+        if catatan_diag is not None:
+            catatan_diag["kesimpulan"] = _alasan_fallback(exc)
         return _rakit_kesimpulan_fallback(poin_list)
 
 
@@ -317,7 +326,8 @@ def _rakit_narasi_rekomendasi_fallback(poin_list: list[PoinOutput]) -> NarasiRek
     )
 
 
-def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> NarasiRekomendasiOutput:
+def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: str,
+                              catatan_diag: dict | None = None) -> NarasiRekomendasiOutput:
     """SATU panggilan LLM TAMBAHAN (item permintaan user 2026-09-21) — narasi 2 paragraf ringkas
     berdasar rekomendasi_sistem per-poin (paragraf 1: ITBX+Intensitas, paragraf 2: Dampak Terhadap
     Lingkungan/Hidrologi). Gagal/melanggar aturan angka -> fallback deterministik dari saran per-poin
@@ -348,9 +358,13 @@ def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: s
             )
         if not paragraf_gate.strip() or not paragraf_dampak.strip():
             raise ValueError("Narasi rekomendasi LLM mengembalikan paragraf kosong.")
+        if catatan_diag is not None:
+            catatan_diag["narasi"] = "llm"
         return NarasiRekomendasiOutput(paragraf_gate_intensitas=paragraf_gate, paragraf_dampak=paragraf_dampak)
-    except Exception:
+    except Exception as exc:
         logger.exception("Sintesis narasi rekomendasi via LLM gagal/melanggar aturan — fallback deterministik.")
+        if catatan_diag is not None:
+            catatan_diag["narasi"] = _alasan_fallback(exc)
         return _rakit_narasi_rekomendasi_fallback(poin_list)
 
 
@@ -440,8 +454,9 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     # Batas yang lebih ketat (intensitas vs dampak) harus terbaca di NARASI dan KESIMPULAN juga, bukan
     # hanya di disclaimer: pembaca ringkasan akan mengikuti angka dampak yang lebih longgar.
     catatan_batas = _catatan_batas_berbeda(hasil_adaptasi.poin)
-    narasi = _rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem)
-    kesimpulan = _rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem)
+    sintesis: dict = {}
+    narasi = _rakit_narasi_rekomendasi(poin_list, hasil_adaptasi.rekomendasi_sistem, sintesis)
+    kesimpulan = _rakit_kesimpulan(poin_list, hasil_adaptasi.rekomendasi_sistem, sintesis)
     if catatan_batas:
         narasi = narasi.model_copy(update={"paragraf_dampak": f"{narasi.paragraf_dampak} {catatan_batas}".strip()})
         kesimpulan = kesimpulan.model_copy(update={"langkah_berdampak": [*kesimpulan.langkah_berdampak, catatan_batas]})
@@ -461,7 +476,7 @@ def jalankan_precheck(assessment: L2Assessment, retriever: Retriever) -> OutputL
     )
 
     try:
-        log_precheck(assessment, output, diagnostik=_serialisasi_diagnostik(diagnostik))
+        log_precheck(assessment, output, diagnostik=_serialisasi_diagnostik(diagnostik), sintesis=sintesis)
     except Exception:
         logger.exception("Gagal menulis log precheck — melanjutkan tanpa menggagalkan respons.")
 

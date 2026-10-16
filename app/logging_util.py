@@ -19,6 +19,7 @@ def log_precheck(
     response: OutputL3,
     *,
     diagnostik: list[dict] | None = None,
+    sintesis: dict | None = None,
     log_path: Path | str = DEFAULT_LOG_PATH,
 ) -> None:
     """Append satu baris JSON (request + response [+ diagnostik]) ke berkas log JSONL.
@@ -49,6 +50,9 @@ def log_precheck(
         "request": request.model_dump(mode="json"),
         "response": response.model_dump(mode="json"),
         "diagnostik": diagnostik if diagnostik is not None else [],
+        # Hasil sintesis narasi/kesimpulan: "llm" atau "fallback: <sebab>". Sebelumnya penyebab
+        # fallback hanya muncul di konsol (APP-2026-UJI-2: narasi jadi gabungan mentah tanpa jejak).
+        "sintesis": sintesis if sintesis is not None else {},
     }
 
     with path.open("a", encoding="utf-8") as f:
