@@ -740,6 +740,94 @@ def _cek_penjelasan_dampak(poin_output: PoinOutput, poin: PoinKonteks) -> list[s
     return masalah
 
 
+_RE_INTENSITAS_DI_ITBX = re.compile(r"\b(?:KDB|KLB|KDH)\b|koefisien\s+(?:dasar|lantai|daerah)|ambang\s+intensitas",
+                                   re.IGNORECASE)
+
+
+def _teks_poin(poin_output: PoinOutput) -> str:
+    return (f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} "
+            f"{poin_output.rekomendasi.saran}")
+
+
+def _sumber_fakta_itbx(poin: PoinKonteks, chunks: list[Chunk] | None) -> str:
+    sumber = " ".join((poin.fakta.get("keterangan_ketentuan") or []) + [str(poin.fakta.get("reason") or "")])
+    sumber += " " + " ".join(d.kutipan for d in poin.dasar_hukum)
+    return sumber + " " + " ".join(c.teks for c in (chunks or []))
+
+
+def _cek_itbx_bahas_intensitas(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """APP-2026-UJI-2: ITBX menyuruh "KDB tidak melebihi 60%" padahal lokasi resapan berbatas 50%
+    (60% diambil dari rentang "50-60%" di tabel yg salah dikutip). Angka batas intensitas milik poin
+    intensitas; di ITBX ia hanya sumber kontradiksi yang menyebar ke narasi dan kesimpulan."""
+    if poin.poin_id != "itbx":
+        return []
+    sumber = " ".join((poin.fakta.get("keterangan_ketentuan") or []) + [str(poin.fakta.get("reason") or "")])
+    if _RE_INTENSITAS_DI_ITBX.search(_teks_poin(poin_output)) and not _RE_INTENSITAS_DI_ITBX.search(sumber):
+        return [
+            "poin ITBX membahas KDB/KLB/KDH atau ambang intensitas. Itu milik poin intensitas dan bisa "
+            "bertentangan dengannya. Bahas HANYA klasifikasi kegiatan dan syaratnya."
+        ]
+    return []
+
+
+_RE_KLAIM_SUDAH_TERPENUHI = re.compile(r"(?:sudah|telah)\s+(?:memenuhi|terpenuhi)", re.IGNORECASE)
+_RE_KLAIM_MEMENUHI_SYARAT = re.compile(
+    r"memenuhi\s+(?:syarat|batas|ketentuan)\s+(?:luas|maksimal|20)", re.IGNORECASE)
+_RE_KALIMAT_BERSYARAT = re.compile(
+    r"\bharus\b|\bagar\b|asalkan|selama|\bjika\b|apabila|\bperlu\b|\bwajib\b|dengan\s+syarat|supaya|"
+    r"\bhingga\b|\bbila\b|\bsebelum\b|\bdapat\s+diloloskan\s+bila",
+    re.IGNORECASE,
+)
+_RE_OTOMATIS = re.compile(r"secara\s+otomatis|diloloskan\s+otomatis|otomatis\s+oleh\s+sistem", re.IGNORECASE)
+
+
+def _cek_itbx_klaim_terpenuhi(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """APP-2026-UJI-3/-4: ITBX menulis pemohon "memenuhi"/"telah memenuhi" batas 20% luas blok dan
+    "diloloskan otomatis oleh sistem". Payload tidak memuat rasio itu, jadi tak ada yang bisa
+    dinyatakan terpenuhi; dan keputusan ada pada petugas, bukan sistem."""
+    if poin.poin_id != "itbx":
+        return []
+    teks = _teks_poin(poin_output)
+    masalah = []
+    if _RE_OTOMATIS.search(teks):
+        masalah.append("jangan menyebut kegiatan 'diloloskan otomatis': keputusan ada pada petugas.")
+    if poin.status in ("B", "T", "TB"):
+        for kalimat in _RE_PISAH_KALIMAT.split(teks):
+            if _RE_KLAIM_SUDAH_TERPENUHI.search(kalimat) or (
+                    _RE_KLAIM_MEMENUHI_SYARAT.search(kalimat) and not _RE_KALIMAT_BERSYARAT.search(kalimat)):
+                masalah.append(
+                    "poin ITBX bersyarat menyatakan syarat 'sudah/telah memenuhi'. Data tidak memuat bukti "
+                    "syarat itu terpenuhi: tulis sebagai kewajiban yang HARUS dipenuhi pemohon."
+                )
+                break
+    return masalah
+
+
+_POLA_KEWAJIBAN_KARANGAN = (
+    re.compile(r"(?:menambah|tambah)\s+blok", re.IGNORECASE),
+    re.compile(r"(?:menyertakan|sertakan|melampirkan|lampirkan|menyiapkan|siapkan)\s+"
+               r"(?:dokumen|berkas|perhitungan|bukti)", re.IGNORECASE),
+    re.compile(r"dokumen\s+(?:perhitungan|pendukung)|berkas\s+permohonan", re.IGNORECASE),
+)
+
+
+def _cek_kewajiban_administratif_karangan(poin_output: PoinOutput, poin: PoinKonteks,
+                                          chunks: list[Chunk] | None) -> list[str]:
+    """APP-2026-UJI-1/-2/-4: "menyertakan dokumen perhitungan luas blok", "menambah blok", "dokumen
+    pendukung (rencana tata ruang, perhitungan KDB)" tak ada di dokumen mana pun. Sah hanya bila
+    frasanya tertulis di fakta atau pasal yang disodorkan."""
+    teks = _teks_poin(poin_output)
+    sumber = _sumber_fakta_itbx(poin, chunks)
+    for pola in _POLA_KEWAJIBAN_KARANGAN:
+        m = pola.search(teks)
+        if m and not pola.search(sumber):
+            return [
+                f"saran memuat kewajiban administratif yang tak tertulis di fakta/pasal ({m.group(0)!r}). "
+                "DILARANG menambah kewajiban dokumen, perhitungan, berkas, atau 'menambah blok'."
+            ]
+    return []
+
+
 _POLA_SYARAT_KELOMPOK_LAIN = (
     ("jam operasional", re.compile(r"jam\s+(?:operasional|buka)|\bpukul\s+22|\b22[.:]00", re.IGNORECASE)),
     ("dokumen lingkungan", re.compile(r"dokumen\s+(?:perizinan\s+)?lingkungan", re.IGNORECASE)),
@@ -928,6 +1016,9 @@ def perbaiki_poin(
     masalah.extend(_cek_persen_intensitas_di_dampak(poin_bersih, poin))
     masalah.extend(_cek_penjelasan_dampak(poin_bersih, poin))
     masalah.extend(_cek_syarat_kelompok_lain(poin_bersih, poin))
+    masalah.extend(_cek_itbx_bahas_intensitas(poin_bersih, poin))
+    masalah.extend(_cek_itbx_klaim_terpenuhi(poin_bersih, poin))
+    masalah.extend(_cek_kewajiban_administratif_karangan(poin_bersih, poin, chunks))
     masalah.extend(_cek_prosedur_karangan(poin_bersih, poin, chunks))
 
     poin_bersih = _paksa_field_wajib(poin_bersih, poin, assessment)

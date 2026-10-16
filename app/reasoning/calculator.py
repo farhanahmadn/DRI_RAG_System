@@ -409,8 +409,9 @@ def bangun_langkah_pemeliharaan_dampak(mitigasi: dict, kawasan_resapan: bool | N
         )
     elif kawasan_resapan:
         deskripsi_sumur = (
-            "Lokasi berada di kawasan resapan air: sediakan sumur atau kolam resapan sesuai ketentuan "
-            "khusus kawasan resapan air dan pastikan air hujan tidak melimpas keluar lahan."
+            "Lokasi berada di kawasan resapan air: pastikan air hujan tidak melimpas keluar lahan "
+            "(zero delta Q). Sediakan sumur atau kolam resapan untuk mendukungnya, karena ketentuan khusus "
+            "kawasan resapan air mewajibkannya pada lahan terbangun yang sudah ada."
         )
     else:
         deskripsi_sumur = (

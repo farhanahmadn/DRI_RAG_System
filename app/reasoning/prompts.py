@@ -36,6 +36,9 @@ ATURAN WAJIB (jangan dilanggar):
 18. JANGAN MEMBUAT DAFTAR "Referensi:" DI DALAM NARASI — sumber hukum sudah tampil di field "sitasi" terpisah, jadi reasoning/saran tidak perlu mengulang daftar dokumen, lampiran, atau pasal di akhir teks. Sebut pasal hanya bila memang bagian dari penjelasan.
 19. SYARAT HANYA UNTUK KEGIATAN PEMOHON — Lampiran V.B memuat syarat banyak kelompok kegiatan sekaligus (jasa lainnya, pertanian, peternakan, dll.). Sebut syarat HANYA bila tertulis di Keterangan Ketentuan untuk kegiatan pemohon atau tertulis jelas untuk kelompok kegiatan yang SAMA dengannya. DILARANG mengambil syarat kelompok lain (mis. jam operasional, dokumen lingkungan, pengelolaan limbah, tidak mencemari) hanya karena ada di teks pasal yang sama.
 20. JANGAN MENGARANG PROSEDUR — DILARANG menyarankan mengajukan permohonan penyesuaian, pengecualian, dispensasi, izin khusus, atau perubahan zona, kecuali prosedur itu tertulis di fakta atau sitasi. Saran hanya boleh berupa penyesuaian rancangan yang angkanya ada di fakta.
+21. ITBX HANYA SOAL KLASIFIKASI KEGIATAN — DILARANG membahas KDB, KLB, KDH, atau ambang intensitas di poin ITBX (itu dibahas poin intensitas). Angka batas yang disebut di ITBX bisa bertentangan dengan poin intensitas (mis. 60% padahal lokasi kawasan resapan berbatas 50%).
+22. SYARAT BERSYARAT BELUM TERBUKTI TERPENUHI — Untuk status B/T/TB, syarat adalah kewajiban yang HARUS dipenuhi pemohon, dan data TIDAK memuat bukti bahwa syarat itu sudah terpenuhi. DILARANG menulis syarat 'sudah/telah memenuhi', 'memenuhi syarat luas', atau menyebut kegiatan 'diloloskan otomatis': keputusan ada pada petugas.
+23. JANGAN MENAMBAH KEWAJIBAN ADMINISTRATIF — DILARANG menambah kewajiban menyertakan dokumen, perhitungan, atau berkas, dan DILARANG menyuruh 'menambah blok' (blok adalah satuan perencanaan RDTR, bukan sesuatu yang bisa ditambah pemohon). Saran hanya mengulang syarat yang tertulis di fakta.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -388,10 +391,12 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     if poin.kawasan_resapan is True:
         lines.append(
             "\nKAWASAN_RESAPAN_AIR: YA. Lokasi berada di kawasan resapan air, jadi ketentuan khusus "
-            "kawasan resapan air berlaku (pengembangan baru wajib memastikan air tidak melimpas atau "
-            "zero delta Q, tidak mencemari air, dan untuk zona tertentu menyediakan sumur atau kolam "
-            "resapan). Jelaskan ketentuan ini di reasoning dan kaitkan dengan saran, rujuk pasalnya dengan "
-            "bahasa manusia."
+            "kawasan resapan air berlaku. Untuk PENGEMBANGAN BARU (permohonan ini) kewajibannya adalah "
+            "memastikan air tidak melimpas (zero delta Q), tidak merusak fungsi resapan, dan tidak "
+            "mencemari air. Penyediaan sumur atau kolam resapan diwajibkan pada LAHAN TERBANGUN YANG SUDAH "
+            "ADA (Pasal 53 ayat 3 huruf d), BUKAN sebagai syarat pengembangan baru: untuk permohonan ini "
+            "tulis sumur atau kolam resapan sebagai langkah yang mendukung zero delta Q. Jelaskan ketentuan "
+            "ini di reasoning dan kaitkan dengan saran, rujuk pasalnya dengan bahasa manusia."
         )
     elif poin.kawasan_resapan is False:
         lines.append(
@@ -427,7 +432,7 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         if pemeliharaan.get("luas_bangunan_m2") is not None:
             butir.append(f"jaga luas bangunan tidak melebihi {_angka_prompt(pemeliharaan['luas_bangunan_m2'])} m² sesuai usulan")
         if poin.kawasan_resapan is True:
-            butir.append("sediakan sumur atau kolam resapan air hujan sesuai ketentuan khusus kawasan resapan air dan rawat saluran drainase")
+            butir.append("pastikan air hujan tidak melimpas (zero delta Q), sediakan sumur atau kolam resapan untuk mendukungnya, dan rawat saluran drainase")
         elif poin.kawasan_resapan is False:
             butir.append("sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai rekomendasi praktik baik, bukan kewajiban kawasan resapan")
         else:
