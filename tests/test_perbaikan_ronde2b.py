@@ -163,3 +163,20 @@ class TestCatatanSintesis:
         baris = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines()]
         assert baris[0]["sintesis"] == {"narasi": "fallback: ValueError: x"}
         assert baris[1]["sintesis"] == {}
+
+
+class TestAngkaSintesisFormatDesimal:
+    """Hasil uji nyata 2026-10-16: sintesis narasi ditolak karena "861,6" vs "861.6"."""
+
+    def _poin(self, saran):
+        return [_out("intensitas", saran=saran)]
+
+    def test_koma_dan_titik_dianggap_sama(self):
+        poin = self._poin("Kurangi luas lantai dasar hingga 861.6 m² (KDB 60%).")
+        assert assemble._angka_tak_terlacak_ke_saran("maksimal 861,6 m²", poin) is None
+        poin = self._poin("Luas lantai dasar maksimal 861,6 m².")
+        assert assemble._angka_tak_terlacak_ke_saran("maksimal 861.6 m²", poin) is None
+
+    def test_angka_karangan_tetap_ditolak(self):
+        poin = self._poin("Kurangi luas lantai dasar hingga 861.6 m².")
+        assert assemble._angka_tak_terlacak_ke_saran("maksimal 862,6 m²", poin) is not None

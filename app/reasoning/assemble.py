@@ -282,7 +282,12 @@ def _angka_tak_terlacak_ke_saran(teks: str, poin_list: list[PoinOutput]) -> str 
     sumber += " " + " ".join(l.deskripsi for p in poin_list for l in p.rekomendasi.langkah_konkret)
     for m in _RE_ANGKA_MENCURIGAKAN.finditer(teks):
         angka = m.group(0)
-        if re.search(rf"\b{re.escape(angka)}\b", sumber) is None and not _dekat_dgn_pembulatan(angka, sumber):
+        # "861,6" (gaya Indonesia) dan "861.6" adalah angka yang SAMA, hanya beda format: sintesis narasi
+        # jatuh ke fallback karena LLM menulis koma sedangkan saran memakai titik (hasil uji nyata
+        # 2026-10-16). Pembatas `(?![\d]|[.,]\d)` mencegah "20" dianggap ada karena teks memuat "20.000".
+        varian = {angka, angka.replace(",", "."), angka.replace(".", ",")}
+        ada = any(re.search(rf"(?<![\d.,]){re.escape(v)}(?!\d|[.,]\d)", sumber) for v in varian)
+        if not ada and not _dekat_dgn_pembulatan(angka.replace(",", "."), sumber):
             return angka
     return None
 
