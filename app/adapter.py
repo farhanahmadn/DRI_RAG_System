@@ -14,6 +14,7 @@ from app.reasoning.calculator import (
     sarankan_arah_mitigasi_dampak,
 )
 from app.ketentuan_khusus import tentukan_kawasan_resapan, tentukan_rawan_kekeringan
+from app.tipe_bangunan import ambil_tipe_bangunan
 from app.reasoning.rekomendasi import turunkan_rekomendasi
 from app.schemas import AdapterResult, L2Assessment, Lokasi, PoinKonteks
 
@@ -240,6 +241,9 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
             "limitations": impact.limitations,
             "luas_usulan_melebihi_persil": impact.luas_usulan_melebihi_persil,
             "kawasan_resapan": kawasan_resapan,
+            # Tipe bangunan/kegiatan yang diusulkan (permintaan rapat 2026-10-16): menentukan kelas
+            # bangunan & koefisien limpasan atap pada perhitungan BE.
+            "tipe_bangunan": ambil_tipe_bangunan(assessment),
             "kawasan_hidrologi": {
                 k: v for k, v in {
                     "nama": impact.kawasan_hidrologi, "kode": impact.kode_kawasan,

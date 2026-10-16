@@ -21,6 +21,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
 from app.logging_util import log_precheck
 from app import batas_waktu
+from app.tipe_bangunan import ambil_tipe_bangunan, frasa_tipe_bangunan
 from app.reasoning import llm_client, observability
 from app.reasoning.calculator import _fmt_id, normalisasi_kategori_dampak
 from app.reasoning.guardrail import (
@@ -202,7 +203,8 @@ def _rakit_ringkasan_dampak(assessment: L2Assessment) -> RingkasanDampakOutput:
         )
 
     kategori = normalisasi_kategori_dampak(impact.impact_category)
-    kalimat = f"Dampak terhadap lingkungan (hidrologi) tergolong {kategori}"
+    kalimat = (f"Dampak terhadap lingkungan (hidrologi) tergolong {kategori}"
+               f"{frasa_tipe_bangunan(ambil_tipe_bangunan(assessment))}")
     if impact.impact_score is not None:
         kalimat += " (skor dampak bersifat invers: semakin tinggi skor, semakin rendah dampaknya)."
     else:

@@ -397,6 +397,24 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "sarankan pemohon meninjau ulang proporsi KDB/KDH agar sesuai batas fisik persil."
         )
 
+    tipe = fakta.get("tipe_bangunan") or {}
+    if tipe.get("kegiatan") or tipe.get("kelas_atap"):
+        bagian = []
+        if tipe.get("kegiatan"):
+            bagian.append(f"kegiatan yang diusulkan: {tipe['kegiatan']}"
+                          + (f" (KBLI {tipe['kbli']})" if tipe.get("kbli") else ""))
+        if tipe.get("kelas_atap"):
+            bagian.append(f"kelas bangunan pada perhitungan limpasan: {tipe['kelas_atap']}")
+        if tipe.get("jumlah_lantai"):
+            bagian.append(f"{tipe['jumlah_lantai']} lantai")
+        lines.append(
+            "\nTIPE_BANGUNAN (dari back-end): " + ", ".join(bagian) + ". WAJIB sebut jenis kegiatan atau "
+            "bangunan ini di reasoning_pendek dan reasoning_panjang, dan jelaskan bahwa jenis bangunan "
+            "memengaruhi koefisien limpasan atap pada perhitungan dampak (dua bangunan berluas sama tetapi "
+            "berbeda jenis bisa berbeda dampaknya). Jangan menyebut angka koefisien dan jangan mengarang "
+            "jenis bangunan lain."
+        )
+
     kawasan = fakta.get("kawasan_hidrologi") or {}
     if kawasan.get("nama"):
         lines.append(

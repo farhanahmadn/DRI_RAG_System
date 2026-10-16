@@ -943,6 +943,32 @@ def _cek_prosedur_karangan(poin_output: PoinOutput, poin: PoinKonteks, chunks: l
     ]
 
 
+_KATA_UMUM_KEGIATAN = frozenset({"lainnya", "lain", "yang", "untuk", "dengan", "dalam", "serta", "atau"})
+
+
+def _pastikan_tipe_bangunan(poin_output: PoinOutput, poin: PoinKonteks) -> PoinOutput:
+    """Rapat 2026-10-16: penjelasan dampak hidrologi harus membawa tipe bangunan/kegiatan yang diusulkan
+    (ia menentukan koefisien limpasan atap). Bila LLM lupa menyebutnya, kalimat deterministik ditambahkan
+    ke akhir reasoning_panjang. Diperbaiki, BUKAN ditolak: menolak seluruh penjelasan hanya karena satu nama
+    tidak disebut akan membakar percobaan dan berujung low_confidence."""
+    if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
+        return poin_output
+    tipe = poin.fakta.get("tipe_bangunan") or {}
+    kegiatan = (tipe.get("kegiatan") or "").strip()
+    if not kegiatan:
+        return poin_output
+    kata = [k for k in re.findall(r"[A-Za-z]{4,}", kegiatan.lower()) if k not in _KATA_UMUM_KEGIATAN]
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang}".lower()
+    if not kata or any(k in teks for k in kata):
+        return poin_output
+    kalimat = f"Tipe bangunan yang diusulkan adalah {kegiatan}"
+    if tipe.get("kelas_atap"):
+        kalimat += f" (kelas bangunan: {tipe['kelas_atap']})"
+    kalimat += ", yang memengaruhi koefisien limpasan atap pada perhitungan dampak."
+    return poin_output.model_copy(update={
+        "reasoning_panjang": f"{poin_output.reasoning_panjang.rstrip()} {kalimat}"})
+
+
 def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     """Lokasi yang BE nyatakan BUKAN kawasan resapan air tak boleh dijelaskan memakai ketentuan
     kawasan resapan (APP-2026-UJI-4)."""
@@ -1058,6 +1084,8 @@ def perbaiki_poin(
             ),
         }),
     })
+
+    poin_bersih = _pastikan_tipe_bangunan(poin_bersih, poin)
 
     if not poin_bersih.reasoning_pendek.strip() or not poin_bersih.reasoning_panjang.strip():
         masalah.append("reasoning_pendek/reasoning_panjang kosong.")
