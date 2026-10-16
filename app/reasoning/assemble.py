@@ -292,10 +292,34 @@ def _angka_tak_terlacak_ke_saran(teks: str, poin_list: list[PoinOutput]) -> str 
     return None
 
 
+_RE_NOMOR_BUTIR = re.compile(r"^\s*\d+[.)]\s*")
+_BAKU_TAK_PERLU_TINDAKAN = "Tidak diperlukan tindakan khusus"
+
+
+def _butir_saran(saran: str) -> list[str]:
+    """Pecah saran bernomor ("1. ...\n2. ...") jadi butir bersih tanpa nomor/baris kosong."""
+    return [b for b in (_RE_NOMOR_BUTIR.sub("", baris).strip() for baris in (saran or "").splitlines()) if b]
+
+
+def _butir_bermakna(daftar_saran: list[str]) -> list[str]:
+    """Semua butir dari beberapa saran. Kalimat baku "Tidak diperlukan tindakan khusus" dibuang bila
+    ada butir lain: ia hanya benar untuk poin yang lolos, dan menyesatkan jika ditempel di samping
+    langkah perbaikan poin lain (hasil uji nyata 2026-10-16)."""
+    butir = [b for s in daftar_saran for b in _butir_saran(s)]
+    isi = [b for b in butir if not b.startswith(_BAKU_TAK_PERLU_TINDAKAN)]
+    return isi or butir[:1]
+
+
+def _sebagai_kalimat(butir: str) -> str:
+    butir = butir.strip()
+    return butir if butir.endswith((".", "!", "?")) else butir + "."
+
+
 def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput]) -> KesimpulanOutput:
-    """Dipakai kalau panggilan LLM sintesis gagal/melanggar aturan — deterministik, saran
-    per-poin verbatim (sudah lolos guardrail, jadi aman ditampilkan apa adanya)."""
-    langkah = [p.rekomendasi.saran for p in poin_list if p.rekomendasi.saran.strip()]
+    """Dipakai kalau panggilan LLM sintesis gagal/melanggar aturan — deterministik, butir saran
+    per-poin verbatim (sudah lolos guardrail, jadi aman ditampilkan apa adanya), satu butir per
+    baris tanpa nomor sisipan."""
+    langkah = _butir_bermakna([p.rekomendasi.saran for p in poin_list if p.rekomendasi.saran.strip()])
     return KesimpulanOutput(langkah_berdampak=langkah, catatan_lokasi=None)
 
 
@@ -347,9 +371,11 @@ def _rakit_narasi_rekomendasi_fallback(poin_list: list[PoinOutput]) -> NarasiRek
     ]
     poin_dampak = by_id.get("dampak")
     saran_dampak = poin_dampak.rekomendasi.saran if poin_dampak and poin_dampak.rekomendasi.saran.strip() else ""
+    kalimat_gate = " ".join(_sebagai_kalimat(b) for b in _butir_bermakna(saran_gate))
+    kalimat_dampak = " ".join(_sebagai_kalimat(b) for b in _butir_bermakna([saran_dampak])) if saran_dampak else ""
     return NarasiRekomendasiOutput(
-        paragraf_gate_intensitas=" ".join(saran_gate) or "Tidak ada catatan tambahan untuk ITBX dan intensitas bangunan.",
-        paragraf_dampak=saran_dampak or "Tidak ada catatan tambahan untuk dampak terhadap lingkungan (hidrologi).",
+        paragraf_gate_intensitas=kalimat_gate or "Tidak ada catatan tambahan untuk ITBX dan intensitas bangunan.",
+        paragraf_dampak=kalimat_dampak or "Tidak ada catatan tambahan untuk dampak terhadap lingkungan (hidrologi).",
     )
 
 

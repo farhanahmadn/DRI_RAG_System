@@ -171,7 +171,7 @@ def sarankan_arah_mitigasi_dampak(impact: ImpactAssessment, kawasan_resapan: boo
     hasil: dict = {
         "perlu_mitigasi": True,
         "arah": [
-            "turunkan KDB (proporsi tapak/bangunan)",
+            "turunkan KDB (kurangi luas lantai dasar bangunan)",
             "naikkan KDH/RTH",
             "sumur resapan",
             "kolam retensi",

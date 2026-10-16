@@ -986,6 +986,40 @@ def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     return []
 
 
+_RE_KLAIM_KOEFISIEN_BEDA = re.compile(
+    r"koefisien\s+limpasan[^.]{0,60}(?:berbeda|lebih\s+(?:tinggi|besar|rendah|kecil))|"
+    r"(?:berbeda|lebih\s+(?:tinggi|besar))[^.]{0,60}koefisien\s+limpasan",
+    re.IGNORECASE,
+)
+_RE_HURUF_D_53 = re.compile(r"(?:ayat\s*\(?3\)?\s*)?huruf\s+d\b", re.IGNORECASE)
+_RE_LAHAN_SUDAH_ADA = re.compile(r"sudah\s+ada|telah\s+ada|terbangun|eksisting", re.IGNORECASE)
+_RE_KLAIM_DAMPAK_MEMENUHI = re.compile(
+    r"(?:sudah|telah)\s+(?:memenuhi|sesuai)|memenuhi\s+(?:syarat|ketentuan)\s+(?:tersebut|kawasan|resapan)",
+    re.IGNORECASE,
+)
+
+
+def _cek_klaim_dampak_tanpa_dasar(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """Hasil uji nyata 2026-10-16: narasi dampak mengarang 'koefisien limpasan atap berbeda antara jenis
+    bangunan', memakai Pasal 53 ayat (3) huruf d sebagai kewajiban bangunan baru (huruf d hanya untuk lahan
+    terbangun yang SUDAH ADA), dan menyatakan pemohon 'memenuhi syarat' kawasan resapan."""
+    if poin.poin_id != "dampak":
+        return []
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang} {poin_output.rekomendasi.saran}"
+    masalah: list[str] = []
+    for kalimat in _RE_PISAH_KALIMAT.split(teks):
+        if _RE_KLAIM_KOEFISIEN_BEDA.search(kalimat):
+            masalah.append("narasi dampak membandingkan koefisien limpasan antar jenis bangunan, klaim yang "
+                           "tidak ada di fakta (SYSTEM_PROMPT aturan #24). Hapus kalimat itu.")
+        if _RE_HURUF_D_53.search(kalimat) and not _RE_LAHAN_SUDAH_ADA.search(kalimat):
+            masalah.append("Pasal 53 ayat (3) huruf d berlaku untuk lahan terbangun yang sudah ada, bukan "
+                           "kewajiban bangunan baru (SYSTEM_PROMPT aturan #24). Sebut 'lahan terbangun yang sudah ada'.")
+        if _RE_KLAIM_DAMPAK_MEMENUHI.search(kalimat):
+            masalah.append("narasi dampak menyatakan pemohon sudah memenuhi syarat, padahal data tidak memuat "
+                           "bukti pemenuhan (SYSTEM_PROMPT aturan #24).")
+    return masalah[:2]
+
+
 def _cek_saran_dampak_tanpa_tindakan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     """Permintaan user 2026-10-14: dampak yang dinilai (termasuk Rendah) WAJIB tetap punya saran
     pencegahan/pemeliharaan konkret, bukan "tidak diperlukan tindakan"."""
@@ -1104,6 +1138,7 @@ def perbaiki_poin(
     masalah.extend(_cek_tanda_baca_dilarang(poin_bersih))
     masalah.extend(_cek_saran_dampak_tanpa_tindakan(poin_bersih, poin))
     masalah.extend(_cek_klaim_resapan(poin_bersih, poin))
+    masalah.extend(_cek_klaim_dampak_tanpa_dasar(poin_bersih, poin))
     masalah.extend(_cek_persen_intensitas_di_dampak(poin_bersih, poin))
     masalah.extend(_cek_penjelasan_dampak(poin_bersih, poin))
     masalah.extend(_cek_syarat_kelompok_lain(poin_bersih, poin))
