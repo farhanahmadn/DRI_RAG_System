@@ -63,3 +63,37 @@ class TestFallbackSintesis:
 
 def test_system_prompt_lebih_ringkas():
     assert len(prompts.SYSTEM_PROMPT) < 7000
+
+
+def test_panggilan_llm_poin_berurutan(monkeypatch):
+    import threading
+    import time
+
+    from app.reasoning import llm_client
+
+    aktif, puncak, kunci = 0, 0, threading.Lock()
+
+    def palsu(prompt, json_schema, **kw):
+        nonlocal aktif, puncak
+        with kunci:
+            aktif += 1
+            puncak = max(puncak, aktif)
+        time.sleep(0.05)
+        with kunci:
+            aktif -= 1
+        return {}
+
+    monkeypatch.setattr(llm_client, "_generate_tanpa_antre", palsu)
+    ts = [threading.Thread(target=llm_client.generate, args=("p", {}), kwargs={"schema_name": "poin"})
+          for _ in range(4)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert puncak == 1
+
+
+def test_sintesis_tidak_diantre(monkeypatch):
+    from app.reasoning import llm_client
+
+    monkeypatch.setattr(llm_client, "_generate_tanpa_antre", lambda p, s, **kw: {"ok": 1})
+    with llm_client._antrean_llm:  # antrean poin terkunci, sintesis tetap jalan
+        assert llm_client.generate("p", {}, schema_name="kesimpulan") == {"ok": 1}

@@ -345,7 +345,7 @@ def _keluaran_kosong_token_habis(exc: BadRequestError) -> bool:
     return "json_validate_failed" in pesan and "'failed_generation': ''" in pesan
 
 
-def generate(
+def _generate_tanpa_antre(
     prompt: str,
     json_schema: dict,
     *,
@@ -481,3 +481,22 @@ def generate(
         # exception asli kalau LLM_MODEL entah bagaimana hilang di tengah jalan.
         model_untuk_log = model_terpakai if model_terpakai != "unknown" else (os.getenv("LLM_MODEL") or "unknown")
         observability.catat_generation(schema_name, prompt, hasil, model_untuk_log, latensi, error=error_msg)
+
+
+# Antrean panggilan LLM per-poin: tiga poin yang berangkat bersamaan membawa >10K token dalam hitungan
+# detik, padahal Groq free tier membatasi 8K token/menit per ORGANISASI (hasil uji nyata 2026-10-16:
+# ratusan 429). Default 1 = poin diproses satu per satu (retrieval tetap paralel). Naikkan lewat
+# LLM_MAX_CONCURRENT bila akun berbayar. Sintesis (narasi/kesimpulan) tidak diantre: ia baru jalan setelah
+# semua poin selesai dan kecil.
+_SKEMA_SINTESIS = frozenset({"kesimpulan", "narasi_rekomendasi"})
+_antrean_llm = threading.BoundedSemaphore(max(1, int(os.getenv("LLM_MAX_CONCURRENT", "1"))))
+
+
+def generate(prompt: str, json_schema: dict, **kwargs) -> dict:
+    """Pintu masuk panggilan LLM: antre untuk poin, langsung untuk sintesis. Lihat _generate_tanpa_antre."""
+    if kwargs.get("schema_name") in _SKEMA_SINTESIS:
+        return _generate_tanpa_antre(prompt, json_schema, **kwargs)
+    with _antrean_llm:
+        # Waktu antre ikut anggaran permintaan: jangan mulai panggilan bila sisa waktu sudah habis.
+        batas_waktu.periksa(_MIN_SISA_PANGGILAN_S, "panggilan LLM")
+        return _generate_tanpa_antre(prompt, json_schema, **kwargs)
