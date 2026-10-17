@@ -98,3 +98,50 @@ def test_sintesis_tidak_diantre(monkeypatch):
     monkeypatch.setattr(llm_client, "_generate_tanpa_antre", lambda p, s, **kw: {"ok": 1})
     with llm_client._antrean_llm:  # antrean poin terkunci, sintesis tetap jalan
         assert llm_client.generate("p", {}, schema_name="kesimpulan") == {"ok": 1}
+
+
+class TestPinKunciDanSintesisAuto:
+    def _rot(self, n=3):
+        from app.reasoning.llm_client import _RotasiKunciGroq
+        return _RotasiKunciGroq([f"k{i}" for i in range(n)], None)
+
+    def test_pin_memetakan_poin_ke_kunci_tetap(self):
+        r = self._rot()
+        assert [r.kunci_awal(i) for i in (0, 1, 2, 0)] == [0, 1, 2, 0]
+
+    def test_pin_maju_bila_kunci_karantina(self):
+        r = self._rot()
+        r.karantina(1, 60, "uji")
+        assert r.kunci_awal(1) == 2
+
+    def test_tanpa_pin_tetap_round_robin(self):
+        r = self._rot()
+        assert [r.kunci_awal() for _ in range(4)] == [0, 1, 2, 0]
+
+    def test_konteks_poin_membawa_pin(self):
+        from app.reasoning import assemble, llm_client
+        assert assemble._konteks_dgn_pin(2).run(llm_client._pin_kunci.get) == 2
+        assert llm_client._pin_kunci.get() is None
+
+    def test_sintesis_off_dilewati(self, monkeypatch):
+        from app.reasoning import assemble
+        monkeypatch.setenv("SINTESIS_LLM", "off")
+        assert assemble._alasan_lewati_sintesis() is not None
+
+    def test_sintesis_auto_lewati_saat_waktu_sempit_atau_429(self, monkeypatch):
+        from app import batas_waktu
+        from app.reasoning import assemble, llm_client
+        monkeypatch.setenv("SINTESIS_LLM", "auto")
+        assert assemble._alasan_lewati_sintesis() is None  # tanpa anggaran, tanpa 429
+        with batas_waktu.anggaran(10.0):
+            assert "sisa waktu" in assemble._alasan_lewati_sintesis()
+        llm_client._catat_rate_limit()
+        assert "429" in assemble._alasan_lewati_sintesis()
+        monkeypatch.setattr(llm_client, "_waktu_rate_limit_terakhir", 0.0)
+
+    def test_sintesis_on_selalu_mencoba(self, monkeypatch):
+        from app.reasoning import assemble, llm_client
+        monkeypatch.setenv("SINTESIS_LLM", "on")
+        llm_client._catat_rate_limit()
+        assert assemble._alasan_lewati_sintesis() is None
+        monkeypatch.setattr(llm_client, "_waktu_rate_limit_terakhir", 0.0)

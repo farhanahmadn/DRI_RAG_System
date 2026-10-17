@@ -142,6 +142,6 @@ class TestEndToEnd:
         with batas_waktu.anggaran(5):  # < _MIN_SISA_SINTESIS_S
             narasi = assemble._rakit_narasi_rekomendasi([], "Setuju", catatan)
             assemble._rakit_kesimpulan([], "Setuju", catatan)
-        assert catatan["narasi"].startswith("fallback: BatasWaktuTerlampaui")
-        assert catatan["kesimpulan"].startswith("fallback: BatasWaktuTerlampaui")
+        assert catatan["narasi"].startswith("dilewati: sisa waktu")
+        assert catatan["kesimpulan"].startswith("dilewati: sisa waktu")
         assert narasi.paragraf_gate_intensitas  # fallback deterministik tetap terisi

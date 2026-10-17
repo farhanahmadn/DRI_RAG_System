@@ -20,3 +20,15 @@ import os
 
 os.environ["RETRIEVER"] = "mock"
 os.environ["DATABASE_URL"] = ""
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _reset_jejak_rate_limit():
+    """Jejak 429 terakhir adalah state modul: jangan bocor antar tes (memengaruhi SINTESIS_LLM=auto)."""
+    from app.reasoning import llm_client
+    llm_client._waktu_rate_limit_terakhir = 0.0
+    yield
+    llm_client._waktu_rate_limit_terakhir = 0.0

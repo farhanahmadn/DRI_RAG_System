@@ -89,6 +89,36 @@ _TOLERANSI_TUNGGU_S = 4.0
 _MIN_SISA_SINTESIS_S = 10.0
 
 
+def _konteks_dgn_pin(indeks_poin: int) -> contextvars.Context:
+    """Salinan konteks untuk satu thread poin, dengan kunci Groq dipin ke urutan poin (itbx, intensitas,
+    dampak -> kunci 0, 1, 2). Lihat llm_client._RotasiKunciGroq.kunci_awal(pin=...)."""
+    ctx = contextvars.copy_context()
+    ctx.run(llm_client._pin_kunci.set, indeks_poin)
+    return ctx
+
+
+# Sintesis narasi/kesimpulan: "auto" (bawaan) memakai LLM hanya bila sisa waktu cukup dan Groq tidak baru
+# saja membalas 429 (jendela token menit masih terisi). "on" selalu mencoba, "off" selalu rakitan
+# deterministik dari saran per-poin. Rakitan deterministik tidak kalah akurat (semua angka sudah final
+# di poin), hanya lebih kaku.
+_SINTESIS_LLM = os.getenv("SINTESIS_LLM", "auto").strip().lower()
+_MIN_SISA_SINTESIS_AUTO_S = float(os.getenv("SINTESIS_MIN_SISA_S", "25"))
+
+
+def _alasan_lewati_sintesis() -> str | None:
+    mode = os.getenv("SINTESIS_LLM", _SINTESIS_LLM).strip().lower()
+    if mode == "off":
+        return "SINTESIS_LLM=off"
+    if mode == "on":
+        return None
+    sisa = batas_waktu.sisa()
+    if sisa is not None and sisa < _MIN_SISA_SINTESIS_AUTO_S:
+        return f"sisa waktu {sisa:.0f}s kurang dari {_MIN_SISA_SINTESIS_AUTO_S:.0f}s"
+    if llm_client.baru_kena_rate_limit():
+        return "Groq baru saja membatasi laju (429)"
+    return None
+
+
 def _poin_batas_waktu(poin: PoinKonteks) -> tuple[PoinOutput, DiagnosaPoin]:
     diagnosa = DiagnosaPoin(
         poin_id=poin.poin_id, berhasil=False,
@@ -331,6 +361,10 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
                       catatan_diag: dict | None = None) -> KesimpulanOutput:
     """SATU panggilan LLM (bukan retry loop) — gagal atau melanggar aturan angka -> fallback
     deterministik dari saran per-poin."""
+    if (alasan := _alasan_lewati_sintesis()) is not None:
+        if catatan_diag is not None:
+            catatan_diag["kesimpulan"] = f"dilewati: {alasan}"
+        return _rakit_kesimpulan_fallback(poin_list)
     try:
         batas_waktu.periksa(_MIN_SISA_SINTESIS_S, "sintesis kesimpulan")
         prompt = build_kesimpulan_prompt(poin_list, rekomendasi_sistem)
@@ -385,6 +419,10 @@ def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: s
     berdasar rekomendasi_sistem per-poin (paragraf 1: ITBX+Intensitas, paragraf 2: Dampak Terhadap
     Lingkungan/Hidrologi). Gagal/melanggar aturan angka -> fallback deterministik dari saran per-poin
     (pola identik `_rakit_kesimpulan` di atas — jaga konsistensi 2 panggilan sintesis ini)."""
+    if (alasan := _alasan_lewati_sintesis()) is not None:
+        if catatan_diag is not None:
+            catatan_diag["narasi"] = f"dilewati: {alasan}"
+        return _rakit_narasi_rekomendasi_fallback(poin_list)
     try:
         batas_waktu.periksa(_MIN_SISA_SINTESIS_S, "sintesis narasi")
         prompt = build_narasi_rekomendasi_prompt(poin_list, rekomendasi_sistem)
@@ -514,8 +552,8 @@ def _jalankan_precheck_inti(assessment: L2Assessment, retriever: Retriever) -> O
 
     # Konteks (anggaran waktu) disalin per thread: ContextVar tidak otomatis ikut ke thread pool.
     futures = [
-        _executor.submit(contextvars.copy_context().run, _generate_poin_defensif, poin, retriever, assessment)
-        for poin in hasil_adaptasi.poin
+        _executor.submit(_konteks_dgn_pin(i).run, _generate_poin_defensif, poin, retriever, assessment)
+        for i, poin in enumerate(hasil_adaptasi.poin)
     ]
     hasil_poin = []
     for f, poin in zip(futures, hasil_adaptasi.poin):  # urutan submit == urutan hasil (itbx, intensitas, dampak)

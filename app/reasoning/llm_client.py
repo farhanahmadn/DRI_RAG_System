@@ -17,6 +17,7 @@ demo bergantian menyerap beban — BUKAN solusi produksi jangka panjang, cuma je
 langganan resmi (lihat docs/STATUS.md).
 """
 
+import contextvars
 import json
 import logging
 import os
@@ -163,12 +164,21 @@ class _RotasiKunciGroq:
                     return kandidat
         return None
 
-    def kunci_awal(self) -> int:
+    def kunci_awal(self, pin: int | None = None) -> int:
         """Index kunci AWAL utk satu panggilan generate() baru — round-robin (increment atomik),
         BUKAN selalu kunci pertama. Kunci yang sedang dikarantina dilewati; kalau SEMUA mati, langsung
-        gagal dgn pesan jelas (tanpa membuang satu round-trip pun)."""
+        gagal dgn pesan jelas (tanpa membuang satu round-trip pun).
+
+        `pin` (opsional): tiap poin dipetakan ke kunci tetap (pin % jumlah_kunci), dan bila kunci itu
+        sedang dikarantina maju ke kunci tersedia berikutnya. Kunci Groq di sini berasal dari organisasi
+        berbeda (masing-masing 8K TPM), jadi tiga poin paralel di tiga kunci tidak berebut kuota yang sama."""
         with self._lock:
             n = len(self._keys)
+            if pin is not None:
+                for langkah in range(n):
+                    idx = (pin + langkah) % n
+                    if self._tersedia_nolock(idx):
+                        return idx
             for _ in range(n):
                 idx = self._counter % n
                 self._counter += 1
@@ -195,6 +205,20 @@ class _RotasiKunciGroq:
 
 
 _rotator: _RotasiKunciGroq | None = None
+
+# Pin kunci per poin (diatur assemble.py per thread poin lewat ContextVar), lihat kunci_awal(pin=...).
+_pin_kunci: contextvars.ContextVar[int | None] = contextvars.ContextVar("pin_kunci_llm", default=None)
+_waktu_rate_limit_terakhir = 0.0
+
+
+def _catat_rate_limit() -> None:
+    global _waktu_rate_limit_terakhir
+    _waktu_rate_limit_terakhir = time.monotonic()
+
+
+def baru_kena_rate_limit(dalam_detik: float = 30.0) -> bool:
+    """True bila ada 429 dalam `dalam_detik` terakhir (jendela token menit masih terisi)."""
+    return _waktu_rate_limit_terakhir > 0 and (time.monotonic() - _waktu_rate_limit_terakhir) < dalam_detik
 
 
 def _get_rotator() -> _RotasiKunciGroq:
@@ -388,7 +412,7 @@ def _generate_tanpa_antre(
         # ditangani reaktif spt sebelumnya: TPM/RPM -> tunggu+ulang KUNCI SAMA; TPD/RPD -> lompat
         # SEGERA ke kunci berikutnya (idx lokal, tak perlu koordinasi lintas-thread — tiap
         # panggilan generate() punya jalur/kunci sendiri sejak kunci_awal()).
-        idx = rotator.kunci_awal()
+        idx = rotator.kunci_awal(_pin_kunci.get())
         tunggu_di_kunci_ini = 0
         kunci_berbeda_dicoba = 1
         sudah_eskalasi_token = False
@@ -422,6 +446,7 @@ def _generate_tanpa_antre(
                 max_tokens = _MAKS_TOKEN_EKSKALASI
                 continue
             except RateLimitError as exc:
+                _catat_rate_limit()
                 jenis = _klasifikasi_rate_limit(str(exc))
                 pindah_kunci = False
                 if jenis == "tpd":
