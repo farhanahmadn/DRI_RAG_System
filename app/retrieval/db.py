@@ -37,7 +37,10 @@ def connect(dsn: str | None = None):
     dsn = dsn or os.getenv("DATABASE_URL")
     if not dsn:
         raise RuntimeError("DATABASE_URL belum diset")
-    conn = psycopg.connect(dsn)
+    # Tanpa connect_timeout, host DB yang tak terjangkau menggantung sampai batas OS (menit) dan melewati
+    # anggaran waktu permintaan (hasil uji 2026-10-17: 151 dtk saat Postgres mati). Gagal cepat agar
+    # poin jatuh ke fallback `retrieval_db_gagal` dalam hitungan detik.
+    conn = psycopg.connect(dsn, connect_timeout=int(os.getenv("DB_CONNECT_TIMEOUT_S", "5")))
     register_vector(conn)
     return conn
 

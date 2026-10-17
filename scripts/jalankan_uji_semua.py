@@ -12,6 +12,7 @@ Butuh: Postgres menyala (RETRIEVER=asli), kunci Groq dan Jina sehat (cek: python
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from datetime import date
@@ -39,7 +40,8 @@ def main() -> None:
     keluar.mkdir(parents=True, exist_ok=True)
     retriever = get_retriever()
     ringkasan = []
-    for berkas in URUTAN:
+    saring = os.getenv("UJI_FILTER", "")  # potongan nama berkas; kosong = semua
+    for berkas in [b for b in URUTAN if saring in b.name]:
         envelope = L2Envelope.model_validate(json.loads(berkas.read_text(encoding="utf-8")))
         nomor = envelope.data.application_number
         mulai = time.perf_counter()
