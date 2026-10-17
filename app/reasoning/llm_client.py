@@ -485,11 +485,11 @@ def _generate_tanpa_antre(
 
 # Antrean panggilan LLM per-poin: tiga poin yang berangkat bersamaan membawa >10K token dalam hitungan
 # detik, padahal Groq free tier membatasi 8K token/menit per ORGANISASI (hasil uji nyata 2026-10-16:
-# ratusan 429). Default 1 = poin diproses satu per satu (retrieval tetap paralel). Naikkan lewat
+# ratusan 429). Default 3 = semua poin paralel. Uji nyata 2026-10-17 (9 payload): berurutan (1) lebih buruk: 16 poin fallback vs 7, karena latensi panggilan reasoning tak muat di anggaran 85 dtk. Naikkan lewat
 # LLM_MAX_CONCURRENT bila akun berbayar. Sintesis (narasi/kesimpulan) tidak diantre: ia baru jalan setelah
 # semua poin selesai dan kecil.
 _SKEMA_SINTESIS = frozenset({"kesimpulan", "narasi_rekomendasi"})
-_antrean_llm = threading.BoundedSemaphore(max(1, int(os.getenv("LLM_MAX_CONCURRENT", "1"))))
+_antrean_llm = threading.BoundedSemaphore(max(1, int(os.getenv("LLM_MAX_CONCURRENT", "3"))))
 
 
 def generate(prompt: str, json_schema: dict, **kwargs) -> dict:
