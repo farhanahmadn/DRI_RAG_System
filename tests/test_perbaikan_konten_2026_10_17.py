@@ -84,6 +84,7 @@ def test_panggilan_llm_poin_berurutan(monkeypatch):
         return {}
 
     monkeypatch.setattr(llm_client, "_generate_tanpa_antre", palsu)
+    monkeypatch.setattr(llm_client, "_antrean_llm", threading.BoundedSemaphore(1))
     ts = [threading.Thread(target=llm_client.generate, args=("p", {}), kwargs={"schema_name": "poin"})
           for _ in range(4)]
     [t.start() for t in ts]
