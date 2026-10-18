@@ -166,3 +166,48 @@ class TestGuardrailBerhentiSaatLLMMati:
         d = DiagnosaPoin(poin_id="itbx", berhasil=False, percobaan=1)
         d.exception_terakhir = "LayananTidakTersediaError: Semua kunci Groq sedang dikarantina"
         assert d.sebab() == "llm_tidak_tersedia"
+
+
+def _tpm(detik: float = 40.0) -> RateLimitError:
+    pesan = (f"Rate limit reached for model x on tokens per minute (TPM): Limit 8000, Used 7500. "
+             f"Please try again in {detik}s.")
+    resp = httpx.Response(429, request=httpx.Request("POST", "https://api.groq.com/x"), json={"error": {"message": pesan}})
+    return RateLimitError(message=pesan, response=resp, body=None)
+
+
+class TestPindahKunciSaatTpm:
+    def test_tpm_panjang_pindah_ke_kunci_longgar_tanpa_tidur(self, rotator_tiga_kunci, monkeypatch):
+        dipakai, tidur = [], []
+
+        def _stub(client, messages, json_schema, schema_name, temperature, max_tokens):
+            dipakai.append(client.api_key)
+            if client.api_key == "k0":
+                raise _tpm(40.0)
+            return _Completion()
+
+        monkeypatch.setattr(lc, "_panggil_llm_sekali", _stub)
+        monkeypatch.setattr(lc.time, "sleep", lambda d: tidur.append(d))
+        assert lc.generate("p", {"type": "object"}, schema_name="t") == {"ok": True}
+        assert dipakai == ["k0", "k1"] and tidur == []
+        # k0 kini dingin: panggilan berikutnya yang dipin ke k0 langsung memilih kunci longgar.
+        dipakai.clear()
+        token = lc._pin_kunci.set(0)
+        try:
+            lc.generate("p", {"type": "object"}, schema_name="t")
+        finally:
+            lc._pin_kunci.reset(token)
+        assert dipakai == ["k1"]
+
+    def test_tpm_pendek_tetap_menunggu(self, rotator_tiga_kunci, monkeypatch):
+        dipakai, tidur = [], []
+
+        def _stub(client, messages, json_schema, schema_name, temperature, max_tokens):
+            dipakai.append(client.api_key)
+            if len(dipakai) == 1:
+                raise _tpm(1.5)
+            return _Completion()
+
+        monkeypatch.setattr(lc, "_panggil_llm_sekali", _stub)
+        monkeypatch.setattr(lc.time, "sleep", lambda d: tidur.append(d))
+        lc.generate("p", {"type": "object"}, schema_name="t")
+        assert dipakai == ["k0", "k0"] and len(tidur) == 1

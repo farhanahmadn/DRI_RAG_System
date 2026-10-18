@@ -135,6 +135,7 @@ class _RotasiKunciGroq:
         self._lock = threading.Lock()
         self._clients: dict[int, OpenAI] = {}
         self._karantina: dict[int, float] = {}  # index kunci -> waktu monotonic karantina berakhir
+        self._dingin_tpm: dict[int, float] = {}  # index kunci -> waktu monotonic jendela token menit pulih
 
     def jumlah_kunci(self) -> int:
         return len(self._keys)
@@ -156,6 +157,18 @@ class _RotasiKunciGroq:
         if baru:
             logger.warning("Kunci Groq index %d dikarantina %.0f detik (alasan: %s)", idx, detik, alasan)
 
+    def tandai_tpm(self, idx: int, detik: float) -> None:
+        """Kunci ini baru kena batas token/menit: hindari dulu bila ada kunci lain yang longgar."""
+        with self._lock:
+            self._dingin_tpm[idx % len(self._keys)] = time.monotonic() + max(detik, 0.0)
+
+    def _longgar_nolock(self, idx: int) -> bool:
+        return self._tersedia_nolock(idx) and time.monotonic() >= self._dingin_tpm.get(idx, 0.0)
+
+    def longgar(self, idx: int) -> bool:
+        with self._lock:
+            return self._longgar_nolock(idx)
+
     def jumlah_tersedia(self) -> int:
         with self._lock:
             return sum(1 for i in range(len(self._keys)) if self._tersedia_nolock(i))
@@ -164,6 +177,10 @@ class _RotasiKunciGroq:
         """Kunci tersedia berikutnya SESUDAH `idx` (melingkar, tidak termasuk `idx`), atau None."""
         n = len(self._keys)
         with self._lock:
+            for langkah in range(1, n):
+                kandidat = (idx + langkah) % n
+                if self._longgar_nolock(kandidat):
+                    return kandidat
             for langkah in range(1, n):
                 kandidat = (idx + langkah) % n
                 if self._tersedia_nolock(kandidat):
@@ -181,6 +198,10 @@ class _RotasiKunciGroq:
         with self._lock:
             n = len(self._keys)
             if pin is not None:
+                for langkah in range(n):
+                    idx = (pin + langkah) % n
+                    if self._longgar_nolock(idx):
+                        return idx
                 for langkah in range(n):
                     idx = (pin + langkah) % n
                     if self._tersedia_nolock(idx):
@@ -278,6 +299,8 @@ def _org_dibatasi(exc: Exception) -> bool:
 
 # Sisa anggaran minimum (detik) agar satu panggilan LLM masih layak dimulai.
 _MIN_SISA_PANGGILAN_S = 5.0
+# Batas tunggu TPM (detik) di atas mana panggilan pindah ke kunci lain yang longgar alih-alih menunggu.
+_AMBANG_PINDAH_TPM_S = float(os.getenv("GROQ_AMBANG_PINDAH_TPM_S", "3"))
 
 
 def _batasi_client(client: OpenAI) -> OpenAI:
@@ -464,10 +487,19 @@ def _generate_tanpa_antre(
                     # dulu di kunci yang sama; pindah kunci HANYA sbg upaya terakhir kalau sudah
                     # nunggu berkali-kali tanpa membaik.
                     tunggu_di_kunci_ini += 1
-                    if tunggu_di_kunci_ini > _MAKS_TUNGGU_PER_KUNCI:
+                    detik = _ekstrak_tunggu_detik(str(exc))
+                    rotator.tandai_tpm(idx, detik)
+                    # Kunci Groq di sini dari organisasi berbeda (kuota token/menit terpisah): bila ada kunci
+                    # lain yang longgar, pindah SEKARANG daripada menunggu puluhan detik di kunci yang penuh
+                    # (hasil uji 2026-10-18: ITBX gugur karena menunggu 40-50 dtk padahal kunci lain menganggur).
+                    kandidat = rotator.kunci_berikutnya(idx)
+                    if (detik > _AMBANG_PINDAH_TPM_S and kandidat is not None
+                            and kunci_berbeda_dicoba < rotator.jumlah_kunci()
+                            and rotator.longgar(kandidat)):
+                        pindah_kunci = True
+                    elif tunggu_di_kunci_ini > _MAKS_TUNGGU_PER_KUNCI:
                         pindah_kunci = True
                     else:
-                        detik = _ekstrak_tunggu_detik(str(exc))
                         logger.warning(
                             "Rate limit TPM/RPM (kunci index %d) — tunggu %.1fs lalu ulang (percobaan %d/%d): %s",
                             idx, detik, tunggu_di_kunci_ini, _MAKS_TUNGGU_PER_KUNCI, exc,
