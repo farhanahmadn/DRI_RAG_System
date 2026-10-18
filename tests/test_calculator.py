@@ -554,11 +554,13 @@ class TestMitigasiTinggiResapanVsNonResapan:
                 "saran": "... atau menyediakan fasilitas sumur/kolam resapan air hujan ..."},
         )
 
-    def test_saran_be_diteruskan_apa_adanya_untuk_semua_status(self):
-        for status in (True, False, None):
+    def test_sumur_tidak_diteruskan_untuk_non_resapan(self):
+        for status in (True, None):
             hasil = hitung_target_mitigasi_dampak(self._impact(), status)
-            assert "sumur/kolam resapan" in hasil["saran_be"]
-            assert "tampungan" not in hasil["saran_be"]
+            assert "sumur/kolam resapan" in hasil["saran_be"] and "dimensi_minimum_resapan" in hasil
+        bukan = hitung_target_mitigasi_dampak(self._impact(), False)
+        assert "saran_be" not in bukan and "dimensi_minimum_resapan" not in bukan
+        assert bukan["penyesuaian_lahan"]["luas_bangunan_maks_m2"] == 1077.0
 
     def test_langkah_sumur_hanya_di_kawasan_resapan_dan_wajib(self):
         """Aturan PM 2026-10-18: Tinggi-resapan = KDB/KDH wajib + sumur wajib. Tinggi-non-resapan = KDB/KDH wajib, tanpa sumur."""

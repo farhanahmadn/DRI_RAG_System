@@ -250,10 +250,13 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment, kawasan_resapan: boo
             if breakdown.get("kdh_usulan_persen") is not None:
                 hasil["kdh_usulan_persen"] = _bulat2(breakdown["kdh_usulan_persen"])
         dimensi = rekom.get("dimensi_minimum")
-        if dimensi:
+        # Aturan PM 2026-10-18: di luar kawasan resapan, dampak Tinggi dimitigasi hanya dengan KDB turun dan
+        # KDH/RTH naik. Dimensi sumur dan kalimat BE yang menyebut sumur TIDAK diteruskan ke prompt,
+        # supaya LLM tidak memunculkannya di narasi.
+        if dimensi and kawasan_resapan is not False:
             hasil["dimensi_minimum_resapan"] = dimensi
         saran_be = rekom.get("saran")
-        if saran_be:
+        if saran_be and not (kawasan_resapan is False and penyesuaian):
             hasil["saran_be"] = saran_be
         # Status resapan HANYA mengubah kerangka hukum penyajian (wajib vs rekomendasi), BUKAN
         # jenis fasilitas: RDTR Pasal 53 mewajibkan sumur/kolam resapan di kawasan resapan, dan
