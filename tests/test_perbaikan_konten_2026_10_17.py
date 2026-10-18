@@ -209,7 +209,9 @@ class TestFallbackDeterministik:
 def test_reasoning_effort_dari_env(monkeypatch):
     from app.reasoning import llm_client as lc
     monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
-    assert lc._kwargs_penalaran() == {}
+    assert lc._kwargs_penalaran() == {"reasoning_effort": "low"}  # bawaan
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "")
+    assert lc._kwargs_penalaran() == {}  # dikosongkan = bawaan model
     monkeypatch.setenv("LLM_REASONING_EFFORT", "Low")
     assert lc._kwargs_penalaran() == {"reasoning_effort": "low"}
     monkeypatch.setenv("LLM_REASONING_EFFORT", "ngawur")

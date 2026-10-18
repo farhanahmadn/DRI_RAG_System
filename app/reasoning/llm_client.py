@@ -318,10 +318,10 @@ _TINGKAT_PENALARAN = ("low", "medium", "high")
 
 
 def _kwargs_penalaran() -> dict:
-    """`reasoning_effort` untuk model reasoning (gpt-oss). Kosong = bawaan model. Uji 2026-10-19: "low"
+    """`reasoning_effort` untuk model reasoning (gpt-oss). Bawaan "low" (uji A/B 2026-10-19: fallback 2 vs 3 dari 6 poin, durasi sama atau lebih cepat); kosongkan variabel ini untuk memakai bawaan model. Uji 2026-10-19: "low"
     memangkas token penalaran sekitar 25x dan waktu sekitar 3x pada tugas menulis sederhana, sementara token
     keluaran ikut menghabiskan kuota token/menit Groq."""
-    nilai = os.getenv("LLM_REASONING_EFFORT", "").strip().lower()
+    nilai = os.getenv("LLM_REASONING_EFFORT", "low").strip().lower()
     return {"reasoning_effort": nilai} if nilai in _TINGKAT_PENALARAN else {}
 
 
