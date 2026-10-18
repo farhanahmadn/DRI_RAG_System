@@ -91,7 +91,9 @@ _RE_COBA_LAGI_DETIK = re.compile(r"try again in ([\d.]+)\s*s", re.IGNORECASE)
 def _muat_daftar_kunci() -> list[str]:
     """GROQ_API_KEYS (comma-separated, utk rotasi) diprioritaskan; fallback ke GROQ_API_KEY
     tunggal (perilaku lama, tetap didukung penuh — array isi 1 elemen secara efektif)."""
-    jamak = os.getenv("GROQ_API_KEYS")
+    # GROQ_API_KEYS_OVERRIDE: pengganti SEMENTARA lewat variabel proses (mis. uji dengan kunci lain), karena
+    # GROQ_API_KEYS dipaksa dari .env di atas. Tidak pernah ditulis ke berkas.
+    jamak = os.getenv("GROQ_API_KEYS_OVERRIDE") or os.getenv("GROQ_API_KEYS")
     if jamak:
         kunci = [k.strip() for k in jamak.split(",") if k.strip()]
         # GROQ_KEY_INDEXES="3" atau "2,3": pakai hanya kunci pada urutan itu (mis. uji dengan kunci baru
