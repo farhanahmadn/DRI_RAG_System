@@ -98,7 +98,7 @@ class TestPromptDanTeksPasal53:
         p = PoinKonteks(poin_id="dampak", kategori="D", tipe_rekomendasi="numerik-mitigasi", status="Tinggi",
                         fakta={"dinilai": True}, kawasan_resapan=True)
         teks = "\n".join(_bangun_fakta_dampak(p))
-        assert "LAHAN TERBANGUN YANG SUDAH ADA" in teks and "BUKAN sebagai syarat pengembangan baru" in teks
+        assert "LAHAN TERBANGUN YANG SUDAH ADA" in teks and "JANGAN menyebut huruf d sebagai dasar kewajiban" in teks
 
     def test_langkah_pemeliharaan_resapan_menyebut_zero_delta_q_dan_lahan_eksisting(self):
         from app.reasoning.calculator import bangun_langkah_dampak_poin

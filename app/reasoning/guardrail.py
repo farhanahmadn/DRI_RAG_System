@@ -1020,6 +1020,19 @@ def _cek_klaim_dampak_tanpa_dasar(poin_output: PoinOutput, poin: PoinKonteks) ->
     return masalah[:2]
 
 
+def _cek_sumur_dampak_tinggi_non_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
+    """Aturan PM 2026-10-18: dampak Tinggi/Sangat Tinggi di LUAR kawasan resapan hanya dimitigasi dengan
+    menurunkan KDB dan menaikkan KDH/RTH. Sumur/kolam resapan tak disebut sama sekali (saran dan langkah
+    konkret sudah deterministik, jadi yang dicek hanya narasi LLM)."""
+    if poin.poin_id != "dampak" or poin.kawasan_resapan is not False or poin.status not in ("Tinggi", "Sangat Tinggi"):
+        return []
+    teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang}"
+    if _RE_FASILITAS_RESAPAN.search(teks):
+        return ["narasi dampak Tinggi di luar kawasan resapan menyebut sumur/kolam resapan, padahal mitigasinya "
+                "hanya menurunkan KDB dan menaikkan KDH/RTH. Hapus semua penyebutan sumur atau kolam resapan."]
+    return []
+
+
 def _cek_saran_dampak_tanpa_tindakan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
     """Permintaan user 2026-10-14: dampak yang dinilai (termasuk Rendah) WAJIB tetap punya saran
     pencegahan/pemeliharaan konkret, bukan "tidak diperlukan tindakan"."""
@@ -1139,6 +1152,7 @@ def perbaiki_poin(
     masalah.extend(_cek_saran_dampak_tanpa_tindakan(poin_bersih, poin))
     masalah.extend(_cek_klaim_resapan(poin_bersih, poin))
     masalah.extend(_cek_klaim_dampak_tanpa_dasar(poin_bersih, poin))
+    masalah.extend(_cek_sumur_dampak_tinggi_non_resapan(poin_bersih, poin))
     masalah.extend(_cek_persen_intensitas_di_dampak(poin_bersih, poin))
     masalah.extend(_cek_penjelasan_dampak(poin_bersih, poin))
     masalah.extend(_cek_syarat_kelompok_lain(poin_bersih, poin))

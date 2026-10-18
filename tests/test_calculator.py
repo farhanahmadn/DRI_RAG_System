@@ -560,17 +560,29 @@ class TestMitigasiTinggiResapanVsNonResapan:
             assert "sumur/kolam resapan" in hasil["saran_be"]
             assert "tampungan" not in hasil["saran_be"]
 
-    def test_langkah_dimensi_sama_parameter_beda_kerangka(self):
-        def _dim(status):
-            langkah = bangun_langkah_konkret_dampak(hitung_target_mitigasi_dampak(self._impact(), status))
-            return langkah[-1]
-        for status in (True, False, None):
-            assert _dim(status)["parameter"] == "Dimensi Minimum Sumur Resapan"
-            assert _dim(status)["nilai_target"] == 0.62
-        assert "sejalan dengan ketentuan khusus kawasan resapan air" in _dim(True)["deskripsi"]
-        assert "bukan kewajiban" in _dim(False)["deskripsi"]
-        assert "Alternatif" in _dim(None)["deskripsi"]
+    def test_langkah_sumur_hanya_di_kawasan_resapan_dan_wajib(self):
+        """Aturan PM 2026-10-18: Tinggi-resapan = KDB/KDH wajib + sumur wajib. Tinggi-non-resapan = KDB/KDH wajib, tanpa sumur."""
+        def _langkah(status):
+            return bangun_langkah_konkret_dampak(hitung_target_mitigasi_dampak(self._impact(), status))
+        resapan, bukan, tak_tahu = _langkah(True), _langkah(False), _langkah(None)
+        assert [x["parameter"] for x in resapan] == ["Luas Bangunan (Atap)", "Luas RTH", "Dimensi Minimum Sumur Resapan"]
+        assert resapan[0]["deskripsi"].startswith("Wajib menurunkan")
+        assert resapan[1]["deskripsi"].startswith("Wajib meningkatkan")
+        assert resapan[2]["deskripsi"].startswith("Wajib menyediakan sumur") and "zero delta Q" in resapan[2]["deskripsi"]
+        assert [x["parameter"] for x in bukan] == ["Luas Bangunan (Atap)", "Luas RTH"]
+        assert "Alternatif" in tak_tahu[-1]["deskripsi"]
 
-    def test_arah_mitigasi_tinggi_selalu_sumur_resapan(self):
-        for status in (True, False, None):
+    def test_saran_pm_resapan_dan_non_resapan(self):
+        from app.reasoning.calculator import bangun_saran_mitigasi_dampak
+        resapan = bangun_saran_mitigasi_dampak(hitung_target_mitigasi_dampak(self._impact(), True), True)
+        bukan = bangun_saran_mitigasi_dampak(hitung_target_mitigasi_dampak(self._impact(), False), False)
+        assert resapan.startswith("1. Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m²")
+        assert "2. Wajib memastikan air hujan tidak melimpas" in resapan and "0.62 m³" in resapan.replace(",", ".")
+        assert " atau menyediakan fasilitas sumur" not in resapan
+        assert "sumur" not in bukan and "zero delta Q" not in bukan and "\n2." not in bukan
+        assert bangun_saran_mitigasi_dampak(hitung_target_mitigasi_dampak(self._impact(), None), None) is None
+
+    def test_arah_mitigasi_tinggi_sumur_hanya_bila_bukan_non_resapan(self):
+        for status in (True, None):
             assert "sumur resapan" in sarankan_arah_mitigasi_dampak(self._impact(), status)["arah"]
+        assert "sumur resapan" not in sarankan_arah_mitigasi_dampak(self._impact(), False)["arah"]

@@ -145,3 +145,36 @@ class TestPinKunciDanSintesisAuto:
         llm_client._catat_rate_limit()
         assert assemble._alasan_lewati_sintesis() is None
         monkeypatch.setattr(llm_client, "_waktu_rate_limit_terakhir", 0.0)
+
+
+class TestAturanPM:
+    def test_sumur_di_dampak_tinggi_non_resapan_ditolak(self):
+        from app.reasoning.guardrail import _cek_sumur_dampak_tinggi_non_resapan
+        poin = PoinKonteks(poin_id="dampak", kategori="K", tipe_rekomendasi="numerik-mitigasi",
+                           status="Tinggi", fakta={}, kawasan_resapan=False)
+        assert _cek_sumur_dampak_tinggi_non_resapan(_out("dampak", "s", "Sediakan sumur resapan."), poin)
+        assert not _cek_sumur_dampak_tinggi_non_resapan(_out("dampak", "s", "Turunkan KDB."), poin)
+        resapan = poin.model_copy(update={"kawasan_resapan": True})
+        assert not _cek_sumur_dampak_tinggi_non_resapan(_out("dampak", "s", "Sediakan sumur resapan."), resapan)
+        rendah = poin.model_copy(update={"status": "Rendah"})
+        assert not _cek_sumur_dampak_tinggi_non_resapan(_out("dampak", "s", "Sediakan sumur resapan."), rendah)
+
+    def test_arah_mitigasi_tanpa_sumur_di_non_resapan(self):
+        from app.schemas import ImpactAssessment
+        i = ImpactAssessment(dinilai=True, impact_category="TINGGI", runoff_change_index=2.7)
+        assert "sumur resapan" not in sarankan_arah_mitigasi_dampak(i, False)["arah"]
+        assert "sumur resapan" in sarankan_arah_mitigasi_dampak(i, True)["arah"]
+
+    def test_sitasi_dampak_dilengkapi_deterministik(self):
+        from app.reasoning.generator import _lengkapi_sitasi_dampak
+        from app.retrieval.base import Chunk
+        c53 = Chunk(id="rdtr-sleman-tengah-p53-a3", level="ayat", dokumen="Perbup", pasal="53", teks="zero delta Q")
+        cvi = Chunk(id="rdtr-sleman-tengah-vi-r-3", level="tabel", dokumen="Perbup", pasal="", teks="KDB")
+        peta = {c53.id: c53, cvi.id: cvi}
+        resapan = PoinKonteks(poin_id="dampak", kategori="K", tipe_rekomendasi="numerik-mitigasi",
+                              status="Tinggi", fakta={}, kawasan_resapan=True)
+        assert [x.citation_id for x in _lengkapi_sitasi_dampak([], resapan, peta)] == [c53.id]
+        bukan = resapan.model_copy(update={"kawasan_resapan": False, "fakta": {"target_mitigasi": {"a": 1}}})
+        assert [x.citation_id for x in _lengkapi_sitasi_dampak([], bukan, peta)] == [cvi.id]
+        rendah_bukan = bukan.model_copy(update={"fakta": {}})
+        assert _lengkapi_sitasi_dampak([], rendah_bukan, peta) == []

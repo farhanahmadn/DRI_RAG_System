@@ -39,7 +39,7 @@ ATURAN WAJIB:
 21. ITBX HANYA SOAL KLASIFIKASI KEGIATAN: DILARANG membahas KDB, KLB, KDH, atau ambang intensitas di poin ITBX.
 22. SYARAT BERSYARAT BELUM TERBUKTI TERPENUHI: untuk status B/T/TB, syarat adalah kewajiban yang HARUS dipenuhi dan data TIDAK memuat bukti syarat sudah terpenuhi. DILARANG menulis 'sudah/telah memenuhi', 'memenuhi syarat luas', atau 'diloloskan otomatis'. Keputusan ada pada petugas.
 23. JANGAN MENAMBAH KEWAJIBAN ADMINISTRATIF: DILARANG menambah kewajiban dokumen, perhitungan, atau berkas, dan DILARANG menyuruh 'menambah blok'. Saran hanya mengulang syarat yang tertulis di fakta.
-24. HANYA YANG ADA DI FAKTA: DILARANG membuat klaim sebab-akibat atau teknis yang tidak tertulis di fakta (mis. koefisien limpasan berbeda antar jenis bangunan, perilaku tanah), DILARANG menyebut Pasal 53 ayat (3) huruf d sebagai kewajiban bangunan baru (huruf d untuk lahan terbangun yang sudah ada), dan di poin dampak DILARANG menyatakan pemohon sudah memenuhi syarat kawasan resapan. Jangan menulis istilah dalam kurung seperti "(proporsi tapak/bangunan)".
+24. HANYA YANG ADA DI FAKTA: DILARANG membuat klaim sebab-akibat atau teknis yang tidak tertulis di fakta (mis. koefisien limpasan berbeda antar jenis bangunan, perilaku tanah), DILARANG menyebut Pasal 53 ayat (3) huruf d sebagai dasar kewajiban bangunan baru (huruf d untuk lahan terbangun yang sudah ada, kewajiban bangunan baru adalah zero delta Q pada huruf a), dan di poin dampak DILARANG menyatakan pemohon sudah memenuhi syarat kawasan resapan. Jangan menulis istilah dalam kurung seperti "(proporsi tapak/bangunan)".
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
@@ -435,10 +435,13 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "\nKAWASAN_RESAPAN_AIR: YA. Lokasi berada di kawasan resapan air, jadi ketentuan khusus "
             "kawasan resapan air berlaku. Untuk PENGEMBANGAN BARU (permohonan ini) kewajibannya adalah "
             "memastikan air tidak melimpas (zero delta Q), tidak merusak fungsi resapan, dan tidak "
-            "mencemari air. Penyediaan sumur atau kolam resapan diwajibkan pada LAHAN TERBANGUN YANG SUDAH "
-            "ADA (Pasal 53 ayat 3 huruf d), BUKAN sebagai syarat pengembangan baru: untuk permohonan ini "
-            "tulis sumur atau kolam resapan sebagai langkah yang mendukung zero delta Q. Jelaskan ketentuan "
-            "ini di reasoning dan kaitkan dengan saran, rujuk pasalnya dengan bahasa manusia."
+            "mencemari air (Pasal 53 ayat 3 huruf a sampai c). Sumur atau kolam resapan adalah SARANA "
+            "memenuhi zero delta Q itu. Teks Pasal 53 ayat 3 huruf d sendiri mewajibkan sumur atau kolam "
+            "pada LAHAN TERBANGUN YANG SUDAH ADA, jadi JANGAN menyebut huruf d sebagai dasar kewajiban "
+            "bangunan baru. Untuk dampak Tinggi, tulis sumur atau kolam resapan sebagai kewajiban untuk "
+            "memenuhi zero delta Q (ketentuan khusus kawasan resapan air), dan menurunkan KDB serta "
+            "menaikkan KDH/RTH sebagai kewajiban. Jelaskan ketentuan ini di reasoning dan kaitkan dengan "
+            "saran, rujuk pasalnya dengan bahasa manusia."
         )
     elif poin.kawasan_resapan is False:
         lines.append(
@@ -446,9 +449,11 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) sebagai ketentuan yang "
             "berlaku dan DILARANG menyatakan lokasi berada di kawasan atau zona resapan air. Anda BOLEH "
             "menulis SATU kalimat bahwa ketentuan khusus kawasan resapan air (Pasal 53) tidak berlaku "
-            "karena lokasi di luar kawasan resapan. Sumur atau kolam resapan BOLEH dan "
-            "dianjurkan sebagai opsi mitigasi (RDTR mendorong sumur resapan di area terbangun), tetapi "
-            "sebutkan sebagai rekomendasi, BUKAN kewajiban dari ketentuan kawasan resapan air. JANGAN "
+            "karena lokasi di luar kawasan resapan. Pada dampak Rendah atau Sedang, sumur atau kolam "
+            "resapan BOLEH dianjurkan sebagai praktik baik. Pada dampak Tinggi atau Sangat Tinggi, JANGAN "
+            "menyebut sumur atau kolam resapan sama sekali: mitigasinya adalah kewajiban menurunkan KDB "
+            "dan menaikkan KDH/RTH. Bila sumur disebut, sebutkan sebagai rekomendasi, BUKAN kewajiban dari "
+            "ketentuan kawasan resapan air. JANGAN "
             "memakai kata 'mengharuskan', 'wajib', atau 'menuntut' untuk sumur atau kolam resapan, dan "
             "JANGAN menyebut ketentuan RDTR mewajibkannya. Jangan menulis bahwa lokasi 'tidak dapat "
             "memanfaatkan' Pasal 53 (pasal itu bukan manfaat, ia hanya tidak berlaku di sini)."

@@ -94,6 +94,12 @@ def _muat_daftar_kunci() -> list[str]:
     jamak = os.getenv("GROQ_API_KEYS")
     if jamak:
         kunci = [k.strip() for k in jamak.split(",") if k.strip()]
+        # GROQ_KEY_INDEXES="3" atau "2,3": pakai hanya kunci pada urutan itu (mis. uji dengan kunci baru
+        # saat kuota harian kunci lain habis). Kosong = semua kunci.
+        pilih = os.getenv("GROQ_KEY_INDEXES", "").strip()
+        if pilih:
+            indeks = {int(i) for i in pilih.split(",") if i.strip().isdigit()}
+            kunci = [k for i, k in enumerate(kunci) if i in indeks]
         if kunci:
             return kunci
     tunggal = os.getenv("GROQ_API_KEY")

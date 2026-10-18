@@ -11,6 +11,7 @@ import logging
 from app.reasoning import llm_client
 from app.reasoning.calculator import (
     bangun_langkah_dampak_poin,
+    bangun_saran_mitigasi_dampak,
     pilih_target_dampak_poin,
     bangun_langkah_konkret_intensitas,
     pilih_target_utama_intensitas,
@@ -61,6 +62,29 @@ def _saran_tidak_dinilai(poin: PoinKonteks) -> str:
     return _SARAN_TIDAK_DINILAI
 
 
+_ID_PASAL_53_AYAT_3 = "rdtr-sleman-tengah-p53-a3"
+
+
+def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict) -> list:
+    """Setiap luaran harus bersitasi (PM 2026-10-18), jangan bergantung pada LLM memilihnya.
+    - Kawasan resapan: Pasal 53 ayat (3) (zero delta Q huruf a, sumur/kolam huruf d).
+    - Bukan resapan dengan mitigasi: Lampiran VI (batas KDB/KDH), dasar langkah menurunkan KDB dan menaikkan KDH.
+    Hanya menambah chunk yang memang hasil retrieval, tak pernah mengarang."""
+    if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
+        return sitasi
+    ada = {x.citation_id for x in sitasi}
+    tambah = None
+    if poin.kawasan_resapan is True:
+        tambah = chunk_by_id.get(_ID_PASAL_53_AYAT_3)
+    elif poin.kawasan_resapan is False and (poin.fakta or {}).get("target_mitigasi"):
+        tambah = next((c for cid, c in chunk_by_id.items() if "-vi-" in cid), None)
+    if tambah is None or tambah.id in ada:
+        return sitasi
+    return [*sitasi, SitasiOutput(
+        citation_id=tambah.id, dokumen=tambah.dokumen, pasal=tambah.pasal or "",
+        halaman=tambah.halaman or 0, kutipan=tambah.teks, terverifikasi=True)]
+
+
 def _saran_mitigasi_dampak(poin: PoinKonteks) -> str | None:
     """APP-2026-8025/-5067: BE kini (kadang) kirim `impact_assessment.rekomendasi_mitigasi.saran` —
     narasi mitigasi SUDAH DIHITUNG PENUH (angka fisik m²/KDB%/KDH% konkret + dimensi sumur/kolam
@@ -77,6 +101,11 @@ def _saran_mitigasi_dampak(poin: PoinKonteks) -> str | None:
     if poin.poin_id != "dampak":
         return None
     target_mitigasi = (poin.fakta or {}).get("target_mitigasi") or {}
+    # Aturan PM 2026-10-18: saran dirakit dari angka BE (wajib, sumur hanya di kawasan resapan), bukan
+    # menyalin kalimat BE yang menulis sumur sebagai alternatif.
+    saran_pm = bangun_saran_mitigasi_dampak(target_mitigasi, poin.kawasan_resapan)
+    if saran_pm:
+        return saran_pm
     saran = target_mitigasi.get("saran_be") or None
     if saran and poin.kawasan_resapan is True:
         saran = (saran.rstrip() + " Lokasi berada di kawasan resapan air, sehingga ketentuan khusus "
@@ -578,6 +607,8 @@ def generate_poin(
                 terverifikasi=True,
             )
         )
+
+    sitasi = _lengkapi_sitasi_dampak(sitasi, poin, chunk_by_id)
 
     target: float | str | None = None
     # langkah_konkret (additive, 2026-08-18): SEMUA parameter yang melanggar sekaligus, dirakit
