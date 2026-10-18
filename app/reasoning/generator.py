@@ -100,6 +100,45 @@ def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict,
         halaman=tambah.halaman or 0, kutipan=tambah.teks, terverifikasi=True)]
 
 
+_MAKS_SYARAT_ITBX_DALAM_SARAN = 5
+_DAFTAR_PANJANG_ITBX = 8
+
+
+def saran_itbx_deterministik(poin: PoinKonteks) -> str | None:
+    """Saran ITBX bersyarat/terbatas dari kode, bukan LLM: syarat diambil VERBATIM dari
+    `keterangan_ketentuan` kegiatan pemohon. Hasil uji 2026-10-19: penolakan guardrail terbesar di ITBX adalah
+    saran yang meminjam syarat kelompok lain, mengarang kewajiban dokumen/bukti, atau menyatakan syarat
+    "sudah terpenuhi". Menyalin syarat apa adanya menutup ketiganya dan menghemat panggilan LLM.
+
+    Daftar pendek (sampai 8 item) dianggap sudah relevan dari BE. Daftar panjang (satu dokumen zona memuat
+    semua kelompok kegiatan) hanya diambil item yang berbagi kata kunci dengan kegiatan pemohon. Tidak ada
+    yang relevan -> None, dan saran tetap dari LLM seperti sebelumnya."""
+    if poin.poin_id != "itbx" or poin.status not in ("T", "B", "TB"):
+        return None
+    fakta = poin.fakta or {}
+    ketentuan = [str(x).strip() for x in (fakta.get("keterangan_ketentuan") or []) if str(x).strip()]
+    if not ketentuan:
+        return None
+    if len(ketentuan) > _DAFTAR_PANJANG_ITBX:
+        kata = _kata_kunci_itbx(fakta.get("kegiatan_diusulkan") or "")
+        ketentuan = [k for k in ketentuan if kata and kata & _kata_kunci_itbx(k)]
+        if not ketentuan:
+            return None
+    terpilih = ketentuan[:_MAKS_SYARAT_ITBX_DALAM_SARAN]
+    butir = []
+    for i, item in enumerate(terpilih, 1):
+        teks = item.replace(";", ",").rstrip()
+        if teks and teks[-1] not in ".!?":
+            teks += "."
+        butir.append(f"{i}. Syarat yang harus dipenuhi pemohon: {teks}")
+    return "\n".join(butir)
+
+
+def _kata_kunci_itbx(teks: str) -> set[str]:
+    from app.reasoning.prompts import _kata_kunci
+    return _kata_kunci(teks)
+
+
 def _saran_mitigasi_dampak(poin: PoinKonteks) -> str | None:
     """APP-2026-8025/-5067: BE kini (kadang) kirim `impact_assessment.rekomendasi_mitigasi.saran` —
     narasi mitigasi SUDAH DIHITUNG PENUH (angka fisik m²/KDB%/KDH% konkret + dimensi sumur/kolam
@@ -653,6 +692,9 @@ def generate_poin(
         target = None
         langkah_konkret = []
     else:
+        saran_itbx = saran_itbx_deterministik(poin)
+        if saran_itbx:
+            saran = saran_itbx
         saran_mitigasi = _saran_mitigasi_dampak(poin)
         if saran_mitigasi:
             # target/langkah_konkret SUDAH dirakit dari fakta['target_mitigasi'] di atas (yg,

@@ -186,6 +186,10 @@ def _bangun_fakta_itbx(poin: PoinKonteks) -> list[str]:
             lines.append("\nKeterangan Ketentuan (syarat yang berlaku, diurutkan berdasar relevansi ke kegiatan pemohon):")
             dipotong = terurut[:_MAKS_KETERANGAN_KETENTUAN]
             lines.extend(f"- {item}" for item in dipotong)
+            lines.append(
+                "Catatan: field saran untuk poin ini ditetapkan sistem dari syarat di atas. Isi saran dengan "
+                "satu kalimat pendek saja, lalu fokuskan reasoning pada alasan status dan syarat yang berlaku."
+            )
             if len(terurut) > _MAKS_KETERANGAN_KETENTUAN:
                 lines.append(
                     f"(dipotong dari {len(terurut)} item total — {_MAKS_KETERANGAN_KETENTUAN} item "

@@ -16,7 +16,7 @@ from app.reasoning.calculator import (
     bangun_langkah_konkret_intensitas,
     pilih_target_utama_intensitas,
 )
-from app.reasoning.generator import _saran_tidak_dinilai
+from app.reasoning.generator import _saran_tidak_dinilai, saran_itbx_deterministik
 from app.schemas import LangkahKonkretOutput, PoinKonteks, PoinOutput, RekomendasiOutput
 
 
@@ -91,6 +91,8 @@ def _saran_deterministik(poin: PoinKonteks, langkah: list[LangkahKonkretOutput])
     kalkulator/BE, jadi tidak perlu berhenti di "peninjauan manual". Dampak Tinggi memakai saran aturan PM
     (wajib, sumur hanya di kawasan resapan). Poin lain dengan langkah konkret memakai daftar bernomor dari
     deskripsi langkah. None bila tak ada langkah (mis. ITBX): tetap peninjauan manual."""
+    if poin.poin_id == "itbx":
+        return saran_itbx_deterministik(poin)
     if poin.poin_id == "dampak":
         saran = bangun_saran_mitigasi_dampak((poin.fakta or {}).get("target_mitigasi") or {}, poin.kawasan_resapan)
         if saran:

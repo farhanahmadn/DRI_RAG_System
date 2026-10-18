@@ -216,3 +216,39 @@ def test_reasoning_effort_dari_env(monkeypatch):
     assert lc._kwargs_penalaran() == {"reasoning_effort": "low"}
     monkeypatch.setenv("LLM_REASONING_EFFORT", "ngawur")
     assert lc._kwargs_penalaran() == {}
+
+
+class TestSaranItbxDeterministik:
+    def _itbx(self, status="B", **fakta):
+        return PoinKonteks(poin_id="itbx", kategori="K", tipe_rekomendasi="kategorikal", status=status, fakta=fakta)
+
+    def test_syarat_dikutip_verbatim_tanpa_titik_koma(self):
+        from app.reasoning.generator import saran_itbx_deterministik
+        p = self._itbx(keterangan_ketentuan=["Jam operasional dibatasi maksimal pukul 22.00.",
+                                             "Wajib mengelola limbah; dan sampah secara mandiri"])
+        saran = saran_itbx_deterministik(p)
+        assert saran.splitlines() == [
+            "1. Syarat yang harus dipenuhi pemohon: Jam operasional dibatasi maksimal pukul 22.00.",
+            "2. Syarat yang harus dipenuhi pemohon: Wajib mengelola limbah, dan sampah secara mandiri."]
+        assert ";" not in saran and "sudah memenuhi" not in saran.lower()
+
+    def test_status_selain_t_b_tb_atau_tanpa_syarat_tidak_deterministik(self):
+        from app.reasoning.generator import saran_itbx_deterministik
+        assert saran_itbx_deterministik(self._itbx("I", keterangan_ketentuan=["a"])) is None
+        assert saran_itbx_deterministik(self._itbx("B")) is None
+        assert saran_itbx_deterministik(self._itbx("B", keterangan_ketentuan=[])) is None
+
+    def test_daftar_panjang_hanya_item_relevan_dan_maksimal_lima(self):
+        from app.reasoning.generator import saran_itbx_deterministik
+        banyak = [f"Peternakan unggas item {i}" for i in range(12)] + [
+            "Penyediaan makan minum wajib dibatasi luas lantai penjualan 100 m2"]
+        p = self._itbx(keterangan_ketentuan=banyak, kegiatan_diusulkan="Penyediaan makan minum restoran")
+        saran = saran_itbx_deterministik(p)
+        assert saran.count("\n") == 0 and "makan minum" in saran.lower() and "peternakan" not in saran.lower()
+        tak_relevan = self._itbx(keterangan_ketentuan=banyak, kegiatan_diusulkan="Industri pengolahan logam")
+        assert saran_itbx_deterministik(tak_relevan) is None
+
+    def test_fallback_itbx_memakai_syarat_bila_ada(self):
+        from app.reasoning.templates import template_low_confidence
+        r = template_low_confidence(self._itbx(keterangan_ketentuan=["Hanya melayani masyarakat sekitar."]))
+        assert r.low_confidence and "Hanya melayani masyarakat sekitar." in r.rekomendasi.saran
