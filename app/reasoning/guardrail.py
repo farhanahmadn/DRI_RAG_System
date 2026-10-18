@@ -33,7 +33,7 @@ from app.reasoning.calculator import (
     bangun_langkah_konkret_intensitas,
     pilih_target_utama_intensitas,
 )
-from app.reasoning.generator import ambil_chunks_pendukung, apakah_aman, generate_poin
+from app.reasoning.generator import _lengkapi_sitasi_dampak, ambil_chunks_pendukung, apakah_aman, generate_poin
 from app.reasoning.llm_client import LayananTidakTersediaError
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Chunk, Retriever
@@ -1387,6 +1387,11 @@ def generate_poin_terdiagnosis(
                 logger.info(
                     "poin %r lolos guardrail di percobaan ke-%d/%d", poin.poin_id, percobaan + 1, max_retry + 1
                 )
+            # Sitasi tambahan yang pasti (Pasal 53(3) / Lampiran VI untuk dampak) ditambahkan SETELAH lolos
+            # validasi: validasi sitasi hanya menerima chunk dari konteks poin, sedangkan sitasi ini dicari
+            # terpisah lewat retriever (lihat generator._lengkapi_sitasi_dampak).
+            poin_bersih = poin_bersih.model_copy(update={"sitasi": _lengkapi_sitasi_dampak(
+                poin_bersih.sitasi, poin, {c.id: c for c in chunks}, retriever)})
             return poin_bersih, diagnosa
 
     logger.warning(
