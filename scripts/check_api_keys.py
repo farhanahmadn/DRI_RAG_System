@@ -86,8 +86,7 @@ def cek_jina() -> bool:
     kunci_list = muat_kunci_dari_env()
     print(f"=== Jina (embedding): {len(kunci_list)} kunci, dipakai berurutan (pindah saat habis) ===")
     if not kunci_list:
-        print("  JINA_API_KEYS/JINA_API_KEY belum diisi.
-")
+        print("  JINA_API_KEYS/JINA_API_KEY belum diisi.\n")
         return False
     sehat = 0
     for i, kunci in enumerate(kunci_list):
@@ -112,8 +111,7 @@ def cek_jina() -> bool:
         print(f"  [{i}] {_topeng(kunci)}  {sebab}  HTTP {resp.status_code}: {_kode_error(resp)}")
         if sebab == "SALDO_HABIS":
             print("      -> isi saldo di https://jina.ai/api-dashboard/key-manager")
-    print(f"  -> {sehat}/{len(kunci_list)} kunci sehat
-")
+    print(f"  -> {sehat}/{len(kunci_list)} kunci sehat\n")
     return sehat > 0
 
 
