@@ -40,10 +40,12 @@ def main() -> None:
     keluar.mkdir(parents=True, exist_ok=True)
     retriever = get_retriever()
     ringkasan = []
-    saring = os.getenv("UJI_FILTER", "")  # potongan nama berkas; kosong = semua
-    for berkas in [b for b in URUTAN if saring in b.name]:
+    saring = os.getenv("UJI_FILTER", "")  # potongan nama berkas, dipisah koma; kosong = semua
+    for berkas in [b for b in URUTAN if any(t in b.name for t in saring.split(","))]:
         envelope = L2Envelope.model_validate(json.loads(berkas.read_text(encoding="utf-8")))
         nomor = envelope.data.application_number
+        if ringkasan and os.getenv("UJI_JEDA_S"):
+            time.sleep(float(os.environ["UJI_JEDA_S"]))  # beri jendela token menit Groq pulih antar payload
         mulai = time.perf_counter()
         status, hasil = "ok", None
         try:

@@ -5,6 +5,7 @@ dari model lama: fakta (status/verdict/angka/kategori) DISUNTIKKAN sebagai groun
 membungkusnya jadi Bahasa Indonesia yang jelas. LLM TIDAK PERNAH menyimpulkan verdict sendiri.
 """
 
+import os
 import re
 
 from app import sanitize
@@ -12,7 +13,7 @@ from app.reasoning.calculator import format_target_parameter
 from app.retrieval.base import Chunk
 from app.schemas import DasarHukum, MetaL2, PoinKonteks, PoinOutput
 
-SYSTEM_PROMPT = """Anda asisten reasoning pre-check izin bangunan Kabupaten Sleman. Tulisan Anda adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat ke pemohon.
+SYSTEM_PROMPT_PENDEK = """Anda asisten reasoning pre-check izin bangunan Kabupaten Sleman. Tulisan Anda adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat ke pemohon.
 
 ATURAN WAJIB:
 1. Fakta (status, verdict, angka, kategori) di bawah bersifat FINAL (hasil kode/back-end). Anda HANYA menjelaskan mengapa fakta itu muncul. JANGAN mengubah, menghitung ulang, membalik arah, atau menyimpulkan verdict/status/kategori sendiri.
@@ -42,6 +43,12 @@ ATURAN WAJIB:
 24. HANYA YANG ADA DI FAKTA: DILARANG membuat klaim sebab-akibat atau teknis yang tidak tertulis di fakta (mis. koefisien limpasan berbeda antar jenis bangunan, perilaku tanah), DILARANG menyebut Pasal 53 ayat (3) huruf d sebagai dasar kewajiban bangunan baru (huruf d untuk lahan terbangun yang sudah ada, kewajiban bangunan baru adalah zero delta Q pada huruf a), dan di poin dampak DILARANG menyatakan pemohon sudah memenuhi syarat kawasan resapan. Jangan menulis istilah dalam kurung seperti "(proporsi tapak/bangunan)".
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
+
+# Sakelar uji A/B (PROMPT_SISTEM=panjang|pendek, bawaan pendek). Dibaca saat modul dimuat.
+if os.getenv("PROMPT_SISTEM", "pendek").strip().lower() == "panjang":
+    from app.reasoning.prompt_panjang import SYSTEM_PROMPT_PANJANG as SYSTEM_PROMPT
+else:
+    SYSTEM_PROMPT = SYSTEM_PROMPT_PENDEK
 
 _LABEL_ITBX = {
     "I": "Diizinkan",
