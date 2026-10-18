@@ -1399,7 +1399,14 @@ def generate_poin_terdiagnosis(
         poin.poin_id, diagnosa.percobaan, diagnosa.sebab(), diagnosa.jumlah_chunk,
         "; ".join(diagnosa.masalah_terakhir) or "-",
     )
-    return _paksa_field_wajib(template_low_confidence(poin), poin, assessment), diagnosa
+    hasil_template = _paksa_field_wajib(template_low_confidence(poin), poin, assessment)
+    try:
+        # Sitasi dampak yang pasti (Pasal 53(3) / Lampiran VI) tetap dilampirkan walau LLM gagal.
+        hasil_template = hasil_template.model_copy(update={"sitasi": _lengkapi_sitasi_dampak(
+            hasil_template.sitasi, poin, {}, retriever)})
+    except Exception:  # noqa: BLE001 — sitasi tambahan opsional
+        logger.warning("Sitasi tambahan fallback dampak gagal.", exc_info=True)
+    return hasil_template, diagnosa
 
 
 def generate_poin_dengan_guardrail(

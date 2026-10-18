@@ -77,7 +77,11 @@ def _assert_isolasi_per_poin(output, poin_bermasalah: str = "intensitas") -> Non
     assert bermasalah.low_confidence is True
     assert bermasalah.reasoning_pendek == "Penjelasan otomatis tidak tersedia untuk poin ini."
     assert bermasalah.sitasi == []
-    assert "peninjauan manual" in bermasalah.rekomendasi.saran.lower()
+    # Saran fallback kini langkah deterministik dari kalkulator bila ada (intensitas, dampak), dan tetap
+    # "peninjauan manual" bila tidak ada (ITBX). Penanda manual selalu ada di disclaimer.
+    assert ("peninjauan manual" in bermasalah.rekomendasi.saran.lower()
+            or bermasalah.rekomendasi.langkah_konkret)
+    assert "verifikasi manual" in (bermasalah.rekomendasi.disclaimer or "").lower()
     assert bermasalah.rekomendasi.disclaimer  # ada isinya (bukan None/string kosong)
     assert "verifikasi manual" in bermasalah.rekomendasi.disclaimer.lower()
 

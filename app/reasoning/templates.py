@@ -10,6 +10,7 @@ tidak punya skor per-poin lagi, jadi tidak ada `status_dari_skor` seperti versi 
 """
 
 from app.reasoning.calculator import (
+    bangun_saran_mitigasi_dampak,
     bangun_langkah_dampak_poin,
     pilih_target_dampak_poin,
     bangun_langkah_konkret_intensitas,
@@ -85,6 +86,20 @@ def template_aman(poin: PoinKonteks) -> PoinOutput:
     )
 
 
+def _saran_deterministik(poin: PoinKonteks, langkah: list[LangkahKonkretOutput]) -> str | None:
+    """Saran dari kode (bukan LLM) untuk poin yang LLM-nya gagal: angka dan kewajibannya sudah final di
+    kalkulator/BE, jadi tidak perlu berhenti di "peninjauan manual". Dampak Tinggi memakai saran aturan PM
+    (wajib, sumur hanya di kawasan resapan). Poin lain dengan langkah konkret memakai daftar bernomor dari
+    deskripsi langkah. None bila tak ada langkah (mis. ITBX): tetap peninjauan manual."""
+    if poin.poin_id == "dampak":
+        saran = bangun_saran_mitigasi_dampak((poin.fakta or {}).get("target_mitigasi") or {}, poin.kawasan_resapan)
+        if saran:
+            return saran
+    if not langkah:
+        return None
+    return "\n".join(f"{i}. {l.deskripsi.rstrip()}" for i, l in enumerate(langkah, 1))
+
+
 def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
     """Fallback saat generasi LLM gagal validasi guardrail berulang kali.
 
@@ -102,7 +117,8 @@ def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
         reasoning_pendek = saran
         reasoning_panjang = saran
     else:
-        saran = "Perlu peninjauan manual oleh petugas terkait poin ini."
+        saran = (_saran_deterministik(poin, _langkah_konkret_untuk_poin(poin))
+                 or "Perlu peninjauan manual oleh petugas terkait poin ini.")
         reasoning_pendek = "Penjelasan otomatis tidak tersedia untuk poin ini."
         reasoning_panjang = (
             f"Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin "

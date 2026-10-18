@@ -178,3 +178,29 @@ class TestAturanPM:
         assert [x.citation_id for x in _lengkapi_sitasi_dampak([], bukan, peta)] == [cvi.id]
         rendah_bukan = bukan.model_copy(update={"fakta": {}})
         assert _lengkapi_sitasi_dampak([], rendah_bukan, peta) == []
+
+
+class TestFallbackDeterministik:
+    def _dampak(self, resapan):
+        fakta = {"dinilai": True, "target_mitigasi": {
+            "runoff_change_index_maks": 2.5, "kategori_target": "Sedang",
+            "penyesuaian_lahan": {"luas_bangunan_maks_m2": 1077.0, "luas_rth_min_m2": 359.0,
+                                  "kdb_maks_persen": 75, "kdh_min_persen": 25},
+            "dimensi_minimum_resapan": {"nilai": 0.62, "satuan": "m³"}, "kawasan_resapan": resapan},
+            "kawasan_resapan": resapan}
+        return PoinKonteks(poin_id="dampak", kategori="K", tipe_rekomendasi="numerik-mitigasi",
+                           status="Tinggi", fakta=fakta, kawasan_resapan=resapan)
+
+    def test_dampak_tinggi_fallback_memakai_saran_pm(self):
+        from app.reasoning.templates import template_low_confidence
+        r = template_low_confidence(self._dampak(True))
+        assert r.low_confidence and r.rekomendasi.saran.startswith("1. Wajib menurunkan")
+        assert "2. Wajib memastikan air hujan tidak melimpas" in r.rekomendasi.saran
+        b = template_low_confidence(self._dampak(False))
+        assert "sumur" not in b.rekomendasi.saran and b.low_confidence
+        assert "Perlu peninjauan manual" not in b.rekomendasi.saran
+
+    def test_itbx_tanpa_langkah_tetap_peninjauan_manual(self):
+        from app.reasoning.templates import template_low_confidence
+        p = PoinKonteks(poin_id="itbx", kategori="K", tipe_rekomendasi="kategorikal", status="B", fakta={})
+        assert "peninjauan manual" in template_low_confidence(p).rekomendasi.saran
