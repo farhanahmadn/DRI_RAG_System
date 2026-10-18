@@ -76,36 +76,59 @@ def post_json(
     json_body: dict,
     timeout_s: float,
     max_retries: int,
+    kunci=None,
 ) -> dict:
     """POST JSON dgn retry (backoff eksponensial dibatasi 8s) + circuit breaker per `name` + semaphore
     concurrency global (`PROVIDER_MAX_CONCURRENT`) — panggilan ke-N+1 ANTRE (bukan gagal) kalau sudah
-    ada N panggilan in-flight, tidak menambah beban ke provider yang sedang sibuk."""
+    ada N panggilan in-flight, tidak menambah beban ke provider yang sedang sibuk.
+
+    `kunci` (opsional, `app.retrieval.jina_keys.KumpulanKunciJina`): header Authorization diisi dari key
+    aktif. Bila balasan menandakan key HABIS/DITOLAK (402/401/403 atau 429 saldo), key ditandai habis dan
+    permintaan yang SAMA langsung diulang dengan key berikutnya, tanpa menghabiskan jatah retry dan tanpa
+    dihitung sebagai kegagalan circuit breaker."""
     import httpx
 
     from app import batas_waktu
+    from app.retrieval import jina_keys
 
     _check_circuit(name)
     last_exc: Exception | None = None
-    for attempt in range(max_retries + 1):
+    attempt = 0
+    ganti_kunci = 0
+    while True:
         # Anggaran waktu permintaan (app/batas_waktu.py): jangan mulai panggilan yang tak mungkin selesai,
         # dan jangan biarkan timeout per panggilan melampaui sisa anggaran.
         batas_waktu.periksa(2.0, f"panggilan provider {name}")
         sisa = batas_waktu.sisa()
         timeout_efektif = timeout_s if sisa is None else max(1.0, min(timeout_s, sisa - 1.0))
+        idx = None
+        hdr = headers
+        if kunci is not None:
+            idx, key = kunci.aktif()  # SemuaKunciJinaHabisError langsung naik ke pemanggil
+            hdr = {**headers, "Authorization": f"Bearer {key}"}
         try:
             with _semaphore:
                 with httpx.Client(timeout=timeout_efektif) as client:
-                    resp = client.post(url, headers=headers, json=json_body)
+                    resp = client.post(url, headers=hdr, json=json_body)
+            if kunci is not None and jina_keys.kunci_habis(resp.status_code, resp.text):
+                kunci.tandai_habis(idx, f"HTTP {resp.status_code}")
+                ganti_kunci += 1
+                if ganti_kunci <= kunci.jumlah():
+                    continue  # ulang permintaan yang sama dgn key berikutnya (aktif() akan raise bila habis)
             resp.raise_for_status()
             _record_success(name)
             return resp.json()
+        except jina_keys.SemuaKunciJinaHabisError:
+            raise
         except Exception as exc:  # noqa: BLE001 — transport apa pun dicoba ulang (timeout/5xx/DNS/dll)
             last_exc = exc
             _record_failure(name)
-            if attempt < max_retries:
-                jeda = min(2 ** attempt, 8)
-                batas_waktu.periksa(jeda + 3.0, f"ulang panggilan provider {name}")
-                time.sleep(jeda)
+            if attempt >= max_retries:
+                break
+            jeda = min(2 ** attempt, 8)
+            batas_waktu.periksa(jeda + 3.0, f"ulang panggilan provider {name}")
+            time.sleep(jeda)
+            attempt += 1
     raise RuntimeError(
         f"Panggilan provider '{name}' gagal setelah {max_retries + 1} percobaan: {last_exc}"
     ) from last_exc

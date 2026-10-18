@@ -104,16 +104,16 @@ def _encode_dense_local(texts: list[str], batch_size: int) -> list[list[float]]:
 def _encode_dense_jina(texts: list[str], input_type: str) -> list[list[float]]:
     from app.retrieval import _provider_http as http
 
-    api_key = os.getenv("JINA_API_KEY")
-    if not api_key:
-        raise RuntimeError("JINA_API_KEY tidak ditemukan di environment (EMBEDDING_PROVIDER=jina).")
+    from app.retrieval.jina_keys import get_kumpulan
+
+    kunci = get_kumpulan()  # JINA_API_KEYS (failover berurutan) atau JINA_API_KEY tunggal
     model = os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3")
     task = "retrieval.passage" if input_type == "document" else "retrieval.query"
     body = {"model": model, "task": task, "input": texts}
     data = http.post_json(
         "jina-embed", _JINA_URL,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json_body=body, timeout_s=_EMBED_TIMEOUT_S, max_retries=_EMBED_MAX_RETRIES,
+        headers={"Content-Type": "application/json"},
+        json_body=body, timeout_s=_EMBED_TIMEOUT_S, max_retries=_EMBED_MAX_RETRIES, kunci=kunci,
     )
     rows = sorted(data["data"], key=lambda r: r["index"])
     return [r["embedding"] for r in rows]

@@ -80,32 +80,41 @@ def cek_groq() -> int:
 
 
 def cek_jina() -> bool:
-    kunci = os.getenv("JINA_API_KEY")
-    print("=== Jina (embedding) ===")
-    if not kunci:
-        print("  JINA_API_KEY belum diisi.\n")
+    """Cek tiap key Jina (JINA_API_KEYS atau JINA_API_KEY). True bila ADA key yang sehat."""
+    from app.retrieval.jina_keys import muat_kunci_dari_env
+
+    kunci_list = muat_kunci_dari_env()
+    print(f"=== Jina (embedding): {len(kunci_list)} kunci, dipakai berurutan (pindah saat habis) ===")
+    if not kunci_list:
+        print("  JINA_API_KEYS/JINA_API_KEY belum diisi.
+")
         return False
-    try:
-        resp = httpx.post(
-            "https://api.jina.ai/v1/embeddings",
-            headers={"Authorization": f"Bearer {kunci}", "Content-Type": "application/json"},
-            json={"model": os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3"),
-                  "input": ["tes"], "task": "retrieval.query", "dimensions": int(os.getenv("EMBEDDING_DIM", "1024"))},
-            timeout=_TIMEOUT,
-        )
-    except httpx.HTTPError as exc:
-        print(f"  {_topeng(kunci)}  JARINGAN  {type(exc).__name__}: {exc}\n")
-        return False
-    if resp.status_code == 200:
-        print(f"  {_topeng(kunci)}  SEHAT  (embedding berhasil)\n")
-        return True
-    pesan = resp.text.lower()
-    sebab = "SALDO_HABIS" if "balance" in pesan else "KUNCI_DITOLAK" if resp.status_code in (401, 403) else "ERROR_LAIN"
-    print(f"  {_topeng(kunci)}  {sebab}  HTTP {resp.status_code}: {_kode_error(resp)}")
-    if sebab == "SALDO_HABIS":
-        print("  -> isi saldo di https://jina.ai/api-dashboard/key-manager")
-    print()
-    return False
+    sehat = 0
+    for i, kunci in enumerate(kunci_list):
+        try:
+            resp = httpx.post(
+                "https://api.jina.ai/v1/embeddings",
+                headers={"Authorization": f"Bearer {kunci}", "Content-Type": "application/json"},
+                json={"model": os.getenv("JINA_EMBEDDING_MODEL", "jina-embeddings-v3"),
+                      "input": ["tes"], "task": "retrieval.query",
+                      "dimensions": int(os.getenv("EMBEDDING_DIM", "1024"))},
+                timeout=_TIMEOUT,
+            )
+        except httpx.HTTPError as exc:
+            print(f"  [{i}] {_topeng(kunci)}  JARINGAN  {type(exc).__name__}: {exc}")
+            continue
+        if resp.status_code == 200:
+            sehat += 1
+            print(f"  [{i}] {_topeng(kunci)}  SEHAT  (embedding berhasil)")
+            continue
+        pesan = resp.text.lower()
+        sebab = "SALDO_HABIS" if "balance" in pesan or resp.status_code == 402 else             "KUNCI_DITOLAK" if resp.status_code in (401, 403) else "ERROR_LAIN"
+        print(f"  [{i}] {_topeng(kunci)}  {sebab}  HTTP {resp.status_code}: {_kode_error(resp)}")
+        if sebab == "SALDO_HABIS":
+            print("      -> isi saldo di https://jina.ai/api-dashboard/key-manager")
+    print(f"  -> {sehat}/{len(kunci_list)} kunci sehat
+")
+    return sehat > 0
 
 
 def main() -> None:

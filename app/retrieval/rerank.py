@@ -74,15 +74,15 @@ def _rerank_local(query: str, passages: list[str], batch_size: int) -> list[tupl
 def _rerank_jina(query: str, passages: list[str]) -> list[tuple[int, float]]:
     from app.retrieval import _provider_http as http
 
-    api_key = os.getenv("JINA_API_KEY")
-    if not api_key:
-        raise RuntimeError("JINA_API_KEY tidak ditemukan di environment (RERANK_PROVIDER=jina).")
+    from app.retrieval.jina_keys import get_kumpulan
+
+    kunci = get_kumpulan()  # JINA_API_KEYS (failover berurutan) atau JINA_API_KEY tunggal
     model = os.getenv("JINA_RERANK_MODEL", "jina-reranker-v3")
     body = {"model": model, "query": query, "documents": passages}
     data = http.post_json(
         "jina-rerank", _JINA_URL,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json_body=body, timeout_s=_RERANK_TIMEOUT_S, max_retries=_RERANK_MAX_RETRIES,
+        headers={"Content-Type": "application/json"},
+        json_body=body, timeout_s=_RERANK_TIMEOUT_S, max_retries=_RERANK_MAX_RETRIES, kunci=kunci,
     )
     return [(int(r["index"]), float(r["relevance_score"])) for r in data["results"]]
 
