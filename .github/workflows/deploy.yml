@@ -20,11 +20,14 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      # Cukup extra [dev] (pytest, httpx): seluruh impor berat (psycopg, torch, transformers) LAZY di
-      # dalam fungsi, dan suite offline dipaksa RETRIEVER=mock oleh tests/conftest.py. Jangan
-      # tambahkan [rag] di sini: menarik torch ~2-3GB tanpa dipakai sama sekali.
+      # [dev] (pytest, httpx) + [rag-serverless] (psycopg, pgvector) — extras yang PERSIS sama
+      # dengan yang dipasang di VPS, jadi gerbang mewakili runtime produksi. [rag-serverless]
+      # wajib: tests/test_metrik_generasi.py meng-import psycopg di level modul untuk memverifikasi
+      # connect_timeout; tanpa itu gerbang merah though tidak ada bug (regresi 2026-10-18, #24-#35).
+      # Tetap JANGAN [rag]: menarik torch ~2-3GB tanpa dipakai. Impor berat lain tetap LAZY di
+      # dalam fungsi, dan suite offline dipaksa RETRIEVER=mock oleh tests/conftest.py.
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,rag-serverless]"
 
       - name: Suite offline (tanpa API key / DB)
         run: pytest -q -m "not live"
