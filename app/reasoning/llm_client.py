@@ -314,6 +314,17 @@ def _batasi_client(client: OpenAI) -> OpenAI:
     return client.with_options(timeout=min(_TIMEOUT_S, sisa - 1.0), max_retries=0)
 
 
+_TINGKAT_PENALARAN = ("low", "medium", "high")
+
+
+def _kwargs_penalaran() -> dict:
+    """`reasoning_effort` untuk model reasoning (gpt-oss). Kosong = bawaan model. Uji 2026-10-19: "low"
+    memangkas token penalaran sekitar 25x dan waktu sekitar 3x pada tugas menulis sederhana, sementara token
+    keluaran ikut menghabiskan kuota token/menit Groq."""
+    nilai = os.getenv("LLM_REASONING_EFFORT", "").strip().lower()
+    return {"reasoning_effort": nilai} if nilai in _TINGKAT_PENALARAN else {}
+
+
 def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict, schema_name: str,
                          temperature: float, max_tokens: int):
     """Satu percobaan panggilan (strict json_schema, fallback json_object kalau ditolak) — TIDAK
@@ -329,6 +340,7 @@ def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict,
                 "type": "json_schema",
                 "json_schema": {"name": schema_name, "schema": json_schema, "strict": True},
             },
+            **_kwargs_penalaran(),
         )
     except BadRequestError as exc:
         if _org_dibatasi(exc):
@@ -349,6 +361,7 @@ def _panggil_llm_sekali(client: OpenAI, messages: list[dict], json_schema: dict,
             temperature=temperature,
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
+            **_kwargs_penalaran(),
         )
 
 

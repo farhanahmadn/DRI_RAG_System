@@ -204,3 +204,13 @@ class TestFallbackDeterministik:
         from app.reasoning.templates import template_low_confidence
         p = PoinKonteks(poin_id="itbx", kategori="K", tipe_rekomendasi="kategorikal", status="B", fakta={})
         assert "peninjauan manual" in template_low_confidence(p).rekomendasi.saran
+
+
+def test_reasoning_effort_dari_env(monkeypatch):
+    from app.reasoning import llm_client as lc
+    monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
+    assert lc._kwargs_penalaran() == {}
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "Low")
+    assert lc._kwargs_penalaran() == {"reasoning_effort": "low"}
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "ngawur")
+    assert lc._kwargs_penalaran() == {}
