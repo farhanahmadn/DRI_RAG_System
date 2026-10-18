@@ -65,19 +65,34 @@ def _saran_tidak_dinilai(poin: PoinKonteks) -> str:
 _ID_PASAL_53_AYAT_3 = "rdtr-sleman-tengah-p53-a3"
 
 
-def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict) -> list:
+def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict,
+                            retriever: Retriever | None = None) -> list:
     """Setiap luaran harus bersitasi (PM 2026-10-18), jangan bergantung pada LLM memilihnya.
     - Kawasan resapan: Pasal 53 ayat (3) (zero delta Q huruf a, sumur/kolam huruf d).
     - Bukan resapan dengan mitigasi: Lampiran VI (batas KDB/KDH), dasar langkah menurunkan KDB dan menaikkan KDH.
-    Hanya menambah chunk yang memang hasil retrieval, tak pernah mengarang."""
+    Chunk dicari dulu di hasil retrieval poin, lalu lewat satu pencarian tambahan (chunk pengisi Lampiran VI
+    sengaja disaring dari konteks LLM dampak non-resapan, jadi tidak ada di `chunk_by_id`). Hanya chunk asli
+    dari database yang dipakai, tak pernah mengarang."""
     if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
         return sitasi
     ada = {x.citation_id for x in sitasi}
     tambah = None
     if poin.kawasan_resapan is True:
         tambah = chunk_by_id.get(_ID_PASAL_53_AYAT_3)
+        cocok, query = chunk_ketentuan_resapan, _QUERY_KETENTUAN_RESAPAN
     elif poin.kawasan_resapan is False and (poin.fakta or {}).get("target_mitigasi"):
         tambah = next((c for cid, c in chunk_by_id.items() if "-vi-" in cid), None)
+        cocok, query = (lambda c: "-vi-" in (c.id or "")), _QUERY_INTENSITAS_TAJAM
+    else:
+        return sitasi
+    if tambah is None and retriever is not None:
+        try:
+            filters = (RetrievalFilters(zona=poin.zona_subzone) if poin.zona_subzone
+                       else RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona)))
+            tambah = next((c for c in retriever.search(query, filters, top_k=6)
+                           if cocok(c) and _berlaku_utk_subzona(c, poin.zona_subzone)), None)
+        except Exception:  # noqa: BLE001 — sitasi tambahan bersifat opsional, jangan menggagalkan poin
+            logger.warning("Pencarian sitasi tambahan untuk dampak gagal.", exc_info=True)
     if tambah is None or tambah.id in ada:
         return sitasi
     return [*sitasi, SitasiOutput(
@@ -608,7 +623,7 @@ def generate_poin(
             )
         )
 
-    sitasi = _lengkapi_sitasi_dampak(sitasi, poin, chunk_by_id)
+    sitasi = _lengkapi_sitasi_dampak(sitasi, poin, chunk_by_id, retriever)
 
     target: float | str | None = None
     # langkah_konkret (additive, 2026-08-18): SEMUA parameter yang melanggar sekaligus, dirakit
