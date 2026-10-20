@@ -138,3 +138,15 @@ def test_dampak_rendah_tak_mengirim_target_be_ke_prompt():
     d = adaptasi(_muat()).poin[-1]
     teks = build_user_prompt(d, [], None, None)
     assert "10960" not in teks and "RINCIAN_MITIGASI_KONKRET" not in teks and "TARGET_MITIGASI_KUANTITATIF" not in teks
+
+
+def test_itbx_status_i_tak_membawa_syarat_lampiran_vb():
+    from app.reasoning.generator import _saring_pengisi_poin
+    from app.retrieval.base import Chunk
+    vb = Chunk(id="rdtr-sleman-tengah-vb-r-3", level="tabel", dokumen="Perbup", pasal="", teks="Lampiran V.B syarat")
+    pasal = Chunk(id="rdtr-sleman-tengah-p59", level="pasal", dokumen="Perbup", pasal="59", teks="Pasal 59")
+    p = adaptasi(_muat()).poin[2]  # itbx zona R, status I
+    assert _saring_pengisi_poin([vb], p) == []
+    assert _saring_pengisi_poin([vb, pasal], p) == [pasal]
+    b = p.model_copy(update={"status": "B"})
+    assert _saring_pengisi_poin([vb], b) == [vb]  # status B membutuhkan syaratnya

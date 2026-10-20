@@ -405,6 +405,12 @@ def _saring_pengisi_poin(chunks: list[Chunk], poin: PoinKonteks) -> list[Chunk]:
     daftar, daftar asli dipertahankan: lebih baik sitasi kurang tepat drpd tanpa sitasi sama sekali."""
     if poin.poin_id == "itbx":
         sisa = [c for c in chunks if "-vi-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran VI")]
+        if poin.status in ("I", "X"):
+            # Lampiran V.B memuat SYARAT kegiatan bersyarat/terbatas (T/B). Kegiatan berstatus I tidak punya syarat
+            # itu, dan LLM yang membacanya meminjam syarat kelompok lain (APP-2026-0022 zona R: dokumen lingkungan,
+            # pengelolaan limbah) lalu ditolak guardrail tiga kali. Dikosongkan walau tak ada pengganti: anchor BE
+            # (Matriks ITBX) tetap tersedia sebagai sitasi.
+            return [c for c in sisa if "-vb-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran V.B")]
     elif poin.poin_id == "intensitas":
         sisa = [c for c in chunks if "-vb-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran V.B")]
     else:
