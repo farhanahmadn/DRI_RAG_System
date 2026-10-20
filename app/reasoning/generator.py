@@ -65,6 +65,25 @@ def _saran_tidak_dinilai(poin: PoinKonteks) -> str:
 _ID_PASAL_53_AYAT_3 = "rdtr-sleman-tengah-p53-a3"
 
 
+def _lengkapi_sitasi_itbx(sitasi: list, poin: PoinKonteks, retriever: Retriever | None) -> list:
+    """ITBX T/B/TB dengan syarat dari BE: lampirkan Lampiran V.B sub-zona itu sebagai sitasi (dasar syarat
+    kegiatan terbatas/bersyarat), dicari lewat retriever karena sengaja tidak dikirim ke LLM."""
+    if retriever is None or poin.status not in ("T", "B", "TB") or not (poin.fakta or {}).get("keterangan_ketentuan"):
+        return sitasi
+    try:
+        filters = (RetrievalFilters(zona=poin.zona_subzone) if poin.zona_subzone
+                   else RetrievalFilters(zona_prefix=_zona_prefix_dari_nama(poin.zona)))
+        vb = next((c for c in retriever.search("ketentuan kegiatan bersyarat terbatas sarana prasarana minimum", filters, top_k=8)
+                   if "-vb-" in (c.id or "") and _berlaku_utk_subzona(c, poin.zona_subzone)), None)
+    except Exception:  # noqa: BLE001 — sitasi tambahan opsional
+        logger.warning("Pencarian Lampiran V.B untuk sitasi ITBX gagal.", exc_info=True)
+        return sitasi
+    if vb is None or vb.id in {x.citation_id for x in sitasi}:
+        return sitasi
+    return [*sitasi, SitasiOutput(citation_id=vb.id, dokumen=vb.dokumen, pasal=vb.pasal or "",
+                                  halaman=vb.halaman or 0, kutipan=vb.teks, terverifikasi=True)]
+
+
 def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict,
                             retriever: Retriever | None = None) -> list:
     """Setiap luaran harus bersitasi (PM 2026-10-18), jangan bergantung pada LLM memilihnya.
@@ -73,6 +92,8 @@ def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict,
     Chunk dicari dulu di hasil retrieval poin, lalu lewat satu pencarian tambahan (chunk pengisi Lampiran VI
     sengaja disaring dari konteks LLM dampak non-resapan, jadi tidak ada di `chunk_by_id`). Hanya chunk asli
     dari database yang dipakai, tak pernah mengarang."""
+    if poin.poin_id == "itbx":
+        return _lengkapi_sitasi_itbx(sitasi, poin, retriever)
     if poin.poin_id != "dampak" or poin.status == "Tidak Dinilai":
         return sitasi
     ada = {x.citation_id for x in sitasi}
@@ -414,6 +435,13 @@ def _saring_pengisi_poin(chunks: list[Chunk], poin: PoinKonteks) -> list[Chunk]:
     daftar, daftar asli dipertahankan: lebih baik sitasi kurang tepat drpd tanpa sitasi sama sekali."""
     if poin.poin_id == "itbx":
         sisa = [c for c in chunks if "-vi-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran VI")]
+        if poin.status in ("T", "B", "TB") and (poin.fakta or {}).get("keterangan_ketentuan"):
+            # Syarat sudah dikirim BE (`keterangan_ketentuan`) dan disalin verbatim ke saran. Teks Lampiran V.B
+            # memuat syarat SEMUA kelompok kegiatan: LLM yang membacanya meminjam syarat kelompok lain (limbah,
+            # dokumen lingkungan) dan mengatribusikan syarat BE ke V.B dengan angka yang tak ada di sana, lalu
+            # ditolak guardrail tiga kali (APP-2026-0022 zona T). V.B tetap dilampirkan sebagai sitasi
+            # setelah lolos validasi (`_lengkapi_sitasi_itbx`).
+            return [c for c in sisa if "-vb-" not in (c.id or "") and not (c.teks or "").lstrip().startswith("Lampiran V.B")]
         if poin.status in ("I", "X"):
             # Lampiran V.B memuat SYARAT kegiatan bersyarat/terbatas (T/B). Kegiatan berstatus I tidak punya syarat
             # itu, dan LLM yang membacanya meminjam syarat kelompok lain (APP-2026-0022 zona R: dokumen lingkungan,

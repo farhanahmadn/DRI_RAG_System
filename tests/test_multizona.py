@@ -154,8 +154,10 @@ def test_itbx_status_i_tak_membawa_syarat_lampiran_vb():
     p = adaptasi(_muat()).poin[2]  # itbx zona R, status I
     assert _saring_pengisi_poin([vb], p) == []
     assert _saring_pengisi_poin([vb, pasal], p) == [pasal]
-    b = p.model_copy(update={"status": "B"})
-    assert _saring_pengisi_poin([vb], b) == [vb]  # status B membutuhkan syaratnya
+    b_tanpa_syarat_be = p.model_copy(update={"status": "B", "fakta": {}})
+    assert _saring_pengisi_poin([vb], b_tanpa_syarat_be) == [vb]  # status B tanpa syarat dari BE butuh V.B
+    b_dengan_syarat_be = p.model_copy(update={"status": "B", "fakta": {"keterangan_ketentuan": ["Syarat BE."]}})
+    assert _saring_pengisi_poin([vb, pasal], b_dengan_syarat_be) == [pasal]  # syarat BE sudah ada: V.B tak dikirim ke LLM
 
 
 class TestPembersihanTeks:
@@ -279,3 +281,33 @@ class TestRingkasanDanBoilerplate:
         from app.reasoning.assemble import _butir_bermakna
         assert _butir_bermakna(["Perbaiki KDB.", "Tidak dievaluasi karena proses berhenti."]) == ["Perbaiki KDB."]
         assert _butir_bermakna(["Tidak dievaluasi karena proses berhenti."]) == ["Tidak dievaluasi karena proses berhenti."]
+
+
+class TestGateEfektifDanSitasiItbx:
+    def test_itbx_t_membuat_ringkasan_gate_lolos_terbatas_walau_gate_be_lolos(self, pipeline):
+        def t(d):
+            d["gate_hukum"]["itbx_zones"][0].update(status="T")
+        out = pipeline(_muat(t))
+        assert out.ringkasan_gate.final_gate_status == "Lolos Terbatas"
+        assert out.ringkasan_gate.kalimat.startswith("Permohonan lolos terbatas pemeriksaan gate hukum")
+        assert out.rekomendasi_sistem == "Lolos Terbatas"
+
+    def test_itbx_x_membuat_ringkasan_gate_tidak_lolos(self, pipeline):
+        def x(d):
+            d["gate_hukum"]["itbx_zones"][1].update(status="X")
+        assert pipeline(_muat(x)).ringkasan_gate.final_gate_status == "Tidak Lolos"
+
+    def test_sitasi_lampiran_vb_dilampirkan_untuk_itbx_bersyarat(self):
+        from app.reasoning.generator import _lengkapi_sitasi_itbx
+        from app.retrieval.base import Chunk
+
+        class _R:
+            def search(self, query, filters, top_k=5, **kw):
+                return [Chunk(id="rdtr-sleman-tengah-vb-p-1", level="tabel", dokumen="Perbup", pasal="",
+                              teks="Lampiran V.B syarat", zona="P-1")]
+
+        poin = adaptasi(_muat()).poin[0].model_copy(
+            update={"status": "B", "fakta": {"keterangan_ketentuan": ["Syarat BE."]}})
+        hasil = _lengkapi_sitasi_itbx([], poin, _R())
+        assert [s.citation_id for s in hasil] == ["rdtr-sleman-tengah-vb-p-1"]
+        assert _lengkapi_sitasi_itbx([], poin.model_copy(update={"status": "I"}), _R()) == []

@@ -428,8 +428,9 @@ class TestJalankanPrecheckEndToEnd:
         assessment = _muat_assessment("l2_sample_amplop_6191.json")
         output = jalankan_precheck(assessment, MockRetriever())
 
-        assert output.ringkasan_gate.final_gate_status == "Lolos Bersyarat"
-        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Lolos Terbatas"  # ITBX T
+        # BE melabeli gate "Lolos Bersyarat", tetapi ITBX T -> Lolos Terbatas (spesifikasi BE bagian 4).
+        assert output.ringkasan_gate.final_gate_status == "Lolos Terbatas"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Lolos Terbatas"
         poin_intensitas = next(p for p in output.poin if p.poin_id == "intensitas")
         assert poin_intensitas.status == "MELAMPAUI_BATAS"
 

@@ -409,6 +409,18 @@ def _itbx_paling_ketat(assessment: L2Assessment) -> str | None:
     return max(daftar, key=lambda s: _URUTAN_KETAT_ITBX.get(s, 0)) if daftar else None
 
 
+def status_gate_efektif(assessment: L2Assessment) -> str:
+    """Status gate menurut spesifikasi BE bagian 4: ITBX X -> Tidak Lolos dan ITBX T/TB -> Lolos Terbatas
+    mengalahkan label gate BE (BE kerap melabeli ITBX T sebagai Lolos Bersyarat atau Lolos)."""
+    gate = assessment.gate_hukum.final_gate_status
+    itbx = _itbx_paling_ketat(assessment)
+    if gate == "Tidak Lolos" or itbx == "X":
+        return "Tidak Lolos"
+    if gate == "Lolos Terbatas" or itbx in ("T", "TB"):
+        return "Lolos Terbatas"
+    return gate
+
+
 def adaptasi(assessment: L2Assessment) -> AdapterResult:
     # final_gate_status dikonsumsi APA ADANYA (ground truth back-end) — tidak diturunkan ulang dari
     # status/parameter tahap-tahap di bawahnya.

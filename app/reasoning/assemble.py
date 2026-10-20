@@ -18,7 +18,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 
-from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan, zona_terpisah
+from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan, status_gate_efektif, zona_terpisah
 from app.ketentuan_khusus import tentukan_kawasan_resapan
 from app.logging_util import log_precheck
 from app import batas_waktu
@@ -198,6 +198,13 @@ def _rakit_kalimat_gate(final_gate_status: str, decisive_stage: str | None, itbx
             "memenuhi seluruh ketentuan yang berlaku."
         )
 
+    if final_gate_status == "Lolos Terbatas":
+        kalimat = ("Permohonan lolos terbatas pemeriksaan gate hukum — kegiatan diizinkan secara terbatas dan "
+                   "harus memenuhi batasan yang berlaku.")
+        if itbx_fallback:
+            kalimat += f" Selain itu, {_KALIMAT_FALLBACK_ITBX}."
+        return kalimat
+
     if final_gate_status == "Lolos Bersyarat":
         dasar = f" pada tahap {tahap}" if tahap else ""
         kalimat = f"Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan{dasar} yang perlu ditindaklanjuti."
@@ -220,10 +227,11 @@ def _rakit_kalimat_gate(final_gate_status: str, decisive_stage: str | None, itbx
 
 def _rakit_ringkasan_gate(assessment: L2Assessment, itbx_fallback: bool) -> RingkasanGateOutput:
     gate = assessment.gate_hukum
+    status = status_gate_efektif(assessment)
     return RingkasanGateOutput(
-        final_gate_status=gate.final_gate_status,
+        final_gate_status=status,
         decisive_stage=gate.decisive_stage,
-        kalimat=_rakit_kalimat_gate(gate.final_gate_status, gate.decisive_stage, itbx_fallback),
+        kalimat=_rakit_kalimat_gate(status, gate.decisive_stage, itbx_fallback),
     )
 
 
