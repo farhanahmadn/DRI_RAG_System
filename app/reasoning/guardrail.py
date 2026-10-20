@@ -542,6 +542,13 @@ def _paksa_field_wajib(
         # (ditemukan live APP-2026-6191; deterministik, TIDAK memicu retry — lihat catatan di atas
         # fungsi _bersihkan_disclaimer_fallback_palsu kenapa bukan cek pemicu-retry).
         disclaimer_dasar = _bersihkan_disclaimer_fallback_palsu(disclaimer_dasar)
+        # LLM kadang menempel sendiri "**CAVEAT**: Penentuan status ini didasarkan pada data matriks RDTR yang mungkin
+        # belum lengkap" di reasoning padahal data lengkap (APP-2026-0022 ITBX T), menyesatkan petugas.
+        for kolom in ("reasoning_pendek", "reasoning_panjang"):
+            asli = getattr(poin_output, kolom)
+            bersih = _bersihkan_disclaimer_fallback_palsu(asli)
+            if bersih and bersih != asli:
+                update[kolom] = bersih
 
     # Cek #3 — meta.caveats WAJIB muncul di disclaimer.
     # Item permintaan user (2026-10-02): kalimat "Tingkat kepercayaan data: rendah/sedang/tinggi."

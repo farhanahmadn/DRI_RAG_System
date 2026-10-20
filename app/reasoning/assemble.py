@@ -416,6 +416,17 @@ def _terapkan_catatan_batas(poin_list: list[PoinOutput], poin_konteks: list) -> 
     return hasil
 
 
+_RE_ID_POIN_BOCOR = re.compile(r"\b(itbx|intensitas|dampak)_[A-Za-z0-9-]+\b", re.IGNORECASE)
+_NAMA_DARI_ID = {"itbx": "ITBX", "intensitas": "intensitas", "dampak": "dampak"}
+
+
+def _bersihkan_id_poin(teks: str | None) -> str | None:
+    """"ITBX_P"/"intensitas_R" (kode poin internal) -> "ITBX"/"intensitas": LLM sintesis menyalinnya dari prompt."""
+    if not teks:
+        return teks
+    return _RE_ID_POIN_BOCOR.sub(lambda m: _NAMA_DARI_ID[m.group(1).lower()], teks)
+
+
 def _id_dasar(poin_id: str) -> str:
     """"itbx_P" -> "itbx", "dampak" -> "dampak". Poin per-zona diberi akhiran kode zona di output."""
     return poin_id.split("_", 1)[0]
@@ -673,7 +684,7 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
             system=SYSTEM_PROMPT_KESIMPULAN,
         )
         # Nomor "1." di awal butir dibuang: FE sudah memberi penomoran (APP-2026-UJI-1: nomor terulang).
-        langkah = [re.sub(r"^\s*\d+[.)]\s*", "", str(l)) for l in (hasil.get("langkah_berdampak") or [])]
+        langkah = [_bersihkan_id_poin(re.sub(r"^\s*\d+[.)]\s*", "", str(l))) for l in (hasil.get("langkah_berdampak") or [])]
         catatan = hasil.get("catatan_lokasi")
         ringkasan = str(hasil.get("ringkasan") or "").strip()
         gabungan = " ".join(langkah) + " " + (catatan or "") + " " + ringkasan
@@ -687,7 +698,7 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
             catatan_diag["kesimpulan"] = "llm"
         return KesimpulanOutput(
             langkah_berdampak=langkah, catatan_lokasi=catatan,
-            ringkasan=_perbaiki_titik_koma(ringkasan) or _ringkasan_deterministik(poin_list, rekomendasi_sistem),
+            ringkasan=_bersihkan_id_poin(_perbaiki_titik_koma(ringkasan)) or _ringkasan_deterministik(poin_list, rekomendasi_sistem),
         )
     except Exception as exc:
         logger.exception("Sintesis kesimpulan via LLM gagal/melanggar aturan — fallback deterministik.")
@@ -738,8 +749,8 @@ def _rakit_narasi_rekomendasi(poin_list: list[PoinOutput], rekomendasi_sistem: s
         )
         # Titik koma = gaya, bukan fakta: diperbaiki (bukan dibuang seluruh sintesis ke fallback).
         # Log VPS 2026-10-14: satu ';' membuang narasi LLM yang sudah jadi.
-        paragraf_gate = _perbaiki_titik_koma(hasil.get("paragraf_gate_intensitas") or "")
-        paragraf_dampak = _perbaiki_titik_koma(hasil.get("paragraf_dampak") or "")
+        paragraf_gate = _bersihkan_id_poin(_perbaiki_titik_koma(hasil.get("paragraf_gate_intensitas") or ""))
+        paragraf_dampak = _bersihkan_id_poin(_perbaiki_titik_koma(hasil.get("paragraf_dampak") or ""))
         gabungan = f"{paragraf_gate} {paragraf_dampak}"
         asing = _angka_tak_terlacak_ke_saran(gabungan, poin_list)
         if asing is not None:

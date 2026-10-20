@@ -311,3 +311,19 @@ class TestGateEfektifDanSitasiItbx:
         hasil = _lengkapi_sitasi_itbx([], poin, _R())
         assert [s.citation_id for s in hasil] == ["rdtr-sleman-tengah-vb-p-1"]
         assert _lengkapi_sitasi_itbx([], poin.model_copy(update={"status": "I"}), _R()) == []
+
+
+class TestPembersihanTeksT:
+    def test_kode_poin_bocor_di_sintesis_dibersihkan(self):
+        from app.reasoning.assemble import _bersihkan_id_poin as b
+        assert b("Di Zona Pertanian, ITBX_P menuntut syarat, intensitas_P memenuhi, dampak tetap.") == \
+            "Di Zona Pertanian, ITBX menuntut syarat, intensitas memenuhi, dampak tetap."
+        assert b("itbx_evaluasi dan dampak_X") == "ITBX dan dampak"
+        assert b(None) is None
+
+    def test_caveat_fallback_palsu_dibuang_dari_reasoning_itbx(self):
+        from app.reasoning.guardrail import _bersihkan_disclaimer_fallback_palsu as b
+        teks = ("Kegiatan terbatas. Tidak ada indikasi pelanggaran.\n\n**CAVEAT**: Penentuan status ini didasarkan pada "
+                "data matriks RDTR yang mungkin belum lengkap — perlu verifikasi manual apakah kegiatan benar-benar "
+                "dilarang atau datanya belum tersedia.")
+        assert b(teks) == "Kegiatan terbatas. Tidak ada indikasi pelanggaran."
