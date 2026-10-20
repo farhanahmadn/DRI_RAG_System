@@ -222,6 +222,11 @@ def hitung_target_mitigasi_dampak(impact: ImpactAssessment, kawasan_resapan: boo
     pernah kasih angka fisik lahan). Fallback ke logika band lama di bawah kalau field ini absen
     (fixture lama / BE belum kirim untuk kasus ini) — backward-compatible.
     """
+    # Dampak Rendah/Sedang tidak butuh mitigasi korektif (gerbang sama dgn `sarankan_arah_mitigasi_dampak`).
+    # BE kadang tetap mengirim `rekomendasi_mitigasi` untuk kategori ini dengan angka tak bermakna (APP-2026-0022:
+    # lantai dasar maks 10.960,79 m² dan dimensi sumur 0 m³ untuk dampak Rendah), jadi diabaikan seluruhnya.
+    if normalisasi_kategori_dampak(impact.impact_category) not in KATEGORI_DAMPAK_BERSYARAT:
+        return {}
     rekom = impact.rekomendasi_mitigasi
     if rekom and rekom.get("target_indeks_maks") is not None:
         hasil: dict = {

@@ -131,3 +131,10 @@ class TestKonsistensiPerZona:
         assert cek_konsistensi_poin_intensitas(poin[1]) == []
         rusak = poin[3].model_copy(update={"status": "MELAMPAUI_BATAS"})
         assert cek_konsistensi_poin_intensitas(rusak) == ["status=MELAMPAUI_BATAS tapi semua parameter.memenuhi=True"]
+
+
+def test_dampak_rendah_tak_mengirim_target_be_ke_prompt():
+    """Prompt dampak Rendah tidak boleh memuat angka mitigasi ganjil dari BE (10.960,79 m², dimensi 0 m³)."""
+    d = adaptasi(_muat()).poin[-1]
+    teks = build_user_prompt(d, [], None, None)
+    assert "10960" not in teks and "RINCIAN_MITIGASI_KONKRET" not in teks and "TARGET_MITIGASI_KUANTITATIF" not in teks

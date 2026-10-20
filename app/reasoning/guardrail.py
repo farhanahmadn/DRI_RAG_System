@@ -988,14 +988,18 @@ def _cek_klaim_resapan(poin_output: PoinOutput, poin: PoinKonteks) -> list[str]:
 
 
 _RE_KLAIM_KOEFISIEN_BEDA = re.compile(
-    r"koefisien\s+limpasan[^.]{0,60}(?:berbeda|lebih\s+(?:tinggi|besar|rendah|kecil))|"
-    r"(?:berbeda|lebih\s+(?:tinggi|besar))[^.]{0,60}koefisien\s+limpasan",
+    # Hanya klaim perbandingan arah yang tak ada di fakta ("koefisien limpasan atap lebih tinggi dibanding ...").
+    # "jenis bangunan memengaruhi koefisien limpasan sehingga dampaknya dapat berbeda" justru diminta prompt.
+    r"koefisien\s+limpasan[^.]{0,60}lebih\s+(?:tinggi|besar|rendah|kecil)|"
+    r"lebih\s+(?:tinggi|besar|rendah|kecil)[^.]{0,40}koefisien\s+limpasan",
     re.IGNORECASE,
 )
 _RE_HURUF_D_53 = re.compile(r"(?:ayat\s*\(?3\)?\s*)?huruf\s+d\b", re.IGNORECASE)
 _RE_LAHAN_SUDAH_ADA = re.compile(r"sudah\s+ada|telah\s+ada|terbangun|eksisting", re.IGNORECASE)
 _RE_KLAIM_DAMPAK_MEMENUHI = re.compile(
-    r"(?:sudah|telah)\s+(?:memenuhi|sesuai)|memenuhi\s+(?:syarat|ketentuan)\s+(?:tersebut|kawasan|resapan)",
+    # Klaim bahwa pemohon SUDAH memenuhi. "Untuk memenuhi ketentuan tersebut, pemohon harus ..." adalah
+    # klausa tujuan, bukan klaim, jadi tidak dicocokkan.
+    r"(?:sudah|telah)\s+(?:memenuhi|sesuai)",
     re.IGNORECASE,
 )
 

@@ -20,8 +20,14 @@ def _dampak() -> PoinKonteks:
 
 class TestKlaimDampak:
     def test_koefisien_beda_ditolak(self):
-        o = _out("dampak", "s", "Koefisien limpasan atap berbeda antara bangunan industri dan pergudangan.")
+        o = _out("dampak", "s", "Koefisien limpasan atap lebih tinggi dibanding bangunan lain dengan luas yang sama.")
         assert _cek_klaim_dampak_tanpa_dasar(o, _dampak())
+        # kalimat yang diminta prompt (jenis bangunan memengaruhi koefisien, dampak dapat berbeda) harus lolos
+        sah = _out("dampak", "s", "Jenis bangunan memengaruhi koefisien limpasan atap, sehingga dua bangunan berluas "
+                                  "sama namun berbeda jenis dapat menghasilkan dampak yang berbeda.")
+        assert not _cek_klaim_dampak_tanpa_dasar(sah, _dampak())
+        tujuan = _out("dampak", "s", "Untuk memenuhi ketentuan tersebut, pemohon harus menyediakan sumur.")
+        assert not _cek_klaim_dampak_tanpa_dasar(tujuan, _dampak())
 
     def test_huruf_d_untuk_bangunan_baru_ditolak(self):
         o = _out("dampak", "s", "Sediakan sumur sesuai Pasal 53 ayat 3 huruf d.")
