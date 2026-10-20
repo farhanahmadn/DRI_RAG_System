@@ -68,9 +68,10 @@ class TestFixtureLolos:
         for p in hasil.poin:
             assert p.zona_subzone == "P-1"
 
-    def test_rekomendasi_sistem_setuju(self):
+    def test_rekomendasi_sistem_dampak_sedang_setuju_bersyarat(self):
+        # Spesifikasi BE v1.0.0 bagian 4: dampak Sedang memerlukan mitigasi -> Setuju Bersyarat (sebelumnya Setuju).
         hasil = adaptasi(_muat_assessment("l2_sample_lolos.json"))
-        assert hasil.rekomendasi_sistem == "Setuju"
+        assert hasil.rekomendasi_sistem == "Setuju Bersyarat"
 
 
 class TestFixtureLolosBersyarat:
@@ -88,9 +89,10 @@ class TestFixtureLolosBersyarat:
         assert poin_intensitas.fakta["parameter"]["kdb"]["memenuhi"] is False
         assert cek_konsistensi_intensitas(assessment) == []
 
-    def test_rekomendasi_sistem_setuju_bersyarat(self):
+    def test_rekomendasi_sistem_itbx_t_lolos_terbatas(self):
+        # ITBX T -> Lolos Terbatas (prioritas 2 spesifikasi BE), walau gate BE melabelinya Lolos Bersyarat.
         hasil = adaptasi(_muat_assessment("l2_sample_amplop_6191.json"))
-        assert hasil.rekomendasi_sistem == "Setuju Bersyarat"
+        assert hasil.rekomendasi_sistem == "Lolos Terbatas"
 
     def test_status_poin_ikut_status_bukan_lolos_walau_dibuat_berbeda(self):
         # Kasus sintetis (bukan fixture kontradiktif) — buktikan adapter tetap memakai `.status`
@@ -155,7 +157,7 @@ class TestFixtureTidakLolos:
 
     def test_rekomendasi_sistem_tidak_setuju(self):
         hasil = adaptasi(_muat_assessment("l2_sample_tidak_lolos.json"))
-        assert hasil.rekomendasi_sistem == "Tidak Setuju"
+        assert hasil.rekomendasi_sistem == "Tolak"
 
     def test_cek_konsistensi_intensitas_tetap_konsisten(self):
         # ITBX yang menggagalkan gate, tapi intensitas sendiri (MEMENUHI_SYARAT, semua parameter
@@ -268,7 +270,7 @@ class TestTahapanIntensitasAbsen:
         hasil = adaptasi(assessment)
         poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
         assert poin_itbx.status == "X"
-        assert hasil.rekomendasi_sistem == "Tidak Setuju"
+        assert hasil.rekomendasi_sistem == "Tolak"
 
 
 class TestFixtureAmplop8090:

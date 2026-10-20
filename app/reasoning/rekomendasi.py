@@ -1,30 +1,45 @@
 """Turunkan rekomendasi_sistem secara deterministik dari gate_hukum + impact_assessment.
 
 Murni fungsi, tanpa I/O/LLM — sesuai prinsip "Deterministik di tempat presisi" (CLAUDE.md).
+
+Mengikuti kontrak BE "Spesifikasi Kontrak Variabel Output AI Reasoning (L3)" v1.0.0 (2026-10-20), bagian 4.
+Nilai sah `rekomendasi_sistem`: Setuju, Setuju Bersyarat, Lolos Terbatas, Tolak.
 """
 
-KATEGORI_DAMPAK_BERSYARAT = {"Tinggi", "Sangat Tinggi"}
+# Dampak yang MEMERLUKAN mitigasi (spesifikasi BE bagian 4: "Sedang/Tinggi/Sangat Tinggi yang memerlukan
+# mitigasi"). Sebelum 2026-10-20 hanya Tinggi/Sangat Tinggi; Sedang kini ikut karena spesifikasi BE
+# menjadikannya pemicu Setuju Bersyarat.
+KATEGORI_DAMPAK_BERSYARAT = {"Sedang", "Tinggi", "Sangat Tinggi"}
+
+REKOMENDASI_TOLAK = "Tolak"
+REKOMENDASI_TERBATAS = "Lolos Terbatas"
+REKOMENDASI_BERSYARAT = "Setuju Bersyarat"
+REKOMENDASI_SETUJU = "Setuju"
 
 
-def turunkan_rekomendasi(gate_status: str, impact_category: str | None) -> str:
-    """Matriks rekomendasi_sistem.
+def turunkan_rekomendasi(gate_status: str, impact_category: str | None, status_itbx: str | None = None) -> str:
+    """Matriks rekomendasi_sistem, urut prioritas (kondisi yang lebih tinggi mengalahkan yang di bawahnya).
 
     `impact_category` HARUS sudah dinormalisasi Title Case oleh caller
     (lihat app/reasoning/calculator.py::normalisasi_kategori_dampak) sebelum dipanggil di sini.
 
-    - Tidak Lolos -> Tidak Setuju (short-circuit, kategori dampak tidak relevan).
-    - Lolos Bersyarat -> Setuju Bersyarat (pelanggaran intensitas sudah cukup, kategori dampak tidak
-      bisa menaikkan/menurunkan ini lagi).
-    - Lolos + dampak Tinggi/Sangat Tinggi -> Setuju Bersyarat.
-    - Lolos + dampak lainnya (termasuk None/belum dinilai) -> Setuju. Dampak yang belum dinilai
-      TIDAK menahan approval (asumsi: absennya penilaian bukan alasan untuk membersyaratkan).
-    """
-    if gate_status == "Tidak Lolos":
-        return "Tidak Setuju"
-    if gate_status == "Lolos Bersyarat":
-        return "Setuju Bersyarat"
-    if gate_status == "Lolos":
-        if impact_category in KATEGORI_DAMPAK_BERSYARAT:
-            return "Setuju Bersyarat"
-        return "Setuju"
-    raise ValueError(f"gate_status tidak dikenal: {gate_status!r}")
+    1. Tolak: gate Tidak Lolos, atau ITBX = X.
+    2. Lolos Terbatas: gate Lolos Terbatas, atau ITBX = T (juga TB: unsur terbatas).
+    3. Setuju Bersyarat: gate Lolos Bersyarat (ITBX B atau intensitas melampaui batas), ITBX = B, atau dampak
+       Sedang/Tinggi/Sangat Tinggi yang memerlukan mitigasi.
+    4. Setuju: semua aspek legal I, intensitas patuh, dampak Rendah (atau belum dinilai: absennya penilaian
+       bukan alasan untuk membersyaratkan).
+
+    `status_itbx` opsional: bila diberikan, ia ikut menentukan (gate BE kadang melabeli ITBX T sebagai Lolos
+    Bersyarat, padahal menurut spesifikasi harus Lolos Terbatas)."""
+    if gate_status not in ("Lolos", "Lolos Bersyarat", "Lolos Terbatas", "Tidak Lolos"):
+        raise ValueError(f"gate_status tidak dikenal: {gate_status!r}")
+    if gate_status == "Tidak Lolos" or status_itbx == "X":
+        return REKOMENDASI_TOLAK
+    if gate_status == "Lolos Terbatas" or status_itbx in ("T", "TB"):
+        return REKOMENDASI_TERBATAS
+    if gate_status == "Lolos Bersyarat" or status_itbx == "B":
+        return REKOMENDASI_BERSYARAT
+    if impact_category in KATEGORI_DAMPAK_BERSYARAT:
+        return REKOMENDASI_BERSYARAT
+    return REKOMENDASI_SETUJU

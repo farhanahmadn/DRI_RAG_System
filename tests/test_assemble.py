@@ -417,7 +417,7 @@ class TestJalankanPrecheckEndToEnd:
 
         assert {p.poin_id for p in output.poin} == {"itbx", "intensitas", "dampak"}
         assert output.ringkasan_gate.final_gate_status == "Lolos"
-        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju Bersyarat"  # dampak Sedang
         assert output.narasi_rekomendasi.paragraf_gate_intensitas.strip() != ""
         assert output.narasi_rekomendasi.paragraf_dampak.strip() != ""
 
@@ -429,7 +429,7 @@ class TestJalankanPrecheckEndToEnd:
         output = jalankan_precheck(assessment, MockRetriever())
 
         assert output.ringkasan_gate.final_gate_status == "Lolos Bersyarat"
-        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Setuju Bersyarat"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Lolos Terbatas"  # ITBX T
         poin_intensitas = next(p for p in output.poin if p.poin_id == "intensitas")
         assert poin_intensitas.status == "MELAMPAUI_BATAS"
 
@@ -442,7 +442,7 @@ class TestJalankanPrecheckEndToEnd:
 
         assert output.ringkasan_gate.final_gate_status == "Tidak Lolos"
         assert output.ringkasan_gate.decisive_stage == "itbx"
-        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Tidak Setuju"
+        assert output.rekomendasi_sistem == adaptasi(assessment).rekomendasi_sistem == "Tolak"
 
     def test_fixture_tidak_lolos_itbx_x_fallback_dipaksa_low_confidence_dan_caveat(self, monkeypatch):
         # reason back-end ("dilarang (X) atau tidak ditemukan") ambigu -> heuristik fallback_data_kosong
@@ -864,7 +864,7 @@ def test_narasi_rekomendasi_titik_koma_diperbaiki_bukan_fallback(monkeypatch):
         "paragraf_gate_intensitas": "ITBX tidak sesuai; pemohon perlu meninjau lokasi.",
         "paragraf_dampak": "Dampak rendah.",
     })
-    hasil = asm._rakit_narasi_rekomendasi([], "Tidak Setuju")
+    hasil = asm._rakit_narasi_rekomendasi([], "Tolak")
     assert hasil.paragraf_gate_intensitas == "ITBX tidak sesuai, pemohon perlu meninjau lokasi."
     assert hasil.paragraf_dampak == "Dampak rendah."
 
@@ -883,13 +883,13 @@ class TestAngkaDikutipDariSaranDiizinkan:
         _patch_kesimpulan_llm(monkeypatch, hasil_dict={
             "langkah_berdampak": ["Luas lantai dasar perlu diturunkan hingga 861.6 m² agar KDB menjadi 60%."],
             "catatan_lokasi": None})
-        hasil = _rakit_kesimpulan(self._poin_list(), "Tidak Setuju")
+        hasil = _rakit_kesimpulan(self._poin_list(), "Tolak")
         assert "861.6" in hasil.langkah_berdampak[0]
 
     def test_kesimpulan_angka_karangan_tetap_fallback(self, monkeypatch):
         _patch_kesimpulan_llm(monkeypatch, hasil_dict={
             "langkah_berdampak": ["Luas lantai dasar perlu diturunkan hingga 999.9 m²."], "catatan_lokasi": None})
-        hasil = _rakit_kesimpulan(self._poin_list(), "Tidak Setuju")
+        hasil = _rakit_kesimpulan(self._poin_list(), "Tolak")
         assert hasil.langkah_berdampak == [self._poin_list()[0].rekomendasi.saran]
 
     def test_narasi_mengutip_angka_saran_lolos(self, monkeypatch):
@@ -898,7 +898,7 @@ class TestAngkaDikutipDariSaranDiizinkan:
             "paragraf_dampak": "Dampak perlu dipantau."})
         poin_list = self._poin_list() + [
             _poin_output(poin_id="dampak", rekomendasi=RekomendasiOutput(tipe="numerik-mitigasi", saran="Pantau dampak."))]
-        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Tidak Setuju")
+        hasil = assemble_module._rakit_narasi_rekomendasi(poin_list, "Tolak")
         assert "861.6" in hasil.paragraf_gate_intensitas
 
 

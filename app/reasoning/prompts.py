@@ -26,7 +26,7 @@ ATURAN WAJIB:
 8. JANGAN MENGHITUNG atau MENGARANG angka. Angka FAKTA yang diberikan boleh disebut verbatim (contoh: "KDB usulan 90% melampaui batas maksimum 60%"), tetapi tidak boleh dihitung, diperkirakan, atau dikarang. Angka target final dirakit sistem di field terpisah.
 9. Sebut pemohon sebagai orang ketiga ("pemohon"/"permohonan ini"), JANGAN memakai "Anda". Bahasa Indonesia jelas, profesional, analitis, dapat diaudit.
 10a. BAHASA UNTUK PETUGAS, BUKAN BAHASA SISTEM. DILARANG menyalin nama field/label teknis ("KATEGORI_DAMPAK", "STATUS_ITBX", "FALLBACK_DATA_KOSONG", "ambang_maks") atau menjelaskan mekanisme internal sistem. Tulis substansinya dengan kata biasa ("dampak tergolong Rendah", "kegiatan termasuk kategori Bersyarat").
-10. POIN LOLOS TETAP WAJIB DIJELASKAN KONKRET: jika poin lolos/memenuhi (STATUS_ITBX "I", STATUS_INTENSITAS "MEMENUHI_SYARAT", dampak "Rendah"/"Sedang"), JANGAN menulis "tidak ada catatan berisiko". Jelaskan mengapa lolos dengan fakta relevan (kategori kegiatan di zona, angka usulan vs ambang, kategori dampak) dan sitasi yang tersedia.
+10. POIN LOLOS TETAP WAJIB DIJELASKAN KONKRET: jika poin lolos/memenuhi (STATUS_ITBX "I", STATUS_INTENSITAS "MEMENUHI_SYARAT", dampak "Rendah"), JANGAN menulis "tidak ada catatan berisiko". Jelaskan mengapa lolos dengan fakta relevan (kategori kegiatan di zona, angka usulan vs ambang, kategori dampak) dan sitasi yang tersedia.
 11. SARAN HARUS KONKRET & DAPAT DITINDAKLANJUTI. Sebut APA yang disesuaikan dan angka targetnya persis jika ada. Jika ada lebih dari satu langkah/opsi di fakta, tulis "saran" sebagai daftar bernomor ("1. ...\\n2. ...") satu opsi per baris. Jika ada TARGET_MITIGASI_KUANTITATIF atau target numerik lain, sebut angkanya di salah satu baris saran. Untuk intensitas, jika "[TARGET PATUH: ...]" memuat angka m², angka m² itu WAJIB dikutip persis di saran, bukan hanya persentasenya.
 12. FORMAT PENEKANAN: di "reasoning_panjang" tandai BOLD (diapit tanda bintang ganda **seperti ini**): (a) status/verdict poin, (b) alasan utama (satu frasa pendek), (c) kalimat tindak-lanjut terakhir. Jangan bold seluruh paragraf.
 13. Tulis angka sebagai kalimat kualitatif, bukan notasi mentah: BENAR "KDH sebesar 19,6% berada di bawah ketentuan minimal 30%", SALAH "KDH (19.591212) Min (30)" atau "KDB (96.095) Max (70)".
@@ -376,8 +376,8 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
     lines = [
         f"KATEGORI_DAMPAK: {poin.status}",
         (
-            f"Kategori dampak ini FINAL — jelaskan dampak tergolong {poin.status} dan (bila Tinggi/"
-            "Sangat Tinggi) perlu mitigasi. JANGAN menafsirkan atau menyebut skor angka; gunakan "
+            f"Kategori dampak ini FINAL — jelaskan dampak tergolong {poin.status} dan (bila Sedang/"
+            "Tinggi/Sangat Tinggi) perlu mitigasi. JANGAN menafsirkan atau menyebut skor angka; gunakan "
             "KATEGORI apa adanya."
         ),
     ]
@@ -459,8 +459,8 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             "ketentuan khusus kawasan resapan air (zero delta Q, Pasal 53) sebagai ketentuan yang "
             "berlaku dan DILARANG menyatakan lokasi berada di kawasan atau zona resapan air. Anda BOLEH "
             "menulis SATU kalimat bahwa ketentuan khusus kawasan resapan air (Pasal 53) tidak berlaku "
-            "karena lokasi di luar kawasan resapan. Pada dampak Rendah atau Sedang, sumur atau kolam "
-            "resapan BOLEH dianjurkan sebagai praktik baik. Pada dampak Tinggi atau Sangat Tinggi, JANGAN "
+            "karena lokasi di luar kawasan resapan. Pada dampak Rendah, sumur atau kolam "
+            "resapan BOLEH dianjurkan sebagai praktik baik. Pada dampak Sedang, Tinggi, atau Sangat Tinggi, JANGAN "
             "menyebut sumur atau kolam resapan sama sekali: mitigasinya adalah kewajiban menurunkan KDB "
             "dan menaikkan KDH/RTH. Bila sumur disebut, sebutkan sebagai rekomendasi, BUKAN kewajiban dari "
             "ketentuan kawasan resapan air. JANGAN "

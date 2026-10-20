@@ -177,7 +177,7 @@ class KeputusanZona(BaseModel):
 
 
 class GateHukum(BaseModel):
-    final_gate_status: Literal["Lolos", "Lolos Bersyarat", "Tidak Lolos"]
+    final_gate_status: Literal["Lolos", "Lolos Bersyarat", "Lolos Terbatas", "Tidak Lolos"]
     # Rekomendasi versi back-end — informational only. Kita turunkan rekomendasi_sistem sendiri secara
     # deterministik (lihat app/reasoning/rekomendasi.py), TIDAK memakai field ini langsung.
     rekomendasi_sistem: str | None = None
@@ -402,7 +402,7 @@ class PoinOutput(BaseModel):
 
 
 class RingkasanGateOutput(BaseModel):
-    final_gate_status: Literal["Lolos", "Lolos Bersyarat", "Tidak Lolos"]
+    final_gate_status: Literal["Lolos", "Lolos Bersyarat", "Lolos Terbatas", "Tidak Lolos"]
     decisive_stage: str | None = None
     kalimat: str
 
@@ -411,11 +411,18 @@ class RingkasanDampakOutput(BaseModel):
     impact_category: str | None = None
     impact_score: float | None = None
     kalimat: str
+    # Kontrak BE v1.0.0: label klasifikasi kawasan tapak, status resapan, dan butir ringkas dampak.
+    kawasan_label: str | None = None
+    is_kawasan_resapan: bool = False
+    poin: list[str] = []
 
 
 class KesimpulanOutput(BaseModel):
     langkah_berdampak: list[str]
     catatan_lokasi: str | None = None
+    # Kontrak BE v1.0.0: ringkasan eksekutif 1-2 kalimat, dan cerminan langkah_berdampak untuk mesin PDF.
+    ringkasan: str = ""
+    ringkasan_tindak_lanjut: list[str] = []
 
 
 # Item permintaan user 2026-09-21: narasi 2 paragraf ringkas berdasar rekomendasi_sistem per-poin —
@@ -440,8 +447,10 @@ class RekomendasiZonaOutput(BaseModel):
     status_intensitas: str | None = None
     status_keputusan: str | None = None
     rekomendasi: str
+    pertimbangan: str = ""
     alasan: str
     saran: str
+    rekomendasi_poin: list[str] = []
     poin_ids: list[str]
     low_confidence: bool = False
 

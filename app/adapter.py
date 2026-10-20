@@ -399,11 +399,22 @@ def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
     )
 
 
+_URUTAN_KETAT_ITBX = {"X": 4, "TB": 3, "T": 3, "B": 2, "I": 1}
+
+
+def _itbx_paling_ketat(assessment: L2Assessment) -> str | None:
+    """Status ITBX paling ketat di seluruh zona (X > T/TB > B > I); satu zona = status `tahapan.itbx`."""
+    zona = assessment.gate_hukum.itbx_zones or []
+    daftar = [z.status for z in zona] if len(zona) >= 2 else [assessment.gate_hukum.tahapan.itbx.status]
+    return max(daftar, key=lambda s: _URUTAN_KETAT_ITBX.get(s, 0)) if daftar else None
+
+
 def adaptasi(assessment: L2Assessment) -> AdapterResult:
     # final_gate_status dikonsumsi APA ADANYA (ground truth back-end) — tidak diturunkan ulang dari
     # status/parameter tahap-tahap di bawahnya.
     kategori_dampak = normalisasi_kategori_dampak(assessment.impact_assessment.impact_category)
-    rekomendasi_sistem = turunkan_rekomendasi(assessment.gate_hukum.final_gate_status, kategori_dampak)
+    rekomendasi_sistem = turunkan_rekomendasi(
+        assessment.gate_hukum.final_gate_status, kategori_dampak, _itbx_paling_ketat(assessment))
     pasangan = zona_terpisah(assessment)
     if pasangan:
         poin: list[PoinKonteks] = []

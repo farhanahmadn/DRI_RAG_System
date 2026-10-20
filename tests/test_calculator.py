@@ -159,9 +159,10 @@ class TestSarankanArahMitigasiDampak:
         assert hasil["perlu_mitigasi"] is False
         assert hasil["arah"], "dampak Rendah tetap punya arah pemeliharaan (bukan kosong)"
 
-    def test_kategori_sedang_tidak_perlu_mitigasi(self):
+    def test_kategori_sedang_perlu_mitigasi(self):
+        # Spesifikasi BE v1.0.0 bagian 4: dampak Sedang memerlukan mitigasi (sebelumnya dianggap aman).
         hasil = sarankan_arah_mitigasi_dampak(self._impact(impact_category="SEDANG"))
-        assert hasil["perlu_mitigasi"] is False
+        assert hasil["perlu_mitigasi"] is True
         assert hasil["arah"]
 
     def test_kategori_tinggi_perlu_mitigasi(self):
@@ -229,16 +230,15 @@ class TestHitungTargetMitigasiDampak:
         )
         assert hasil == {}
 
-    def test_kategori_sedang_return_kosong_selaras_sarankan_arah_mitigasi(self):
-        # Bug ditemukan live (APP-2026-8376): kategori "Sedang" BUKAN anggota
-        # KATEGORI_DAMPAK_BERSYARAT (cuma Tinggi/Sangat Tinggi) — sarankan_arah_mitigasi_dampak
-        # sudah benar menandai perlu_mitigasi=False utk Sedang, tapi versi lama fungsi ini tetap
-        # menghitung target (krn cuma cek "ada kategori lebih ringan?"), bikin poin "aman" dapat
-        # target kontradiktif. Gate DISAMAKAN persis dgn KATEGORI_DAMPAK_BERSYARAT sekarang.
+    def test_kategori_sedang_target_turun_ke_rendah_selaras_sarankan_arah_mitigasi(self):
+        # Gerbang hitung_target_mitigasi_dampak SAMA dengan sarankan_arah_mitigasi_dampak (APP-2026-8376):
+        # keduanya memakai KATEGORI_DAMPAK_BERSYARAT. Sejak spesifikasi BE v1.0.0 Sedang termasuk di dalamnya,
+        # jadi target = ambang atas band Rendah (< 1.5), bukan lagi kosong.
         hasil = hitung_target_mitigasi_dampak(
             self._impact(impact_category="Sedang", runoff_change_index=1.56)
         )
-        assert hasil == {}
+        assert hasil["runoff_change_index_maks"] == 1.5 and hasil["kategori_target"] == "Rendah"
+        assert sarankan_arah_mitigasi_dampak(self._impact(impact_category="Sedang", runoff_change_index=1.56))["perlu_mitigasi"]
 
     def test_index_none_return_kosong(self):
         hasil = hitung_target_mitigasi_dampak(self._impact(runoff_change_index=None))

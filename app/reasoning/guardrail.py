@@ -1046,7 +1046,7 @@ def _cek_sumur_dampak_tinggi_non_resapan(poin_output: PoinOutput, poin: PoinKont
     """Aturan PM 2026-10-18: dampak Tinggi/Sangat Tinggi di LUAR kawasan resapan hanya dimitigasi dengan
     menurunkan KDB dan menaikkan KDH/RTH. Sumur/kolam resapan tak disebut sama sekali (saran dan langkah
     konkret sudah deterministik, jadi yang dicek hanya narasi LLM)."""
-    if poin.poin_id != "dampak" or poin.kawasan_resapan is not False or poin.status not in ("Tinggi", "Sangat Tinggi"):
+    if poin.poin_id != "dampak" or poin.kawasan_resapan is not False or poin.status not in ("Sedang", "Tinggi", "Sangat Tinggi"):
         return []
     teks = f"{poin_output.reasoning_pendek} {poin_output.reasoning_panjang}"
     if _RE_FASILITAS_RESAPAN.search(teks):

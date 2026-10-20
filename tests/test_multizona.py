@@ -98,7 +98,7 @@ class TestKeluaranMultiZona:
             d["gate_hukum"]["intensitas_zones"][1]["status"] = "TIDAK_DIEVALUASI"
             d["gate_hukum"]["final_gate_status"] = "Tidak Lolos"
         out = pipeline(_muat(ubah))
-        assert [r.rekomendasi for r in out.rekomendasi_per_zona] == ["Setuju", "Tidak Setuju"]
+        assert [r.rekomendasi for r in out.rekomendasi_per_zona] == ["Setuju", "Tolak"]
         assert out.rekomendasi_per_zona[1].status_intensitas == "Tidak Dinilai"
 
     def test_catatan_global_membawa_pemberitahuan_be(self, pipeline):
