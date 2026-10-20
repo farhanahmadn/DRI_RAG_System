@@ -113,9 +113,18 @@ def saran_itbx_deterministik(poin: PoinKonteks) -> str | None:
     Daftar pendek (sampai 8 item) dianggap sudah relevan dari BE. Daftar panjang (satu dokumen zona memuat
     semua kelompok kegiatan) hanya diambil item yang berbagi kata kunci dengan kegiatan pemohon. Tidak ada
     yang relevan -> None, dan saran tetap dari LLM seperti sebelumnya."""
-    if poin.poin_id != "itbx" or poin.status not in ("T", "B", "TB"):
+    if poin.poin_id != "itbx" or poin.status not in ("T", "B", "TB", "X"):
         return None
     fakta = poin.fakta or {}
+    if poin.status == "X":
+        # Status X: LLM menulis alternatif kegiatan dan zona karangan ("kegiatan komersial atau industri ringan",
+        # "pindah ke Zona Industri") di uji APP-2026-0022 yang melanggar aturan #7/#20. Saran dibuat netral dan
+        # tanpa menebak makna X (dilarang eksplisit / tak ada di matriks / di luar area): maknanya ada di penjelasan.
+        kegiatan = (fakta.get("kegiatan_diusulkan") or "yang diusulkan").strip()
+        zona = f" pada {poin.zona}" if poin.zona else ""
+        return (f"1. Kegiatan {kegiatan} berstatus X{zona}, sehingga tidak dapat dilanjutkan di zona ini sebagaimana "
+                "diusulkan.\n2. Pemohon perlu menyesuaikan jenis kegiatan atau lokasi permohonan, dan keputusan akhir "
+                "ada pada petugas.")
     ketentuan = [str(x).strip() for x in (fakta.get("keterangan_ketentuan") or []) if str(x).strip()]
     if not ketentuan:
         return None

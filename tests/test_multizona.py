@@ -175,3 +175,42 @@ class TestPembersihanTeks:
     def test_prompt_dampak_tak_memuat_status_itbx_kawasan(self):
         d = adaptasi(_muat()).poin[-1]
         assert "status ITBX kegiatan di kawasan itu" not in build_user_prompt(d, [], None, None)
+
+
+class TestPerbaikanCampuran:
+    def test_klb_berunit_m2_dibersihkan_tapi_luas_lain_aman(self):
+        from app.reasoning.guardrail import _bersihkan_label_teknis as b
+        assert b("menurunkan KLB ke maksimal 1 m² dengan mengurangi luas total lantai hingga 1244 m².") == \
+            "menurunkan KLB ke maksimal 1 dengan mengurangi luas total lantai hingga 1244 m²."
+        assert b("KLB 0.08 dengan luas lantai 1244 m²") == "KLB 0.08 dengan luas lantai 1244 m²"
+
+    def test_itbx_x_saran_deterministik_tanpa_karangan(self):
+        from app.reasoning.generator import saran_itbx_deterministik
+
+        def _x(d):
+            d["gate_hukum"]["itbx_zones"][1].update(status="X", keterangan_ketentuan=[])
+        poin = adaptasi(_muat(_x)).poin[2]
+        saran = saran_itbx_deterministik(poin)
+        assert "berstatus X pada Zona Perumahan" in saran and "keputusan akhir ada pada petugas" in saran
+        for karangan in ("industri", "komersial", "pindah"):
+            assert karangan not in saran.lower()
+
+
+class TestTigaZona:
+    def _tiga(self, d):
+        gate = d["gate_hukum"]
+        zona3 = copy.deepcopy(gate["itbx_zones"][1])
+        zona3.update(nama_zona="Zona Perdagangan dan Jasa", kode_zona="K", luas_m2=100.0, persentase=8.0)
+        gate["itbx_zones"].append(zona3)
+        inten3 = copy.deepcopy(gate["intensitas_zones"][1])
+        inten3.update(nama_zona="Zona Perdagangan dan Jasa", kode_zona="K-3", luas_irisan_m2=100.0, persentase=8.0)
+        gate["intensitas_zones"].append(inten3)
+        gate["keputusan_sistem_per_zona"].append(dict(gate["keputusan_sistem_per_zona"][1], nama_zona="Zona Perdagangan dan Jasa", kode_zona="K"))
+        gate["total_zones"] = 3
+
+    def test_tiga_zona_menghasilkan_tujuh_poin_dan_tiga_rekomendasi(self, pipeline):
+        out = pipeline(_muat(self._tiga))
+        assert [p.poin_id for p in out.poin] == [
+            "itbx_P", "intensitas_P", "itbx_R", "intensitas_R", "itbx_K", "intensitas_K", "dampak"]
+        assert [r.kode_zona for r in out.rekomendasi_per_zona] == ["P", "R", "K"]
+        assert out.poin[5].zona.nama_zona == "Zona Perdagangan dan Jasa"
