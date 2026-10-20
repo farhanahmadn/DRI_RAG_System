@@ -182,7 +182,8 @@ def _klausa_status(output: OutputL3) -> str:
         if inten:
             isi.append(f"intensitas {_LABEL_INTENSITAS_RINGKAS.get(inten.status, inten.status.lower())}")
         if isi:
-            bagian.append((f"{label}: " if label else "") + ", ".join(isi))
+            teks = ", ".join(isi)
+            bagian.append(f"{label}: {teks}" if label else teks[0].upper() + teks[1:])
     return (". ".join(bagian) + ".") if bagian else ""
 
 
@@ -235,6 +236,7 @@ def _akar_gate_hidrologis(output: OutputL3, daun: list[tuple[PoinOutput, PoinBE]
     return PoinBE(
         poin_id="gate_hidrologis", kategori="Penilaian Lingkungan (Hidrologi)", status=status,
         reasoning_pendek=b.reasoning_pendek, reasoning_panjang=b.reasoning_panjang,
+        dasar_regulasi=_gabung_dasar([b]),
         rekomendasi=_gabung_rekomendasi([b], b.reasoning_pendek), sub_poin=[b],
         low_confidence=b.low_confidence,
     )

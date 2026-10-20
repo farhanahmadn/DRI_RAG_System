@@ -84,7 +84,7 @@ class TestPohonSatuZona:
 
     def test_ringkasan_gate_memuat_status_itbx_dan_intensitas(self, jalankan):
         kalimat = jalankan(_muat(ubah=_satu_zona)).ringkasan_gate.kalimat
-        assert kalimat.endswith("status ITBX Diizinkan (I), intensitas memenuhi syarat.")
+        assert kalimat.endswith(" Status ITBX Diizinkan (I), intensitas memenuhi syarat.")
 
 
 class TestPohonMultiZona:

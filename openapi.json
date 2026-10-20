@@ -29,6 +29,7 @@
     "/reasoning": {
       "post": {
         "summary": "Reasoning",
+        "description": "Keluaran mengikuti Spesifikasi Kontrak Variabel Output AI Reasoning (L3) v1.0.0 dari BE\n(docs/KONTRAK_L3_BE_V1.md): `poin` berupa pohon gate_hukum/gate_hidrologis.",
         "operationId": "reasoning_reasoning_post",
         "requestBody": {
           "content": {
@@ -46,7 +47,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OutputL3"
+                  "$ref": "#/components/schemas/AdvisoryL3"
                 }
               }
             }
@@ -116,6 +117,64 @@
   },
   "components": {
     "schemas": {
+      "AdvisoryL3": {
+        "properties": {
+          "rekomendasi_sistem": {
+            "type": "string",
+            "title": "Rekomendasi Sistem"
+          },
+          "kesimpulan": {
+            "$ref": "#/components/schemas/KesimpulanOutput"
+          },
+          "ringkasan_gate": {
+            "$ref": "#/components/schemas/RingkasanGateOutput"
+          },
+          "ringkasan_dampak": {
+            "$ref": "#/components/schemas/RingkasanDampakOutput"
+          },
+          "narasi_rekomendasi": {
+            "$ref": "#/components/schemas/NarasiRekomendasiOutput"
+          },
+          "rekomendasi_per_zona": {
+            "items": {
+              "$ref": "#/components/schemas/RekomendasiZonaOutput"
+            },
+            "type": "array",
+            "title": "Rekomendasi Per Zona"
+          },
+          "poin": {
+            "items": {
+              "$ref": "#/components/schemas/PoinBE"
+            },
+            "type": "array",
+            "title": "Poin"
+          },
+          "catatan_global": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Catatan Global",
+            "default": []
+          },
+          "low_confidence_keseluruhan": {
+            "type": "boolean",
+            "title": "Low Confidence Keseluruhan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rekomendasi_sistem",
+          "kesimpulan",
+          "ringkasan_gate",
+          "ringkasan_dampak",
+          "narasi_rekomendasi",
+          "rekomendasi_per_zona",
+          "poin",
+          "low_confidence_keseluruhan"
+        ],
+        "title": "AdvisoryL3"
+      },
       "DasarHukum": {
         "properties": {
           "dokumen": {
@@ -139,6 +198,84 @@
         ],
         "title": "DasarHukum"
       },
+      "DasarRegulasiBE": {
+        "properties": {
+          "judul": {
+            "type": "string",
+            "title": "Judul"
+          },
+          "deskripsi": {
+            "type": "string",
+            "title": "Deskripsi"
+          },
+          "kategori": {
+            "type": "string",
+            "title": "Kategori",
+            "default": "Regulasi Daerah"
+          },
+          "citation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citation Id"
+          },
+          "dokumen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dokumen"
+          },
+          "pasal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pasal"
+          },
+          "halaman": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Halaman"
+          },
+          "terverifikasi": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terverifikasi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judul",
+          "deskripsi"
+        ],
+        "title": "DasarRegulasiBE"
+      },
       "GateHukum": {
         "properties": {
           "final_gate_status": {
@@ -146,6 +283,7 @@
             "enum": [
               "Lolos",
               "Lolos Bersyarat",
+              "Lolos Terbatas",
               "Tidak Lolos"
             ],
             "title": "Final Gate Status"
@@ -1211,6 +1349,19 @@
               }
             ],
             "title": "Catatan Lokasi"
+          },
+          "ringkasan": {
+            "type": "string",
+            "title": "Ringkasan",
+            "default": ""
+          },
+          "ringkasan_tindak_lanjut": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ringkasan Tindak Lanjut",
+            "default": []
           }
         },
         "type": "object",
@@ -1555,64 +1706,6 @@
         ],
         "title": "NarasiRekomendasiOutput"
       },
-      "OutputL3": {
-        "properties": {
-          "ringkasan_gate": {
-            "$ref": "#/components/schemas/RingkasanGateOutput"
-          },
-          "ringkasan_dampak": {
-            "$ref": "#/components/schemas/RingkasanDampakOutput"
-          },
-          "poin": {
-            "items": {
-              "$ref": "#/components/schemas/PoinOutput"
-            },
-            "type": "array",
-            "title": "Poin"
-          },
-          "rekomendasi_sistem": {
-            "type": "string",
-            "title": "Rekomendasi Sistem"
-          },
-          "narasi_rekomendasi": {
-            "$ref": "#/components/schemas/NarasiRekomendasiOutput"
-          },
-          "kesimpulan": {
-            "$ref": "#/components/schemas/KesimpulanOutput"
-          },
-          "catatan_global": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Catatan Global",
-            "default": []
-          },
-          "low_confidence_keseluruhan": {
-            "type": "boolean",
-            "title": "Low Confidence Keseluruhan"
-          },
-          "rekomendasi_per_zona": {
-            "items": {
-              "$ref": "#/components/schemas/RekomendasiZonaOutput"
-            },
-            "type": "array",
-            "title": "Rekomendasi Per Zona",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "ringkasan_gate",
-          "ringkasan_dampak",
-          "poin",
-          "rekomendasi_sistem",
-          "narasi_rekomendasi",
-          "kesimpulan",
-          "low_confidence_keseluruhan"
-        ],
-        "title": "OutputL3"
-      },
       "ParameterIntensitas": {
         "properties": {
           "usulan": {
@@ -1658,7 +1751,7 @@
         ],
         "title": "ParameterIntensitas"
       },
-      "PoinOutput": {
+      "PoinBE": {
         "properties": {
           "poin_id": {
             "type": "string",
@@ -1680,20 +1773,39 @@
             "type": "string",
             "title": "Reasoning Panjang"
           },
+          "dasar_regulasi": {
+            "items": {
+              "$ref": "#/components/schemas/DasarRegulasiBE"
+            },
+            "type": "array",
+            "title": "Dasar Regulasi",
+            "default": []
+          },
+          "rekomendasi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RekomendasiBE"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sub_poin": {
+            "items": {
+              "$ref": "#/components/schemas/PoinBE"
+            },
+            "type": "array",
+            "title": "Sub Poin",
+            "default": []
+          },
           "sitasi": {
             "items": {
               "$ref": "#/components/schemas/SitasiOutput"
             },
             "type": "array",
-            "title": "Sitasi"
-          },
-          "rekomendasi": {
-            "$ref": "#/components/schemas/RekomendasiOutput"
-          },
-          "low_confidence": {
-            "type": "boolean",
-            "title": "Low Confidence",
-            "default": false
+            "title": "Sitasi",
+            "default": []
           },
           "zona": {
             "anyOf": [
@@ -1704,6 +1816,11 @@
                 "type": "null"
               }
             ]
+          },
+          "low_confidence": {
+            "type": "boolean",
+            "title": "Low Confidence",
+            "default": false
           }
         },
         "type": "object",
@@ -1712,20 +1829,20 @@
           "kategori",
           "status",
           "reasoning_pendek",
-          "reasoning_panjang",
-          "sitasi",
-          "rekomendasi"
+          "reasoning_panjang"
         ],
-        "title": "PoinOutput"
+        "title": "PoinBE"
       },
-      "RekomendasiOutput": {
+      "RekomendasiBE": {
         "properties": {
           "tipe": {
-            "type": "string",
-            "enum": [
-              "kategorikal",
-              "numerik",
-              "numerik-mitigasi"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Tipe"
           },
@@ -1747,6 +1864,27 @@
             "type": "string",
             "title": "Saran"
           },
+          "poin": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Poin",
+            "default": []
+          },
+          "langkah_konkret": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Langkah Konkret",
+            "default": []
+          },
+          "alasan": {
+            "type": "string",
+            "title": "Alasan",
+            "default": ""
+          },
           "disclaimer": {
             "anyOf": [
               {
@@ -1758,21 +1896,20 @@
             ],
             "title": "Disclaimer"
           },
-          "langkah_konkret": {
+          "langkah_terstruktur": {
             "items": {
               "$ref": "#/components/schemas/LangkahKonkretOutput"
             },
             "type": "array",
-            "title": "Langkah Konkret",
+            "title": "Langkah Terstruktur",
             "default": []
           }
         },
         "type": "object",
         "required": [
-          "tipe",
           "saran"
         ],
-        "title": "RekomendasiOutput"
+        "title": "RekomendasiBE"
       },
       "RekomendasiZonaOutput": {
         "properties": {
@@ -1857,6 +1994,11 @@
             "type": "string",
             "title": "Rekomendasi"
           },
+          "pertimbangan": {
+            "type": "string",
+            "title": "Pertimbangan",
+            "default": ""
+          },
           "alasan": {
             "type": "string",
             "title": "Alasan"
@@ -1864,6 +2006,14 @@
           "saran": {
             "type": "string",
             "title": "Saran"
+          },
+          "rekomendasi_poin": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rekomendasi Poin",
+            "default": []
           },
           "poin_ids": {
             "items": {
@@ -1915,6 +2065,30 @@
           "kalimat": {
             "type": "string",
             "title": "Kalimat"
+          },
+          "kawasan_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kawasan Label"
+          },
+          "is_kawasan_resapan": {
+            "type": "boolean",
+            "title": "Is Kawasan Resapan",
+            "default": false
+          },
+          "poin": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Poin",
+            "default": []
           }
         },
         "type": "object",
@@ -1930,6 +2104,7 @@
             "enum": [
               "Lolos",
               "Lolos Bersyarat",
+              "Lolos Terbatas",
               "Tidak Lolos"
             ],
             "title": "Final Gate Status"
