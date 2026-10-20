@@ -198,3 +198,21 @@ def test_kalimat_lanjut_ringkasan_dipendekkan_di_batas_anak_kalimat():
     assert len(pendek) <= 260 and pendek.startswith("Pemohon wajib menjaga RTH") and not pendek.endswith((",", " "))
     assert _gabung_ringkasan("Dasar.", panjang).endswith(".") and len(_gabung_ringkasan("Dasar.", panjang)) < 280
     assert _pendekkan_kalimat("Singkat saja") == "Singkat saja"
+
+
+class TestPerapianAkar:
+    def test_klb_berunit_m2_pada_kalimat_ambang(self):
+        from app.reasoning.guardrail import _bersihkan_label_teknis as b
+        assert b("KLB 0,43 berada di bawah ambang maksimal 4,8 m², dan KDH 40 % di atas ambang minimal 25 %") == \
+            "KLB 0,43 berada di bawah ambang maksimal 4,8, dan KDH 40 % di atas ambang minimal 25 %"
+        assert b("KLB 0,43 dengan luas lantai total 1244 m²") == "KLB 0,43 dengan luas lantai total 1244 m²"
+
+    def test_rekomendasi_akar_tanpa_boilerplate_bila_ada_butir_lain(self):
+        from app.kontrak_be import PoinBE, RekomendasiBE, _gabung_rekomendasi
+        def anak(*poin):
+            return PoinBE(poin_id="x", kategori="k", status="s", reasoning_pendek="p", reasoning_panjang="q",
+                          rekomendasi=RekomendasiBE(saran="s", poin=list(poin)))
+        r = _gabung_rekomendasi([anak("Syarat A.", "Syarat B."), anak("Tidak diperlukan tindakan khusus. Poin ini telah memenuhi ketentuan.")], "alasan")
+        assert r.poin == ["Syarat A.", "Syarat B."] and r.saran == "- Syarat A.\n- Syarat B."
+        semua_baku = _gabung_rekomendasi([anak("Tidak diperlukan tindakan khusus. X."), anak("Tidak diperlukan tindakan khusus. Y.")], "a")
+        assert len(semua_baku.poin) == 1

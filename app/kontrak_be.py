@@ -37,6 +37,8 @@ from app.schemas import (
 )
 
 KATEGORI_REGULASI_DAERAH = "Regulasi Daerah"
+# Kalimat baku poin yang sudah memenuhi: tidak ikut ke rekomendasi simpul induk bila ada butir lain.
+_BAKU_TANPA_TINDAKAN = ("Tidak diperlukan tindakan khusus", "Tidak dievaluasi")
 _PANJANG_DESKRIPSI = 300
 
 
@@ -164,7 +166,9 @@ def _gabung_dasar(anak: list[PoinBE]) -> list[DasarRegulasiBE]:
 
 def _gabung_rekomendasi(anak: list[PoinBE], alasan: str) -> RekomendasiBE:
     """Rekomendasi simpul induk: gabungan butir dan langkah anak-anaknya (urut, tanpa duplikat)."""
-    butir = list(dict.fromkeys(b for a in anak if a.rekomendasi for b in a.rekomendasi.poin))
+    semua = list(dict.fromkeys(b for a in anak if a.rekomendasi for b in a.rekomendasi.poin))
+    bermakna = [b for b in semua if not b.startswith(_BAKU_TANPA_TINDAKAN)]
+    butir = bermakna or semua[:1]
     langkah = list(dict.fromkeys(l for a in anak if a.rekomendasi for l in a.rekomendasi.langkah_konkret))
     return RekomendasiBE(
         saran=_ke_bullet(butir) if len(butir) > 1 else (butir[0] if butir else ""),

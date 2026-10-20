@@ -469,6 +469,11 @@ _RE_KLB_M2 = re.compile(
     r"(\bKLB\b\s+(?:ke\s+)?(?:maksimal|maksimum|minimal|sebesar|sekitar|menjadi|di\s+bawah|di\s+atas)?\s*\d+(?:[.,]\d+)?)\s*m(?:²|2)(?![\w²])")
 
 
+# "KLB 0,43 berada di bawah ambang maksimal 4,8 m²": angka ambang yang langsung didahului kata ambang/batas.
+_RE_KLB_AMBANG_M2 = re.compile(
+    r"(\bKLB\b(?:(?!\bKD[BH]\b)(?:\d[.,]\d|[^.\n%])){0,60}?\b(?:ambang|batas)\s+(?:maksimal|maksimum|minimal)?\s*\d+(?:[.,]\d+)?)\s*m(?:²|2)(?![\w²])")
+
+
 def _bersihkan_label_teknis(teks: str | None) -> str | None:
     """Ganti nama label teknis yang tersalin dari prompt dgn padanan Bahasa Indonesia biasa.
     Label tak dikenal tetap dinormalkan (huruf kecil, garis bawah -> spasi) supaya label BARU yang
@@ -483,7 +488,8 @@ def _bersihkan_label_teknis(teks: str | None) -> str | None:
     teks = _RE_BOOL_DATA_MATRIKS.sub("", teks)
     # KLB adalah rasio, bukan persen atau luas: "KLB maksimum 1 %" dan "KLB ke maksimal 1 m²" -> "KLB ... 1".
     teks = _RE_KLB_PERSEN.sub(lambda m: m.group(1), teks)
-    return _RE_KLB_M2.sub(lambda m: m.group(1), teks)
+    teks = _RE_KLB_M2.sub(lambda m: m.group(1), teks)
+    return _RE_KLB_AMBANG_M2.sub(lambda m: m.group(1), teks)
 
 
 def _bersihkan_disclaimer_fallback_palsu(disclaimer: str | None) -> str | None:
