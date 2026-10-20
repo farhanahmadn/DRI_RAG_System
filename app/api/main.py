@@ -12,9 +12,10 @@ from fastapi.responses import JSONResponse
 from app.api.admin import clear_retrieval_cache, verifikasi_admin_token
 from app.api.dependencies import get_retriever
 from app.api.rate_limit import cek_rate_limit
+from app.kontrak_be import AdvisoryL3, ke_kontrak_be
 from app.reasoning.assemble import jalankan_precheck
 from app.retrieval.base import Retriever
-from app.schemas import L2Envelope, OutputL3
+from app.schemas import L2Envelope
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,11 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/reasoning", response_model=OutputL3, dependencies=[Depends(cek_rate_limit)])
-def reasoning(request: L2Envelope, retriever: Retriever = Depends(get_retriever)) -> OutputL3:
-    return jalankan_precheck(request.data, retriever)
+@app.post("/reasoning", response_model=AdvisoryL3, dependencies=[Depends(cek_rate_limit)])
+def reasoning(request: L2Envelope, retriever: Retriever = Depends(get_retriever)) -> AdvisoryL3:
+    """Keluaran mengikuti Spesifikasi Kontrak Variabel Output AI Reasoning (L3) v1.0.0 dari BE
+    (docs/KONTRAK_L3_BE_V1.md): `poin` berupa pohon gate_hukum/gate_hidrologis."""
+    return ke_kontrak_be(jalankan_precheck(request.data, retriever))
 
 
 @app.post("/admin/cache/clear", dependencies=[Depends(verifikasi_admin_token)])

@@ -9,6 +9,7 @@ from app.api import main as main_module
 from app.api.dependencies import get_retriever
 from app.api.main import app
 from app.api.rate_limit import _LIMIT, reset_rate_limiter
+from app.kontrak_be import ke_kontrak_be
 from app.schemas import (
     KesimpulanOutput,
     NarasiRekomendasiOutput,
@@ -82,7 +83,7 @@ def test_reasoning_happy_path_mock(monkeypatch):
     response = client.post("/reasoning", json=_request_body())
 
     assert response.status_code == 200
-    assert response.json() == output.model_dump(mode="json")
+    assert response.json() == ke_kontrak_be(output).model_dump(mode="json")
 
 
 def test_reasoning_terima_payload_amplop_statuscode_message_data(monkeypatch):
@@ -94,7 +95,7 @@ def test_reasoning_terima_payload_amplop_statuscode_message_data(monkeypatch):
     response = client.post("/reasoning", json=_request_body_amplop())
 
     assert response.status_code == 200
-    assert response.json() == output.model_dump(mode="json")
+    assert response.json() == ke_kontrak_be(output).model_dump(mode="json")
 
 
 def test_reasoning_terima_payload_polos_kompatibel_mundur(monkeypatch):
@@ -107,7 +108,7 @@ def test_reasoning_terima_payload_polos_kompatibel_mundur(monkeypatch):
     response = client.post("/reasoning", json=_request_body())
 
     assert response.status_code == 200
-    assert response.json() == output.model_dump(mode="json")
+    assert response.json() == ke_kontrak_be(output).model_dump(mode="json")
 
 
 def test_reasoning_input_buruk_422():

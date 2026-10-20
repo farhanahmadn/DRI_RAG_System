@@ -178,9 +178,15 @@ class TestPIIDetectedErrorTakMenjatuhkanPermohonan:
 
         assert response.status_code == 200
         body = response.json()
-        by_id = {p["poin_id"]: p for p in body["poin"]}
-        assert by_id["intensitas"]["low_confidence"] is True
-        assert by_id["itbx"]["low_confidence"] is False
+        # Kontrak BE v1.0.0: poin berupa pohon (gate_hukum -> itbx_evaluasi/intensitas_evaluasi, gate_hidrologis -> dampak).
+        by_id = {}
+        def _kumpul(daftar):
+            for p in daftar:
+                by_id[p["poin_id"]] = p
+                _kumpul(p.get("sub_poin") or [])
+        _kumpul(body["poin"])
+        assert by_id["intensitas_evaluasi"]["low_confidence"] is True
+        assert by_id["itbx_evaluasi"]["low_confidence"] is False
         assert by_id["dampak"]["low_confidence"] is False
         assert body["low_confidence_keseluruhan"] is True
         assert any("intensitas" in c for c in body["catatan_global"])
