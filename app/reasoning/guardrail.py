@@ -906,6 +906,43 @@ def _cek_atribusi_lampiran_vb(poin_output: PoinOutput, chunks: list[Chunk] | Non
     return []
 
 
+def _buang_kalimat_bermasalah_itbx(teks: str, poin: PoinKonteks, chunks: list[Chunk] | None) -> str:
+    """Poin ITBX: buang KALIMAT yang melanggar aturan teks alih-alih menolak seluruh jawaban. Hasil uji nyata:
+    ITBX T/B ditolak tiga kali hanya karena satu kalimat ("sudah memenuhi syarat", "dokumen pendukung", rujukan
+    Lampiran V.B dengan angka yang tak ada di sana, syarat kelompok lain) dan jatuh ke fallback. Bila semua
+    kalimat terbuang, teks asli dikembalikan dan pemeriksaan biasa menolaknya seperti semula."""
+    if poin.poin_id != "itbx" or not teks:
+        return teks
+    sumber = _sumber_fakta_itbx(poin, chunks)
+    vb = " ".join(c.teks for c in (chunks or []) if "-vb-" in (c.id or "")
+                  or (c.teks or "").lstrip().startswith("Lampiran V.B"))
+
+    def _bermasalah(k: str) -> bool:
+        if _RE_OTOMATIS.search(k):
+            return True
+        if poin.status in ("B", "T", "TB") and (
+                _RE_KLAIM_SUDAH_TERPENUHI.search(k)
+                or (_RE_KLAIM_MEMENUHI_SYARAT.search(k) and not _RE_KALIMAT_BERSYARAT.search(k))):
+            return True
+        if any(p.search(k) and not p.search(sumber) for p in _POLA_KEWAJIBAN_KARANGAN):
+            return True
+        if any(p.search(k) and not p.search(sumber) for _, p in _POLA_SYARAT_KELOMPOK_LAIN):
+            return True
+        if _RE_INTENSITAS_DI_ITBX.search(k) and not _RE_INTENSITAS_DI_ITBX.search(sumber):
+            return True
+        if vb and _RE_LAMPIRAN_VB.search(k):
+            tanpa_rujukan = _RE_LAMPIRAN_VB.sub(" ", k)
+            return any(re.search(rf"(?<![\d.,]){re.escape(a)}(?!\d|[.,]\d)", vb) is None
+                       for a in _RE_ANGKA_BIASA.findall(tanpa_rujukan))
+        return False
+
+    kalimat = _RE_PISAH_KALIMAT.split(teks)
+    sisa = [k for k in kalimat if not _bermasalah(k)]
+    if len(sisa) == len(kalimat) or not sisa:
+        return teks
+    return " ".join(k.strip() for k in sisa if k.strip())
+
+
 def _perbaiki_bold(teks: str) -> str:
     """`**` yang tidak berpasangan (jumlah ganjil) merusak tampilan di FE (APP-2026-UJI-1: "**" menggantung
     di akhir kalimat). Buang yang terakhir."""
@@ -1148,6 +1185,10 @@ def perbaiki_poin(
         }
     )
 
+    poin_bersih = poin_bersih.model_copy(update={
+        "reasoning_pendek": _buang_kalimat_bermasalah_itbx(poin_bersih.reasoning_pendek, poin, chunks),
+        "reasoning_panjang": _buang_kalimat_bermasalah_itbx(poin_bersih.reasoning_panjang, poin, chunks),
+    })
     poin_bersih = poin_bersih.model_copy(update={
         "reasoning_pendek": _perbaiki_bold(_perbaiki_titik_koma(poin_bersih.reasoning_pendek)),
         "reasoning_panjang": _perbaiki_bold(

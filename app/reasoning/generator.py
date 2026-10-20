@@ -101,7 +101,10 @@ def _lengkapi_sitasi_dampak(sitasi: list, poin: PoinKonteks, chunk_by_id: dict,
     if poin.kawasan_resapan is True:
         tambah = chunk_by_id.get(_ID_PASAL_53_AYAT_3)
         cocok, query = chunk_ketentuan_resapan, _QUERY_KETENTUAN_RESAPAN
-    elif poin.kawasan_resapan is False and (poin.fakta or {}).get("target_mitigasi"):
+    elif poin.kawasan_resapan is False:
+        # Dampak di luar kawasan resapan tidak punya pasal khusus. Dasar saran (pertahankan RTH, jaga luas
+        # bangunan, atau turunkan KDB dan naikkan KDH) adalah batas KDB/KDH zona itu di Lampiran VI, jadi itu
+        # yang disitasi, juga untuk dampak Rendah yang tanpa mitigasi korektif.
         tambah = next((c for cid, c in chunk_by_id.items() if "-vi-" in cid), None)
         cocok, query = (lambda c: "-vi-" in (c.id or "")), _QUERY_INTENSITAS_TAJAM
     else:

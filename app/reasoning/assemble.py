@@ -625,9 +625,12 @@ _LABEL_INTENSITAS_RINGKAS = {"MEMENUHI_SYARAT": "memenuhi syarat", "MELAMPAUI_BA
                              "Tidak Dinilai": "belum dinilai"}
 
 
+_KATA_ITBX = {"I": "diizinkan", "T": "terbatas", "B": "bersyarat", "TB": "terbatas dan bersyarat", "X": "berstatus X"}
+
+
 def _ringkasan_deterministik(poin_list: list[PoinOutput], rekomendasi_sistem: str) -> str:
-    """Ringkasan eksekutif 1-2 kalimat (hukum + intensitas + hidrologi) dari STATUS poin, tanpa angka dan tanpa
-    LLM. Dipakai bila LLM tidak menyediakannya atau sintesis dilewati."""
+    """Kalimat status SATU baris (hukum + intensitas + hidrologi) dari STATUS poin, tanpa angka dan tanpa LLM.
+    Menjadi kalimat pertama `kesimpulan.ringkasan`; kalimat kedua (tindak lanjut utama) dari LLM bila ada."""
     gate = [p for p in poin_list if _id_dasar(p.poin_id) in ("itbx", "intensitas")]
     dampak = next((p for p in poin_list if _id_dasar(p.poin_id) == "dampak"), None)
     bagian: list[str] = []
@@ -636,16 +639,26 @@ def _ringkasan_deterministik(poin_list: list[PoinOutput], rekomendasi_sistem: st
         inten = next((p for p in gate if _label_zona(p) == label and _id_dasar(p.poin_id) == "intensitas"), None)
         isi = []
         if itbx:
-            isi.append(f"ITBX {_LABEL_ITBX_RINGKAS.get(itbx.status, itbx.status)}")
+            isi.append(f"ITBX {_KATA_ITBX.get(itbx.status, itbx.status)}")
         if inten:
             isi.append(f"intensitas {_LABEL_INTENSITAS_RINGKAS.get(inten.status, inten.status.lower())}")
         if isi:
-            bagian.append((f"{label}: " if label else "") + ", ".join(isi))
+            bagian.append(f"{label} ({', '.join(isi)})" if label else ", ".join(isi))
     if dampak:
         bagian.append(f"dampak hidrologi {dampak.status.lower()}")
-    kalimat = [f"Permohonan direkomendasikan {rekomendasi_sistem}."]
-    kalimat += [f"{b[0].upper() + b[1:]}." for b in bagian]
-    return " ".join(kalimat)
+    if not bagian:
+        return f"Permohonan direkomendasikan {rekomendasi_sistem}."
+    daftar = bagian[0] if len(bagian) == 1 else ", ".join(bagian[:-1]) + ", dan " + bagian[-1]
+    return f"Permohonan direkomendasikan {rekomendasi_sistem} dengan {daftar}."
+
+
+def _gabung_ringkasan(dasar: str, tindak_lanjut: str | None) -> str:
+    """Kalimat status dari kode + SATU kalimat tindak lanjut dari LLM (kontrak BE: 1-2 kalimat). Kalimat LLM yang
+    mengulang rekomendasi_sistem atau status dibuang karena sudah ada di kalimat pertama."""
+    lanjut = (tindak_lanjut or "").strip()
+    if not lanjut or lanjut.lower().startswith(("permohonan direkomendasikan", "rekomendasi sistem")):
+        return dasar
+    return f"{dasar} {lanjut if lanjut.endswith(('.', '!', '?')) else lanjut + '.'}"
 
 
 def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput], rekomendasi_sistem: str = "") -> KesimpulanOutput:
@@ -698,7 +711,8 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
             catatan_diag["kesimpulan"] = "llm"
         return KesimpulanOutput(
             langkah_berdampak=langkah, catatan_lokasi=catatan,
-            ringkasan=_bersihkan_id_poin(_perbaiki_titik_koma(ringkasan)) or _ringkasan_deterministik(poin_list, rekomendasi_sistem),
+            ringkasan=_gabung_ringkasan(_ringkasan_deterministik(poin_list, rekomendasi_sistem),
+                                        _bersihkan_id_poin(_perbaiki_titik_koma(ringkasan))),
         )
     except Exception as exc:
         logger.exception("Sintesis kesimpulan via LLM gagal/melanggar aturan — fallback deterministik.")

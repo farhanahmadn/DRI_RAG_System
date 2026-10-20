@@ -247,8 +247,10 @@ class TestKontrakBeV1:
     def test_ringkasan_dan_tindak_lanjut_kesimpulan(self, pipeline):
         out = pipeline(_muat())
         k = out.kesimpulan
-        assert k.ringkasan.startswith("Permohonan direkomendasikan Setuju.") and ";" not in k.ringkasan
-        assert "Zona Pertanian: ITBX Diizinkan (I), intensitas memenuhi syarat" in k.ringkasan
+        assert k.ringkasan == ("Permohonan direkomendasikan Setuju dengan Zona Pertanian (ITBX diizinkan, intensitas "
+                               "memenuhi syarat), Zona Perumahan (ITBX diizinkan, intensitas memenuhi syarat), "
+                               "dan dampak hidrologi rendah.")
+        assert ";" not in k.ringkasan
         assert k.ringkasan_tindak_lanjut == k.langkah_berdampak and k.langkah_berdampak
 
     def test_rekomendasi_per_zona_sesuai_kamus_data(self, pipeline):
@@ -273,8 +275,8 @@ class TestRingkasanDanBoilerplate:
             d["gate_hukum"]["itbx_zones"][1].update(status="X")
         out = pipeline(_muat(campur))
         r = out.kesimpulan.ringkasan
-        assert r.startswith("Permohonan direkomendasikan Tolak. Zona Pertanian: ITBX Diizinkan (I), intensitas memenuhi syarat. ")
-        assert "Zona Perumahan: ITBX X, intensitas" in r and r.endswith("Dampak hidrologi rendah.")
+        assert r.startswith("Permohonan direkomendasikan Tolak dengan Zona Pertanian (ITBX diizinkan, ")
+        assert "Zona Perumahan (ITBX berstatus X, intensitas" in r and r.endswith("dan dampak hidrologi rendah.")
         assert ";" not in r
 
     def test_boilerplate_tidak_dievaluasi_dibuang_bila_ada_butir_lain(self):
@@ -327,3 +329,44 @@ class TestPembersihanTeksT:
                 "data matriks RDTR yang mungkin belum lengkap — perlu verifikasi manual apakah kegiatan benar-benar "
                 "dilarang atau datanya belum tersedia.")
         assert b(teks) == "Kegiatan terbatas. Tidak ada indikasi pelanggaran."
+
+
+class TestPerbaikanItbxDanRingkasan:
+    def _itbx_b(self):
+        p = adaptasi(_muat()).poin[0]
+        return p.model_copy(update={"status": "B", "fakta": {
+            "keterangan_ketentuan": ["Luas penunjang maksimal 100 m2.", "Hanya untuk kebutuhan setempat."],
+            "reason": "Lolos Bersyarat (B)."}})
+
+    def test_kalimat_bermasalah_dibuang_bukan_seluruh_jawaban(self):
+        from app.reasoning.guardrail import _buang_kalimat_bermasalah_itbx as b
+        teks = ("Kegiatan berstatus Bersyarat di Zona Pertanian. Pemohon telah memenuhi syarat luas. "
+                "Pemohon wajib menyiapkan dokumen pendukung. Kegiatan diloloskan otomatis oleh sistem. "
+                "Pemohon wajib memenuhi luas penunjang maksimal 100 m2.")
+        assert b(teks, self._itbx_b(), None) == (
+            "Kegiatan berstatus Bersyarat di Zona Pertanian. Pemohon wajib memenuhi luas penunjang maksimal 100 m2.")
+
+    def test_bila_semua_kalimat_bermasalah_teks_asli_dikembalikan(self):
+        from app.reasoning.guardrail import _buang_kalimat_bermasalah_itbx as b
+        teks = "Pemohon telah memenuhi syarat luas. Kegiatan diloloskan otomatis."
+        assert b(teks, self._itbx_b(), None) == teks  # biar pemeriksaan biasa yang menolak
+
+    def test_poin_selain_itbx_tak_disentuh(self):
+        from app.reasoning.guardrail import _buang_kalimat_bermasalah_itbx as b
+        d = adaptasi(_muat()).poin[-1]
+        assert b("Kegiatan diloloskan otomatis. Lain.", d, None) == "Kegiatan diloloskan otomatis. Lain."
+
+    def test_prompt_itbx_bersyarat_memuat_pedoman_penjelasan(self):
+        teks = build_user_prompt(self._itbx_b(), [], None, None)
+        assert "PEDOMAN_PENJELASAN" in teks and "DILARANG" in teks
+        assert "PEDOMAN_PENJELASAN" not in build_user_prompt(adaptasi(_muat()).poin[0], [], None, None)  # status I
+
+    def test_ringkasan_gabungan_dua_kalimat_dan_buang_pengulangan(self):
+        from app.reasoning.assemble import _gabung_ringkasan as g
+        dasar = "Permohonan direkomendasikan Setuju dengan ITBX diizinkan."
+        assert g(dasar, "Pemohon wajib menjaga RTH minimal 1111 m2") == dasar + " Pemohon wajib menjaga RTH minimal 1111 m2."
+        assert g(dasar, "Permohonan direkomendasikan Setuju.") == dasar
+        assert g(dasar, "") == dasar and g(dasar, None) == dasar
+
+    def test_prompt_dampak_memuat_struktur_reasoning(self):
+        assert "STRUKTUR_REASONING" in build_user_prompt(adaptasi(_muat()).poin[-1], [], None, None)

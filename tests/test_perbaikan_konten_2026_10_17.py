@@ -182,8 +182,9 @@ class TestAturanPM:
         assert [x.citation_id for x in _lengkapi_sitasi_dampak([], resapan, peta)] == [c53.id]
         bukan = resapan.model_copy(update={"kawasan_resapan": False, "fakta": {"target_mitigasi": {"a": 1}}})
         assert [x.citation_id for x in _lengkapi_sitasi_dampak([], bukan, peta)] == [cvi.id]
-        rendah_bukan = bukan.model_copy(update={"fakta": {}})
-        assert _lengkapi_sitasi_dampak([], rendah_bukan, peta) == []
+        rendah_bukan = bukan.model_copy(update={"fakta": {}, "status": "Rendah"})
+        assert [x.citation_id for x in _lengkapi_sitasi_dampak([], rendah_bukan, peta)] == [cvi.id]  # kini tersitasi
+        assert _lengkapi_sitasi_dampak([], rendah_bukan.model_copy(update={"status": "Tidak Dinilai"}), peta) == []
 
 
 class TestFallbackDeterministik:
