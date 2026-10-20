@@ -567,6 +567,7 @@ def _angka_tak_terlacak_ke_saran(teks: str, poin_list: list[PoinOutput]) -> str 
 
 _RE_NOMOR_BUTIR = re.compile(r"^\s*\d+[.)]\s*")
 _BAKU_TAK_PERLU_TINDAKAN = "Tidak diperlukan tindakan khusus"
+_BAKU_TIDAK_DIEVALUASI = "Tidak dievaluasi"
 
 
 def _butir_saran(saran: str) -> list[str]:
@@ -579,7 +580,7 @@ def _butir_bermakna(daftar_saran: list[str]) -> list[str]:
     ada butir lain: ia hanya benar untuk poin yang lolos, dan menyesatkan jika ditempel di samping
     langkah perbaikan poin lain (hasil uji nyata 2026-10-16)."""
     butir = [b for s in daftar_saran for b in _butir_saran(s)]
-    isi = [b for b in butir if not b.startswith(_BAKU_TAK_PERLU_TINDAKAN)]
+    isi = [b for b in butir if not b.startswith((_BAKU_TAK_PERLU_TINDAKAN, _BAKU_TIDAK_DIEVALUASI))]
     return isi or butir[:1]
 
 
@@ -623,9 +624,9 @@ def _ringkasan_deterministik(poin_list: list[PoinOutput], rekomendasi_sistem: st
             bagian.append((f"{label}: " if label else "") + ", ".join(isi))
     if dampak:
         bagian.append(f"dampak hidrologi {dampak.status.lower()}")
-    isi_kalimat = "; ".join(bagian).replace(";", ",") if bagian else ""
-    kalimat = f"Permohonan direkomendasikan {rekomendasi_sistem}."
-    return f"{kalimat} {isi_kalimat[0].upper() + isi_kalimat[1:]}." if isi_kalimat else kalimat
+    kalimat = [f"Permohonan direkomendasikan {rekomendasi_sistem}."]
+    kalimat += [f"{b[0].upper() + b[1:]}." for b in bagian]
+    return " ".join(kalimat)
 
 
 def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput], rekomendasi_sistem: str = "") -> KesimpulanOutput:

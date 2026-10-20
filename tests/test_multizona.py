@@ -263,3 +263,19 @@ class TestKontrakBeV1:
         assert [(r.rekomendasi, r.status_keputusan) for r in out.rekomendasi_per_zona] == [
             ("Lolos Terbatas", "LOLOS_TERBATAS"), ("Tolak", "TIDAK_LOLOS")]
         assert out.rekomendasi_sistem == "Tolak"
+
+
+class TestRingkasanDanBoilerplate:
+    def test_ringkasan_deterministik_kalimat_per_zona(self, pipeline):
+        def campur(d):
+            d["gate_hukum"]["itbx_zones"][1].update(status="X")
+        out = pipeline(_muat(campur))
+        r = out.kesimpulan.ringkasan
+        assert r.startswith("Permohonan direkomendasikan Tolak. Zona Pertanian: ITBX Diizinkan (I), intensitas memenuhi syarat. ")
+        assert "Zona Perumahan: ITBX X, intensitas" in r and r.endswith("Dampak hidrologi rendah.")
+        assert ";" not in r
+
+    def test_boilerplate_tidak_dievaluasi_dibuang_bila_ada_butir_lain(self):
+        from app.reasoning.assemble import _butir_bermakna
+        assert _butir_bermakna(["Perbaiki KDB.", "Tidak dievaluasi karena proses berhenti."]) == ["Perbaiki KDB."]
+        assert _butir_bermakna(["Tidak dievaluasi karena proses berhenti."]) == ["Tidak dievaluasi karena proses berhenti."]
