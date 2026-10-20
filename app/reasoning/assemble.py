@@ -655,10 +655,25 @@ def _ringkasan_deterministik(poin_list: list[PoinOutput], rekomendasi_sistem: st
 def _gabung_ringkasan(dasar: str, tindak_lanjut: str | None) -> str:
     """Kalimat status dari kode + SATU kalimat tindak lanjut dari LLM (kontrak BE: 1-2 kalimat). Kalimat LLM yang
     mengulang rekomendasi_sistem atau status dibuang karena sudah ada di kalimat pertama."""
-    lanjut = (tindak_lanjut or "").strip()
+    lanjut = _pendekkan_kalimat((tindak_lanjut or "").strip().rstrip(".!? "))
     if not lanjut or lanjut.lower().startswith(("permohonan direkomendasikan", "rekomendasi sistem")):
         return dasar
-    return f"{dasar} {lanjut if lanjut.endswith(('.', '!', '?')) else lanjut + '.'}"
+    return f"{dasar} {lanjut}."
+
+
+_PANJANG_MAKS_KALIMAT_LANJUT = 260
+
+
+def _pendekkan_kalimat(teks: str, maks: int = _PANJANG_MAKS_KALIMAT_LANJUT) -> str:
+    """Kalimat tindak lanjut yang kelewat panjang dipotong di batas anak kalimat terakhir sebelum `maks` karakter
+    (", ", " serta ", " dan "), supaya kesimpulan.ringkasan tetap 1-2 kalimat ringkas. Rincian lengkap ada di
+    `langkah_berdampak`."""
+    if len(teks) <= maks:
+        return teks
+    potongan = teks[:maks]
+    titik = max(potongan.rfind(", "), potongan.rfind(" serta "), potongan.rfind(" dan "))
+    return potongan[:titik].rstrip(", ") if titik > maks // 2 else potongan.rsplit(" ", 1)[0]
+
 
 
 def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput], rekomendasi_sistem: str = "") -> KesimpulanOutput:

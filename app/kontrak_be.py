@@ -126,10 +126,27 @@ def _rekomendasi_be(p: PoinOutput) -> RekomendasiBE:
     )
 
 
+_LABEL_STATUS_ITBX = {"I": "Diizinkan (I)", "T": "Terbatas (T)", "B": "Bersyarat (B)",
+                      "TB": "Terbatas dan Bersyarat (TB)", "X": "Tidak Diizinkan (X)"}
+
+
+def _status_daun(p: PoinOutput) -> str:
+    """Format status simpul daun mengikuti contoh BE: ITBX "Bersyarat (B)", dampak "SEDANG", intensitas
+    "MELAMPAUI_BATAS". Status internal (kode asli) tetap dipakai di seluruh pipeline."""
+    dasar = _id_dasar(p.poin_id)
+    if dasar == "itbx":
+        return _LABEL_STATUS_ITBX.get(p.status, p.status)
+    if dasar == "dampak":
+        return "TIDAK_DINILAI" if p.status == "Tidak Dinilai" else p.status.upper()
+    if p.status == "Tidak Dinilai":
+        return "TIDAK_DINILAI"
+    return p.status
+
+
 def _daun(p: PoinOutput, banyak_zona: bool) -> PoinBE:
     poin_id = p.poin_id if banyak_zona and p.zona else _ID_LEAF_TUNGGAL.get(_id_dasar(p.poin_id), p.poin_id)
     return PoinBE(
-        poin_id=poin_id, kategori=p.kategori, status=p.status,
+        poin_id=poin_id, kategori=p.kategori, status=_status_daun(p),
         reasoning_pendek=p.reasoning_pendek, reasoning_panjang=p.reasoning_panjang,
         dasar_regulasi=_dasar_regulasi(p.sitasi), rekomendasi=_rekomendasi_be(p),
         sitasi=p.sitasi, zona=p.zona, low_confidence=p.low_confidence,

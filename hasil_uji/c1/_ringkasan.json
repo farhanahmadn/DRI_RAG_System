@@ -1,0 +1,10 @@
+[
+  {
+    "berkas": "hidrologi_set2_4_tinggi_nonresapan.json",
+    "application_number": "APP-2026-UJI2-4-TINGGI-NONRESAPAN",
+    "durasi_detik": 24.2,
+    "status": "ok",
+    "low_confidence_keseluruhan": false,
+    "poin_low_confidence": []
+  }
+]

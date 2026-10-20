@@ -1,0 +1,26 @@
+[
+  {
+    "berkas": "hidrologi_3_rendah_nonresapan.json",
+    "application_number": "APP-2026-UJI-3-RENDAH-NONRESAPAN",
+    "durasi_detik": 12.1,
+    "status": "ok",
+    "low_confidence_keseluruhan": true,
+    "poin_low_confidence": [
+      "itbx",
+      "intensitas",
+      "dampak"
+    ]
+  },
+  {
+    "berkas": "hidrologi_4_tinggi_nonresapan.json",
+    "application_number": "APP-2026-UJI-4-TINGGI-NONRESAPAN",
+    "durasi_detik": 11.8,
+    "status": "ok",
+    "low_confidence_keseluruhan": true,
+    "poin_low_confidence": [
+      "itbx",
+      "intensitas",
+      "dampak"
+    ]
+  }
+]

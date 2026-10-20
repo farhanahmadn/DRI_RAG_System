@@ -1,0 +1,40 @@
+[
+  {
+    "berkas": "hidrologi_1_rendah_resapan.json",
+    "application_number": "APP-2026-UJI-1-RENDAH-RESAPAN",
+    "durasi_detik": 14.5,
+    "status": "ok",
+    "low_confidence_keseluruhan": true,
+    "poin_low_confidence": [
+      "itbx"
+    ]
+  },
+  {
+    "berkas": "hidrologi_2_tinggi_resapan.json",
+    "application_number": "APP-2026-UJI-2-TINGGI-RESAPAN",
+    "durasi_detik": 76.4,
+    "status": "ok",
+    "low_confidence_keseluruhan": true,
+    "poin_low_confidence": [
+      "dampak"
+    ]
+  },
+  {
+    "berkas": "hidrologi_3_rendah_nonresapan.json",
+    "application_number": "APP-2026-UJI-3-RENDAH-NONRESAPAN",
+    "durasi_detik": 77.4,
+    "status": "ok",
+    "low_confidence_keseluruhan": true,
+    "poin_low_confidence": [
+      "itbx"
+    ]
+  },
+  {
+    "berkas": "hidrologi_4_tinggi_nonresapan.json",
+    "application_number": "APP-2026-UJI-4-TINGGI-NONRESAPAN",
+    "durasi_detik": 8.8,
+    "status": "ok",
+    "low_confidence_keseluruhan": false,
+    "poin_low_confidence": []
+  }
+]

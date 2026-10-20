@@ -1,0 +1,121 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Tidak Lolos",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran pada tahap intensitas bangunan (KDB/KLB/KDH) yang bersifat mutlak."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Tinggi",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Tinggi untuk kegiatan Penyediaan Akomodasi Lainnya (kelas bangunan: Perdagangan Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (B) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "1. Syarat yang harus dipenuhi pemohon: Ketentuan Umum kegiatan yang diperbolehkan secara Terbatas (T): hanya untuk perumahan dan akomodasi terbatas.\n2. Syarat yang harus dipenuhi pemohon: Ketentuan Umum kegiatan yang diperbolehkan secara Bersyarat (B): luas keseluruhan kegiatan akomodasi makan minum maksimal 20% dari luas blok.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MELAMPAUI_BATAS",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Intensitas Bangunan (KDB/KLB/KDH)' (intensitas) setelah beberapa kali percobaan. Status (melampaui batas) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": 60.0,
+        "saran": "1. KDB harus turun ke maksimal 60% (selisih 23.57 poin dari usulan) → luas lantai dasar bangunan maksimal 861.6 m²\n2. KDH harus naik ke minimal 25% (kurang 11.07 poin dari usulan) → RTH dibutuhkan minimal 359 m² (RTH yang sudah diusulkan pemohon masih kurang 159 m²)",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": [
+          {
+            "parameter": "KDB",
+            "deskripsi": "KDB harus turun ke maksimal 60% (selisih 23.57 poin dari usulan) → luas lantai dasar bangunan maksimal 861.6 m²",
+            "nilai_saat_ini": 83.57,
+            "nilai_target": 60.0,
+            "satuan": "persen"
+          },
+          {
+            "parameter": "KDH",
+            "deskripsi": "KDH harus naik ke minimal 25% (kurang 11.07 poin dari usulan) → RTH dibutuhkan minimal 359 m² (RTH yang sudah diusulkan pemohon masih kurang 159 m²)",
+            "nilai_saat_ini": 13.93,
+            "nilai_target": 25.0,
+            "satuan": "persen"
+          }
+        ]
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Tinggi",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Terhadap Lingkungan (Hidrologi)' (dampak) setelah beberapa kali percobaan. Status (Tinggi) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-3 (Perumahan Kepadatan Sedang): KDB maksimum 50–60%; KLB maksimum 2–8; KDH minimum 25–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": 2.5,
+        "saran": "1. Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m² (KDB maks 75%) dan meningkatkan RTH menjadi minimal 359 m² (KDH min 25%) agar indeks limpasan tidak lebih dari 2.5 dan kategori dampak turun ke SEDANG.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual. Batas luas lantai dasar menurut ketentuan intensitas ruang (861,60 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 861,60 m².",
+        "langkah_konkret": [
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Wajib menurunkan luas lantai dasar bangunan ke maksimal 1077 m² (KDB maks 75%) agar indeks limpasan turun ke kategori Sedang.",
+            "nilai_saat_ini": 1200.0,
+            "nilai_target": 1077.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Wajib meningkatkan luas RTH ke minimal 359 m² (KDH min 25%) untuk memperluas daerah peresapan air alami.",
+            "nilai_saat_ini": 200.0,
+            "nilai_target": 359.0,
+            "satuan": "m²"
+          }
+        ]
+      },
+      "low_confidence": true
+    }
+  ],
+  "rekomendasi_sistem": "Tidak Setuju",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Syarat yang harus dipenuhi pemohon: Ketentuan Umum kegiatan yang diperbolehkan secara Terbatas (T): hanya untuk perumahan dan akomodasi terbatas. Syarat yang harus dipenuhi pemohon: Ketentuan Umum kegiatan yang diperbolehkan secara Bersyarat (B): luas keseluruhan kegiatan akomodasi makan minum maksimal 20% dari luas blok. KDB harus turun ke maksimal 60% (selisih 23.57 poin dari usulan) → luas lantai dasar bangunan maksimal 861.6 m². KDH harus naik ke minimal 25% (kurang 11.07 poin dari usulan) → RTH dibutuhkan minimal 359 m² (RTH yang sudah diusulkan pemohon masih kurang 159 m²).",
+    "paragraf_dampak": "Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m² (KDB maks 75%) dan meningkatkan RTH menjadi minimal 359 m² (KDH min 25%) agar indeks limpasan tidak lebih dari 2.5 dan kategori dampak turun ke SEDANG. Batas luas lantai dasar menurut ketentuan intensitas ruang (861,60 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 861,60 m²."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Syarat yang harus dipenuhi pemohon: Ketentuan Umum kegiatan yang diperbolehkan secara Terbatas (T): hanya untuk perumahan dan akomodasi terbatas.",
+      "Syarat yang harus dipenuhi pemohon: Ketentuan Umum kegiatan yang diperbolehkan secara Bersyarat (B): luas keseluruhan kegiatan akomodasi makan minum maksimal 20% dari luas blok.",
+      "KDB harus turun ke maksimal 60% (selisih 23.57 poin dari usulan) → luas lantai dasar bangunan maksimal 861.6 m²",
+      "KDH harus naik ke minimal 25% (kurang 11.07 poin dari usulan) → RTH dibutuhkan minimal 359 m² (RTH yang sudah diusulkan pemohon masih kurang 159 m²)",
+      "Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m² (KDB maks 75%) dan meningkatkan RTH menjadi minimal 359 m² (KDH min 25%) agar indeks limpasan tidak lebih dari 2.5 dan kategori dampak turun ke SEDANG.",
+      "Batas luas lantai dasar menurut ketentuan intensitas ruang (861,60 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 861,60 m²."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: itbx, intensitas, dampak) tidak dapat dihasilkan otomatis dan perlu peninjauan manual."
+  ],
+  "low_confidence_keseluruhan": true
+}

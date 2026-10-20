@@ -57,8 +57,10 @@ poin[0] gate_hukum
 poin[1] gate_hidrologis -> sub_poin: dampak     (satu untuk seluruh lahan)
 ```
 Status akar: `gate_hukum` = `LOLOS`, `LOLOS_BERSYARAT`, `LOLOS_TERBATAS`, `TIDAK_LOLOS`. `gate_hidrologis` =
-`PERLU_MITIGASI` (dampak Sedang ke atas), `MEMENUHI_SYARAT` (Rendah), `TIDAK_DINILAI`. Status simpul daun tetap memakai
-nilai asal (`I`/`B`/`T`/`X`, `MEMENUHI_SYARAT`/`MELAMPAUI_BATAS`, `Rendah`/`Sedang`/`Tinggi`/`Sangat Tinggi`).
+`PERLU_MITIGASI` (dampak Sedang ke atas), `MEMENUHI_SYARAT` (Rendah), `TIDAK_DINILAI`. Status simpul daun mengikuti
+contoh BE (2026-10-21): ITBX `Diizinkan (I)` / `Terbatas (T)` / `Bersyarat (B)` / `Terbatas dan Bersyarat (TB)` /
+`Tidak Diizinkan (X)`; intensitas `MEMENUHI_SYARAT` / `MELAMPAUI_BATAS`; dampak huruf kapital (`RENDAH`, `SEDANG`,
+`TINGGI`, `SANGAT TINGGI`). Di `rekomendasi_per_zona`, `status_itbx` tetap kode mentah (`I`/`T`/`B`/`X`) sesuai kamus data.
 
 Setiap simpul memuat `reasoning_pendek`, `reasoning_panjang`, `dasar_regulasi[]` {judul, deskripsi, kategori},
 `rekomendasi` {saran, poin[], langkah_konkret[], alasan} dan `sub_poin[]`. Akar mengagregasi anak-anaknya
@@ -86,12 +88,17 @@ mengarang data spasial, hasil perhitungan, kapasitas mitigasi, atau rujukan regu
   `dimensi_minimum` dari BE bila ada.
 - "Area peresapan alami turun 45%": tidak ada di L2. Butir dampak kita hanya memakai angka yang dikirim.
 
-## 6. Pertanyaan terbuka untuk BE / PM
+## 6. Contoh keluaran
+
+`docs/contoh_output/`: `satu_zona_bersyarat.json` (ITBX B, dampak Rendah non-resapan), `multi_zona_seragam.json` (dua zona,
+keduanya diizinkan), `multi_zona_campuran.json` (zona P bersyarat dan melampaui batas, zona R ITBX X). Seluruhnya keluaran
+nyata (LLM asli), bukan rekaan. Permintaan rinci ke BE: `docs/PERMINTAAN_BE_L3_2026-10-21.md`.
+
+## 7. Pertanyaan terbuka untuk BE / PM
 
 1. **Sumur di dampak non-resapan.** Contoh BE (dampak Sedang, non-resapan) merekomendasikan sumur resapan 6,50 m³,
    sedangkan aturan PM untuk Tinggi non-resapan hanya KDB turun dan RTH naik, tanpa sumur. Sistem mengikuti PM.
-2. **Format `status`.** Contoh BE memakai `SEDANG` (kapital) dan `Bersyarat (B)`. Kita mengirim `Sedang` dan `B`.
-   Bila BE/PDF membutuhkan format contoh, cukup satu pemetaan di `app/kontrak_be.py`.
+2. ~~Format `status`~~ Selesai 2026-10-21: disamakan dengan contoh BE (lihat bagian 3).
 3. **Dampak Rendah.** `rekomendasi_mitigasi` L2 untuk dampak Rendah berisi angka tak bermakna (lantai dasar maks
    10.960,79 m², dimensi 0 m³). Kita mengabaikannya; sebaiknya BE mengirim `null`.
 4. **Zona berstatus ITBX X**: mohon `intensitas_zones` zona itu tetap dikirim dengan `status` yang jelas.

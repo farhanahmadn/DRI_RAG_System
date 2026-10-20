@@ -162,3 +162,39 @@ class TestKamusDataLengkap:
     def test_advisory_model_menerima_dump_sendiri(self, jalankan):
         out = jalankan(_muat())
         assert AdvisoryL3.model_validate(out.model_dump()).rekomendasi_sistem == out.rekomendasi_sistem
+
+
+class TestFormatStatusDaun:
+    def test_status_daun_mengikuti_contoh_be(self, jalankan):
+        def b_dan_sedang(d):
+            _satu_zona(d)
+            d["gate_hukum"]["itbx_zones"][0].update(status="B")
+            d["gate_hukum"]["tahapan"]["itbx"].update(status="B")
+            d["impact_assessment"].update(impact_category="SEDANG", runoff_change_index=2.0, rekomendasi_mitigasi=None)
+        out = jalankan(_muat(ubah=b_dan_sedang))
+        status = {s.poin_id: s.status for s in _semua(out.poin)}
+        assert status["itbx_evaluasi"] == "Bersyarat (B)"
+        assert status["intensitas_evaluasi"] == "MEMENUHI_SYARAT"
+        assert status["dampak"] == "SEDANG"
+
+    def test_label_itbx_lain_dan_tidak_dinilai(self):
+        from app.kontrak_be import _status_daun
+        def poin(pid, status):
+            return PoinOutput(poin_id=pid, kategori="k", status=status, reasoning_pendek="p", reasoning_panjang="q",
+                              sitasi=[], rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="s"))
+        assert [_status_daun(poin("itbx", s)) for s in ("I", "T", "TB", "X")] == [
+            "Diizinkan (I)", "Terbatas (T)", "Terbatas dan Bersyarat (TB)", "Tidak Diizinkan (X)"]
+        assert _status_daun(poin("dampak", "Sangat Tinggi")) == "SANGAT TINGGI"
+        assert _status_daun(poin("dampak", "Tidak Dinilai")) == "TIDAK_DINILAI"
+        assert _status_daun(poin("intensitas_P", "Tidak Dinilai")) == "TIDAK_DINILAI"
+
+
+def test_kalimat_lanjut_ringkasan_dipendekkan_di_batas_anak_kalimat():
+    from app.reasoning.assemble import _gabung_ringkasan, _pendekkan_kalimat
+    panjang = ("Pemohon wajib menjaga RTH minimal 1111 m2, membatasi luas bangunan 100 m2, memastikan air hujan tidak "
+               "melimpas, menyediakan sumur atau kolam resapan, serta merawat saluran drainase secara berkala setiap "
+               "musim hujan dan melaporkannya kepada petugas kelurahan setempat sebelum pengajuan berikutnya")
+    pendek = _pendekkan_kalimat(panjang)
+    assert len(pendek) <= 260 and pendek.startswith("Pemohon wajib menjaga RTH") and not pendek.endswith((",", " "))
+    assert _gabung_ringkasan("Dasar.", panjang).endswith(".") and len(_gabung_ringkasan("Dasar.", panjang)) < 280
+    assert _pendekkan_kalimat("Singkat saja") == "Singkat saja"

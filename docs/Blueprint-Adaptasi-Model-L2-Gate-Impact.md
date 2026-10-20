@@ -100,26 +100,35 @@ class L2Assessment(BaseModel):                 # INPUT utuh dari back-end
 
 ## 3. Penurunan `rekomendasi_sistem` (fungsi DETERMINISTIK — logika kita)
 
-Karena ini bagian kita, kami turunkan dari kombinasi gate × dampak (kode, bukan LLM):
+> **Diperbarui 2026-10-21** mengikuti "Spesifikasi Kontrak Variabel Output AI Reasoning (L3)" v1.0.0 dari BE
+> (bagian 4). Versi lama memakai label "Tidak Setuju" dan menganggap dampak Sedang aman. Rincian kontrak lengkap:
+> `docs/KONTRAK_L3_BE_V1.md`. Implementasi: `app/reasoning/rekomendasi.py`.
+
+Bagian kita, diturunkan dari gate x status ITBX x dampak (kode, bukan LLM). Nilai sah: **Setuju, Setuju Bersyarat,
+Lolos Terbatas, Tolak**. Kondisi berprioritas lebih tinggi mengalahkan yang di bawahnya.
 
 ```python
-def turunkan_rekomendasi(gate_status: str, impact_category: str | None) -> str:
-    if gate_status == "Tidak Lolos":
-        return "Tidak Setuju"                       # X = pelanggaran hukum absolut
-    impact_tinggi = impact_category in ("Tinggi", "Sangat Tinggi")
-    if gate_status == "Lolos Bersyarat" or impact_tinggi:
-        return "Setuju Bersyarat"                   # ada syarat/mitigasi
-    return "Setuju"                                 # Lolos + dampak Rendah/Sedang
+def turunkan_rekomendasi(gate_status, impact_category, status_itbx=None):
+    if gate_status == "Tidak Lolos" or status_itbx == "X":
+        return "Tolak"
+    if gate_status == "Lolos Terbatas" or status_itbx in ("T", "TB"):
+        return "Lolos Terbatas"
+    if gate_status == "Lolos Bersyarat" or status_itbx == "B":
+        return "Setuju Bersyarat"
+    if impact_category in ("Sedang", "Tinggi", "Sangat Tinggi"):   # memerlukan mitigasi
+        return "Setuju Bersyarat"
+    return "Setuju"                                                  # semua I, intensitas patuh, dampak Rendah
 ```
 
-| Gate | Dampak | → rekomendasi_sistem |
+| Prioritas | Kondisi | -> rekomendasi_sistem |
 |---|---|---|
-| Tidak Lolos | apa pun | **Tidak Setuju** |
-| Lolos Bersyarat | apa pun | **Setuju Bersyarat** |
-| Lolos | Rendah/Sedang | **Setuju** |
-| Lolos | Tinggi/Sangat Tinggi | **Setuju Bersyarat** (mitigasi runoff) |
+| 1 | Gate Tidak Lolos, atau ITBX X | **Tolak** |
+| 2 | Gate Lolos Terbatas, atau ITBX T/TB | **Lolos Terbatas** |
+| 3 | Gate Lolos Bersyarat, ITBX B, atau dampak Sedang/Tinggi/Sangat Tinggi | **Setuju Bersyarat** |
+| 4 | Semua aspek legal I, intensitas patuh, dampak Rendah | **Setuju** |
 
-*(Fungsi deterministik + unit test. KONFIRMASI aturan ini ke tim sebelum dikunci.)*
+Kategori dampak saja tidak boleh mengalahkan Tolak atau Lolos Terbatas. Pada lahan multi-zona, ITBX paling ketat di
+antara zona ikut menentukan; rekomendasi per zona memakai ITBX dan intensitas zona itu saja.
 
 ---
 

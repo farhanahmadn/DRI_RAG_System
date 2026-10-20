@@ -1,0 +1,151 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Tidak Lolos",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran pada tahap intensitas bangunan (KDB/KLB/KDH) yang bersifat mutlak."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Tinggi",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Tinggi untuk kegiatan Penyediaan Akomodasi Lainnya (kelas bangunan: Perdagangan Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Kegiatan Penyediaan Akomodasi Lainnya termasuk kategori Bersyarat di zona perumahan, sehingga lolos dengan syarat luas maksimal 20% dari blok.",
+      "reasoning_panjang": "Kegiatan yang diajukan, Penyediaan Akomodasi Lainnya, terdaftar dalam kelompok real estate dan berada di sub-zona perumahan kepadatan sedang (R-3). Menurut peraturan, kegiatan di sub-zona ini dapat diizinkan secara bersyarat (B) dengan ketentuan bahwa luas keseluruhan kegiatan akomodasi makan minum tidak boleh melebihi 20 % dari luas blok. Status ITBX B menunjukkan bahwa kegiatan ini memenuhi syarat tersebut dan tidak dilarang. Oleh karena itu, permohonan ini lolos klasifikasi dengan syarat yang jelas.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Matriks ITBX (R-3)",
+          "halaman": 0,
+          "kutipan": "Data KBLI referensi",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vb-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 274,
+          "kutipan": "Lampiran V.B — Penjelasan Ketentuan Kegiatan (T/B) Sub-zona Perumahan Kepadatan Sedang (R-3):\nSub-zona Perumahan Kepadatan Sedang (R-3)\na. Kegiatan pada kelompok real estate yang diperbolehkan secara terbatas pada sub-zona perumahan kepadatan sedang wajib memenuhi ketentuan terbatas hanya untuk perumahan dan kegiatan yang diperbolehkan maupun bersyarat sesuai dengan kelompok penyediaan akomodasi dan penyediaan makan minum serta perdagangan besar dan eceran, reparasi dan perawatan mobil dan sepeda motor pada sub-zona Perumahan Kepadatan Sedang (R-3).\nb. Kegiatan pada kelompok aktivitas jasa lainnya yang diperbolehkan secara terbatas pada sub-zona perumahan kepadatan sedang wajib memenuhi ketentuan sebagai berikut:\n1. hanya untuk memenuhi kebutuhan masyakarakat sekitar;\n2. jam operasional (jam buka) dibatasi sampai dengan maksimal pukul 22.00 kecuali dengan izin instansi berwenang; dan\na. Kegiatan pada kelompok pertanian, kehutanan, dan perikanan yang diperbolehkan secara bersyarat pada sub-zona perumahan kepadatan sedang wajib memenuhi ketentuan sebagai berikut:\n1. tidak mencemari lingkungan baik air, tanah, udara;\n2. melakukan pengelolaan limbah/sampah;\n3. memiliki dokumen lingkungan sesuai jenis kegiatan dan skalanya berdasar peraturan perundangan;\n4. khusus peternakan domba dan kambing jumlah ternak maksimal 100 ekor dan/atau telah terbangun sebelum perbup ditetapkan;\n5. khusus peternakan unggas jumlah ternak maksimal 20.000 ekor dan/atau telah terbangun sebelum perbup ditetapkan;\n6. khusus usaha peternakan eksisting sebelum perbup ditetapkan yang memiliki jumlah ternak lebih dari ketentuan pada angka 4 dan 5 tetap diperbolehkan;\n7. khusus budidaya ikan laut wajib memenuhi ketentuan tidak mengganggu ekosistem sekitar.\nSarana dan Prasarana minimum berupa:\na. jaringan jalan lingkungan;\nb. jaringan listrik;\nc. jaringan air bersih;\nd. pengolahan limbah komunal/individu;\ne. pengelolaan sampah;\nf. saluran pembuangan air hujan/peresapan air hujan lingkungan; dan\ng. fasilitas lingkungan seperti sarana perniagaan,",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "1. Pemohon perlu menyesuaikan luas kegiatan akomodasi makan minum agar tidak melebihi 20 % dari luas blok.\n2. Pemohon harus memastikan bahwa kegiatan tetap berada dalam batasan perumahan dan tidak melanggar ketentuan terbatas yang berlaku di sub-zona R-3.\n",
+        "disclaimer": null,
+        "langkah_konkret": []
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MELAMPAUI_BATAS",
+      "reasoning_pendek": "KDB melebihi ambang 60% dan KDH kurang dari 25% di Zona Perumahan sub-zona R-3.",
+      "reasoning_panjang": "**melampaui batas** karena KDB usulan 83.57% melebihi ambang maksimal 60% yang ditetapkan untuk Zona Perumahan sub-zona R-3, dan KDH usulan 13.93% berada di bawah ambang minimal 25% yang berlaku di kawasan non-resapan air. **KDB melebihi ambang 60% dan KDH kurang dari 25%**. **Pemohon harus menyesuaikan luas lantai dasar dan RTH agar memenuhi ketentuan**.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Ketentuan Intensitas Ruang (R-3)",
+          "halaman": 0,
+          "kutipan": "KDB maks 60%, KLB maks 4.8, KDH min 25% (kawasan non-resapan air)",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-3 (Perumahan Kepadatan Sedang): KDB maksimum 50–60%; KLB maksimum 2–8; KDH minimum 25–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-2",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-2 (Perumahan Kepadatan Tinggi): KDB maksimum 60–70%; KLB maksimum 3–9.8; KDH minimum 20–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": 60.0,
+        "saran": "1. Pemohon perlu menurunkan luas lantai dasar menjadi maksimal 861.6 m² agar KDB mencapai 60%. 2. Pemohon harus menambah RTH minimal 359 m² agar KDH mencapai 25%.",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "KDB",
+            "deskripsi": "KDB harus turun ke maksimal 60% (selisih 23.57 poin dari usulan) → luas lantai dasar bangunan maksimal 861.6 m²",
+            "nilai_saat_ini": 83.57,
+            "nilai_target": 60.0,
+            "satuan": "persen"
+          },
+          {
+            "parameter": "KDH",
+            "deskripsi": "KDH harus naik ke minimal 25% (kurang 11.07 poin dari usulan) → RTH dibutuhkan minimal 359 m² (RTH yang sudah diusulkan pemohon masih kurang 159 m²)",
+            "nilai_saat_ini": 13.93,
+            "nilai_target": 25.0,
+            "satuan": "persen"
+          }
+        ]
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Tinggi",
+      "reasoning_pendek": "Kategori Dampak Tinggi disebabkan oleh indeks limpasan air tinggi. Mitigasi diperlukan dengan menurunkan KDB, menaikkan KDH/RTH, dan menekan runoff di bawah 2.5.",
+      "reasoning_panjang": "**Tinggi** dampak lingkungan disebabkan oleh **indeks limpasan air tinggi** yang dihasilkan dari luas bangunan dan RTH yang diusulkan. Karena lokasi berada di Zona Perumahan (kode R) dan bukan kawasan resapan air, ketentuan khusus Pasal 53 RDTR tidak berlaku, sehingga mitigasi harus dilakukan melalui penurunan KDB dan peningkatan KDH/RTH. **Mitigasi diperlukan** untuk menurunkan kategori dampak dari Tinggi ke Sedang. Tipe bangunan yang diusulkan adalah Penyediaan Akomodasi Lainnya (kelas bangunan: Perdagangan Pusat Kota), yang memengaruhi koefisien limpasan atap pada perhitungan dampak.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": 2.5,
+        "saran": "1. Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m² (KDB maks 75%) dan meningkatkan RTH menjadi minimal 359 m² (KDH min 25%) agar indeks limpasan tidak lebih dari 2.5 dan kategori dampak turun ke SEDANG.",
+        "disclaimer": "Batas luas lantai dasar menurut ketentuan intensitas ruang (861,60 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 861,60 m².",
+        "langkah_konkret": [
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Wajib menurunkan luas lantai dasar bangunan ke maksimal 1077 m² (KDB maks 75%) agar indeks limpasan turun ke kategori Sedang.",
+            "nilai_saat_ini": 1200.0,
+            "nilai_target": 1077.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Wajib meningkatkan luas RTH ke minimal 359 m² (KDH min 25%) untuk memperluas daerah peresapan air alami.",
+            "nilai_saat_ini": 200.0,
+            "nilai_target": 359.0,
+            "satuan": "m²"
+          }
+        ]
+      },
+      "low_confidence": false
+    }
+  ],
+  "rekomendasi_sistem": "Tidak Setuju",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Pemohon perlu menyesuaikan luas kegiatan akomodasi makan minum agar tidak melebihi 20 % dari luas blok. Pemohon harus memastikan bahwa kegiatan tetap berada dalam batasan perumahan dan tidak melanggar ketentuan terbatas yang berlaku di sub-zona R-3. Pemohon perlu menurunkan luas lantai dasar menjadi maksimal 861.6 m² agar KDB mencapai 60%. 2. Pemohon harus menambah RTH minimal 359 m² agar KDH mencapai 25%.",
+    "paragraf_dampak": "Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m² (KDB maks 75%) dan meningkatkan RTH menjadi minimal 359 m² (KDH min 25%) agar indeks limpasan tidak lebih dari 2.5 dan kategori dampak turun ke SEDANG. Batas luas lantai dasar menurut ketentuan intensitas ruang (861,60 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 861,60 m²."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Pemohon perlu menyesuaikan luas kegiatan akomodasi makan minum agar tidak melebihi 20 % dari luas blok.",
+      "Pemohon harus memastikan bahwa kegiatan tetap berada dalam batasan perumahan dan tidak melanggar ketentuan terbatas yang berlaku di sub-zona R-3.",
+      "Pemohon perlu menurunkan luas lantai dasar menjadi maksimal 861.6 m² agar KDB mencapai 60%. 2. Pemohon harus menambah RTH minimal 359 m² agar KDH mencapai 25%.",
+      "Wajib menurunkan luas lantai dasar bangunan menjadi maksimal 1077 m² (KDB maks 75%) dan meningkatkan RTH menjadi minimal 359 m² (KDH min 25%) agar indeks limpasan tidak lebih dari 2.5 dan kategori dampak turun ke SEDANG.",
+      "Batas luas lantai dasar menurut ketentuan intensitas ruang (861,60 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 861,60 m²."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [],
+  "low_confidence_keseluruhan": false
+}

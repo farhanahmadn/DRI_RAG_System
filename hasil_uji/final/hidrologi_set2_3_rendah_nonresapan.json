@@ -1,0 +1,101 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Lolos Bersyarat",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan pada tahap intensitas bangunan (KDB/KLB/KDH) yang perlu ditindaklanjuti."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Rendah",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Rendah untuk kegiatan Penyediaan Makan Minum (kelas bangunan: Perdagangan dan Jasa Lingkungan)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (B) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MEMENUHI_SYARAT",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Intensitas Bangunan (KDB/KLB/KDH)' (intensitas) setelah beberapa kali percobaan. Status (memenuhi syarat) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Rendah",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Terhadap Lingkungan (Hidrologi)' (dampak) setelah beberapa kali percobaan. Status (Rendah) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": [
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Pertahankan luas RTH minimal 260 m² sesuai usulan, jangan dialihfungsikan agar daerah peresapan air tetap terjaga.",
+            "nilai_saat_ini": 260.0,
+            "nilai_target": 260.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Jaga luas bangunan tidak melebihi 140 m² sesuai usulan. Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya.",
+            "nilai_saat_ini": 140.0,
+            "nilai_target": 140.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Sumur/Kolam Resapan",
+            "deskripsi": "Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik pengelolaan limpasan. Lokasi bukan kawasan resapan air, jadi ini rekomendasi, bukan kewajiban dari ketentuan kawasan resapan air.",
+            "nilai_saat_ini": null,
+            "nilai_target": null,
+            "satuan": null
+          }
+        ]
+      },
+      "low_confidence": true
+    }
+  ],
+  "rekomendasi_sistem": "Setuju Bersyarat",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Perlu peninjauan manual oleh petugas terkait poin ini. Perlu peninjauan manual oleh petugas terkait poin ini.",
+    "paragraf_dampak": "Perlu peninjauan manual oleh petugas terkait poin ini."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: itbx, intensitas, dampak) tidak dapat dihasilkan otomatis dan perlu peninjauan manual."
+  ],
+  "low_confidence_keseluruhan": true
+}

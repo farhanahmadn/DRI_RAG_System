@@ -1,0 +1,110 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Tidak Lolos",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran pada tahap intensitas bangunan (KDB/KLB/KDH) yang bersifat mutlak."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Tinggi",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Tinggi untuk kegiatan Perdagangan Eceran Minimarket (kelas bangunan: Perdagangan Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (B) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MELAMPAUI_BATAS",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Intensitas Bangunan (KDB/KLB/KDH)' (intensitas) setelah beberapa kali percobaan. Status (melampaui batas) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": 60.0,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": [
+          {
+            "parameter": "KDB",
+            "deskripsi": "KDB harus turun ke maksimal 60% (selisih 29.09 poin dari usulan) → luas lantai dasar bangunan maksimal 660 m²",
+            "nilai_saat_ini": 89.09,
+            "nilai_target": 60.0,
+            "satuan": "persen"
+          },
+          {
+            "parameter": "KDH",
+            "deskripsi": "KDH harus naik ke minimal 25% (kurang 21.36 poin dari usulan) → RTH dibutuhkan minimal 275 m² (RTH yang sudah diusulkan pemohon masih kurang 235 m²)",
+            "nilai_saat_ini": 3.64,
+            "nilai_target": 25.0,
+            "satuan": "persen"
+          }
+        ]
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Tinggi",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Terhadap Lingkungan (Hidrologi)' (dampak) setelah beberapa kali percobaan. Status (Tinggi) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": 2.5,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual. Batas luas lantai dasar menurut ketentuan intensitas ruang (660,00 m²) lebih ketat daripada syarat penurunan kategori dampak (900,00 m²), sehingga yang harus diikuti adalah 660,00 m². Ketentuan intensitas ruang menuntut RTH lebih luas (275,00 m²) daripada syarat penurunan kategori dampak (200,00 m²), sehingga yang diikuti adalah 275,00 m².",
+        "langkah_konkret": [
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Wajib menurunkan luas lantai dasar bangunan ke maksimal 900 m² (KDB maks 82%) agar indeks limpasan turun ke kategori Sedang.",
+            "nilai_saat_ini": 980.0,
+            "nilai_target": 900.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Wajib meningkatkan luas RTH ke minimal 200 m² (KDH min 18%) untuk memperluas daerah peresapan air alami.",
+            "nilai_saat_ini": 40.0,
+            "nilai_target": 200.0,
+            "satuan": "m²"
+          }
+        ]
+      },
+      "low_confidence": true
+    }
+  ],
+  "rekomendasi_sistem": "Tidak Setuju",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Perlu peninjauan manual oleh petugas terkait poin ini. Perlu peninjauan manual oleh petugas terkait poin ini.",
+    "paragraf_dampak": "Perlu peninjauan manual oleh petugas terkait poin ini. Batas luas lantai dasar menurut ketentuan intensitas ruang (660,00 m²) lebih ketat daripada syarat penurunan kategori dampak (900,00 m²), sehingga yang harus diikuti adalah 660,00 m². Ketentuan intensitas ruang menuntut RTH lebih luas (275,00 m²) daripada syarat penurunan kategori dampak (200,00 m²), sehingga yang diikuti adalah 275,00 m²."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Batas luas lantai dasar menurut ketentuan intensitas ruang (660,00 m²) lebih ketat daripada syarat penurunan kategori dampak (900,00 m²), sehingga yang harus diikuti adalah 660,00 m². Ketentuan intensitas ruang menuntut RTH lebih luas (275,00 m²) daripada syarat penurunan kategori dampak (200,00 m²), sehingga yang diikuti adalah 275,00 m²."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: itbx, intensitas, dampak) tidak dapat dihasilkan otomatis dan perlu peninjauan manual."
+  ],
+  "low_confidence_keseluruhan": true
+}

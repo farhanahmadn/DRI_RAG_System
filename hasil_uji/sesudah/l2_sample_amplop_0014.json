@@ -1,0 +1,143 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Lolos Bersyarat",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan pada tahap intensitas bangunan (KDB/KLB/KDH) yang perlu ditindaklanjuti."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Rendah",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Rendah untuk kegiatan Rumah Tinggal (kelas bangunan: Perdagangan Sekeliling Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (B) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MELAMPAUI_BATAS",
+      "reasoning_pendek": "KDB 68,36 % melebihi ambang 10 %, KLB 1,37 > 1 %, dan KDH 31,64 % kurang dari 88 % sehingga permohonan melampaui batas intensitas untuk Zona Pertanian P-1.",
+      "reasoning_panjang": "**melampaui batas**. **KDB, KLB, dan KDH melebihi ambang yang ditetapkan untuk Zona Pertanian P-1**. **Pemohon harus menyesuaikan luas lantai dasar, total lantai, dan RTH agar memenuhi ketentuan intensitas**.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Ketentuan Intensitas Ruang (P)",
+          "halaman": 0,
+          "kutipan": "KDB maks 10 , KLB maks 1, KDH min 88",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-p-1",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 370,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona P-1 (Tanaman Pangan): KDB maksimum 10%; KLB maksimum 0.1; KDH minimum 85–88%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": 10.0,
+        "saran": "1. Pemohon menyesuaikan luas lantai dasar menjadi maksimal 102,4 m² (KDB 10 %).\n2. Pemohon menyesuaikan luas total lantai menjadi maksimal 1024 m² (KLB 1).\n3. Pemohon menambah RTH menjadi minimal 901,12 m² (KDH 88 %).",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "KDB",
+            "deskripsi": "KDB harus turun ke maksimal 10% (selisih 58.36 poin dari usulan) → luas lantai dasar bangunan maksimal 102.4 m²",
+            "nilai_saat_ini": 68.36,
+            "nilai_target": 10.0,
+            "satuan": "persen"
+          },
+          {
+            "parameter": "KLB",
+            "deskripsi": "KLB harus turun ke maksimal 1 (selisih 0.37 dari usulan) → luas total lantai bangunan maksimal 1024 m²",
+            "nilai_saat_ini": 1.37,
+            "nilai_target": 1.0,
+            "satuan": "rasio"
+          },
+          {
+            "parameter": "KDH",
+            "deskripsi": "KDH harus naik ke minimal 88% (kurang 56.36 poin dari usulan) → RTH dibutuhkan minimal 901.12 m² (RTH yang sudah diusulkan pemohon masih kurang 577.12 m²)",
+            "nilai_saat_ini": 31.64,
+            "nilai_target": 88.0,
+            "satuan": "persen"
+          }
+        ]
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Rendah",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Terhadap Lingkungan (Hidrologi)' (dampak) setelah beberapa kali percobaan. Status (Rendah) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": [
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Pertahankan luas RTH minimal 324 m² sesuai usulan, jangan dialihfungsikan agar daerah peresapan air tetap terjaga.",
+            "nilai_saat_ini": 324.0,
+            "nilai_target": 324.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Jaga luas bangunan tidak melebihi 700 m² sesuai usulan. Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya.",
+            "nilai_saat_ini": 700.0,
+            "nilai_target": 700.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Sumur/Kolam Resapan",
+            "deskripsi": "Lokasi berada di kawasan resapan air: pastikan air hujan tidak melimpas keluar lahan (zero delta Q). Sediakan sumur atau kolam resapan untuk mendukungnya, karena ketentuan khusus kawasan resapan air mewajibkannya pada lahan terbangun yang sudah ada.",
+            "nilai_saat_ini": null,
+            "nilai_target": null,
+            "satuan": null
+          }
+        ]
+      },
+      "low_confidence": true
+    }
+  ],
+  "rekomendasi_sistem": "Setuju Bersyarat",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Perlu peninjauan manual oleh petugas terkait poin ini. Pemohon menyesuaikan luas lantai dasar menjadi maksimal 102,4 m² (KDB 10 %). Pemohon menyesuaikan luas total lantai menjadi maksimal 1024 m² (KLB 1). Pemohon menambah RTH menjadi minimal 901,12 m² (KDH 88 %).",
+    "paragraf_dampak": "Perlu peninjauan manual oleh petugas terkait poin ini."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Pemohon menyesuaikan luas lantai dasar menjadi maksimal 102,4 m² (KDB 10 %).",
+      "Pemohon menyesuaikan luas total lantai menjadi maksimal 1024 m² (KLB 1).",
+      "Pemohon menambah RTH menjadi minimal 901,12 m² (KDH 88 %).",
+      "Perlu peninjauan manual oleh petugas terkait poin ini."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: itbx, dampak) tidak dapat dihasilkan otomatis dan perlu peninjauan manual.",
+    "Batas waktu pemrosesan tercapai, sehingga sebagian penjelasan tidak sempat dihasilkan otomatis dan perlu ditinjau manual atau permohonan diulang."
+  ],
+  "low_confidence_keseluruhan": true
+}

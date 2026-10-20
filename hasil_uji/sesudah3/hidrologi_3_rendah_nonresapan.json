@@ -1,0 +1,127 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Lolos Bersyarat",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan pada tahap intensitas bangunan (KDB/KLB/KDH) yang perlu ditindaklanjuti."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Rendah",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Rendah untuk kegiatan Penyediaan Akomodasi Lainnya (kelas bangunan: Perdagangan Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Kegiatan penyediaan akomodasi lainnya bersyarat di zona perumahan, sehingga lolos dengan syarat luas akomodasi makan minum maksimal 20% dari luas blok.",
+      "reasoning_panjang": "Status kegiatan adalah **Bersyarat**. Alasan utama adalah **kegiatan bersyarat di zona perumahan**. Oleh karena itu, **pemohon harus memastikan luas akomodasi makan minum tidak melebihi 20% dari luas blok**.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Matriks ITBX (R-3)",
+          "halaman": 0,
+          "kutipan": "Data KBLI referensi",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "1. Pemohon harus menyesuaikan rencana lahan sehingga luas akomodasi makan minum tidak melebihi 20% dari luas blok.",
+        "disclaimer": null,
+        "langkah_konkret": []
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MEMENUHI_SYARAT",
+      "reasoning_pendek": "Pemohon memenuhi semua ambang intensitas KDB, KLB, dan KDH sesuai ketentuan zona R-3, sehingga status INTENSITAS dinyatakan memenuhi syarat.",
+      "reasoning_panjang": "KDB usulan 20,89 % berada di bawah ambang maksimal 60 % yang ditetapkan untuk zona R-3, KLB usulan 0,42 m² berada di bawah ambang maksimal 4,8 m², dan KDH usulan 55,71 % berada di atas ambang minimum 25 % untuk kawasan non-resapan air. Ketentuan ambang ini berasal dari ketentuan intensitas ruang di zona R-3, yang diatur oleh RDTR Sleman dan lampiran VI Peraturan Bupati Sleman Nomor 80 Tahun 2023. Karena semua nilai usulan berada dalam rentang yang diizinkan, pemohon dinyatakan memenuhi syarat intensitas.\n\n**Status**: memenuhi syarat\n**Alasan utama**: semua nilai usulan berada di bawah ambang maksimal atau di atas ambang minimal yang ditetapkan untuk zona R-3\n**Tindak lanjut**: pemohon dapat melanjutkan proses izin tanpa penyesuaian intensitas.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Ketentuan Intensitas Ruang (R-3)",
+          "halaman": 0,
+          "kutipan": "KDB maks 60%, KLB maks 4.8, KDH min 25% (kawasan non-resapan air)",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-3 (Perumahan Kepadatan Sedang): KDB maksimum 50–60%; KLB maksimum 2–8; KDH minimum 25–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": null,
+        "saran": "Tidak diperlukan tindakan khusus. Poin ini telah memenuhi ketentuan.",
+        "disclaimer": null,
+        "langkah_konkret": []
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Rendah",
+      "reasoning_pendek": "Kegiatan penyediaan akomodasi lainnya dengan bangunan dua lantai di zona perumahan memiliki dampak rendah, lokasi tidak berada di kawasan resapan air, sehingga ketentuan Pasal 53 tidak berlaku.\n",
+      "reasoning_panjang": "Kegiatan penyediaan akomodasi lainnya dengan bangunan dua lantai di zona perumahan (kode R) memiliki kategori dampak rendah karena indeks limpasan air yang terukur. Status ITBX di kawasan tersebut adalah B, yang menunjukkan bahwa kegiatan tidak termasuk dalam kategori terlarang. Jenis bangunan ini memengaruhi koefisien limpasan atap, sehingga meskipun luas bangunan dan RTH diusulkan, dampak tetap rendah. Lokasi tidak berada di kawasan resapan air, sehingga ketentuan Pasal 53 tidak berlaku. Karena dampak tergolong rendah, tidak diperlukan mitigasi korektif, namun langkah pencegahan dan pemeliharaan dapat meningkatkan keberlanjutan.\n\nRekomendasi praktis meliputi: mempertahankan luas RTH minimal 800 m² sesuai usulan, menjaga luas bangunan tidak melebihi 300 m², menyediakan sumur atau kolam resapan air hujan sebagai praktik baik, dan merawat saluran drainase secara berkala. Langkah-langkah ini tidak bersifat kewajiban hukum, melainkan saran untuk menjaga kualitas lingkungan.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": null,
+        "saran": "1. Pertahankan luas RTH minimal 800 m² sesuai usulan.\n2. Jaga luas bangunan tidak melebihi 300 m² sesuai usulan.\n3. Sediakan sumur atau kolam resapan air hujan sebagai rekomendasi praktik baik.\n4. Rawat saluran drainase secara berkala.\n",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Pertahankan luas RTH minimal 800 m² sesuai usulan, jangan dialihfungsikan agar daerah peresapan air tetap terjaga.",
+            "nilai_saat_ini": 800.0,
+            "nilai_target": 800.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Jaga luas bangunan tidak melebihi 300 m² sesuai usulan. Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya.",
+            "nilai_saat_ini": 300.0,
+            "nilai_target": 300.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Sumur/Kolam Resapan",
+            "deskripsi": "Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik pengelolaan limpasan. Lokasi bukan kawasan resapan air, jadi ini rekomendasi, bukan kewajiban dari ketentuan kawasan resapan air.",
+            "nilai_saat_ini": null,
+            "nilai_target": null,
+            "satuan": null
+          }
+        ]
+      },
+      "low_confidence": false
+    }
+  ],
+  "rekomendasi_sistem": "Setuju Bersyarat",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "ITBX status B menuntut pemohon menyesuaikan rencana lahan agar luas akomodasi makan minum tidak melebihi 20% dari luas blok. Intensitas bangunan memenuhi syarat, sehingga tidak diperlukan tindakan khusus.",
+    "paragraf_dampak": "Dampak lingkungan dinilai rendah. Pemohon disarankan mempertahankan RTH minimal 800 m², menjaga luas bangunan tidak melebihi 300 m², menyediakan sumur atau kolam resapan air hujan, dan merawat saluran drainase secara berkala."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Pemohon harus menyesuaikan rencana lahan sehingga luas akomodasi makan minum tidak melebihi 20% dari luas blok.",
+      "Pertahankan luas RTH minimal 800 m² sesuai usulan.",
+      "Jaga luas bangunan tidak melebihi 300 m² sesuai usulan.",
+      "Sediakan sumur atau kolam resapan air hujan sebagai rekomendasi praktik baik.",
+      "Rawat saluran drainase secara berkala."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [],
+  "low_confidence_keseluruhan": false
+}

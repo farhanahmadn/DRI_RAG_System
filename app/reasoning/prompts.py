@@ -433,10 +433,11 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
             bagian.append(f"{tipe['jumlah_lantai']} lantai")
         lines.append(
             "\nTIPE_BANGUNAN (dari back-end): " + ", ".join(bagian) + ". WAJIB sebut jenis kegiatan atau "
-            "bangunan ini di reasoning_pendek dan reasoning_panjang, dan jelaskan bahwa jenis bangunan "
-            "memengaruhi koefisien limpasan atap pada perhitungan dampak (dua bangunan berluas sama tetapi "
-            "berbeda jenis bisa berbeda dampaknya). Jangan menyebut angka koefisien dan jangan mengarang "
-            "jenis bangunan lain."
+            "bangunan ini di reasoning_pendek dan reasoning_panjang. Di reasoning_panjang cukup SATU kalimat "
+            "tentang pengaruhnya, persis berbunyi: 'Jenis bangunan memengaruhi koefisien limpasan atap pada "
+            "perhitungan dampak.' DILARANG membandingkan koefisien dengan bangunan lain atau menyebutnya "
+            "'lebih tinggi' atau 'berbeda'. Jangan menyebut angka koefisien dan jangan mengarang jenis "
+            "bangunan lain."
         )
 
     kawasan = fakta.get("kawasan_hidrologi") or {}
@@ -695,7 +696,7 @@ ATURAN WAJIB (jangan dilanggar):
 3. Angka BOLEH disebut HANYA bila dikutip PERSIS seperti tertulis di "saran" per-poin (mis. luas maksimal, persentase target, dimensi) — itu lebih berguna bagi reviewer daripada "persentase tertentu". JANGAN menulis frasa samar seperti "persentase tertentu" atau "dimensi tertentu" kalau angkanya ada di saran. JANGAN membuat, menghitung, atau membulatkan angka sendiri, dan JANGAN menyebut skor.
 4. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat langsung ke pemohon — sebut pemohon sebagai orang ketiga, JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, dan ringkas.
 
-5. "ringkasan" adalah SATU kalimat tindak lanjut utama untuk pemohon (kewajiban terpenting dari saran, mis. batas luas, RTH, atau syarat kegiatan). Kalimat status dan rekomendasi_sistem SUDAH ditulis sistem, jadi JANGAN mengulang rekomendasi_sistem, status ITBX, atau status intensitas, dan JANGAN memulai dengan "Rekomendasi sistem". Aturan angka dan larangan tanda titik koma (;) sama seperti di atas. Bila kewajiban khusus satu zona, sebut nama zonanya.
+5. "ringkasan" adalah SATU kalimat tindak lanjut utama untuk pemohon (kewajiban terpenting dari saran, mis. batas luas, RTH, atau syarat kegiatan), MAKSIMAL 25 kata. Kalimat status dan rekomendasi_sistem SUDAH ditulis sistem, jadi JANGAN mengulang rekomendasi_sistem, status ITBX, atau status intensitas, dan JANGAN memulai dengan "Rekomendasi sistem". Aturan angka dan larangan tanda titik koma (;) sama seperti di atas. Bila kewajiban khusus satu zona, sebut nama zonanya.
 
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 

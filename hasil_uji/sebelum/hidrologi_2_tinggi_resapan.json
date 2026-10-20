@@ -1,0 +1,144 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Tidak Lolos",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran pada tahap intensitas bangunan (KDB/KLB/KDH) yang bersifat mutlak."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Tinggi",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Tinggi untuk kegiatan Penyediaan Akomodasi Lainnya (kelas bangunan: Perdagangan Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (B) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MELAMPAUI_BATAS",
+      "reasoning_pendek": "Usulan KDB 83,57% melampaui batas maksimal 50% dan KDH 13,93% di bawah minimal 30%, sehingga intensitas bangunan tidak memenuhi ketentuan zona R-3.",
+      "reasoning_panjang": "**Melampaui Batas** karena **KDB > 50% dan KDH < 30%**, pemohon harus menyesuaikan luas lantai dasar dan RTH agar sesuai dengan ketentuan zona R-3. KDB usulan 83,57% jauh di atas ambang maksimal 50% yang ditetapkan untuk kawasan resapan air di zona perumahan R-3, sedangkan KDH 13,93% berada di bawah ambang minimal 30%. Untuk memenuhi ketentuan, pemohon perlu menurunkan luas lantai dasar menjadi 718 m² atau kurang, dan menambah RTH menjadi 430,8 m² atau lebih.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Ketentuan Intensitas Ruang (R-3)",
+          "halaman": 0,
+          "kutipan": "KDB maks 50%, KLB maks 3.0, KDH min 30% (kawasan resapan air)",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-3 (Perumahan Kepadatan Sedang): KDB maksimum 50–60%; KLB maksimum 2–8; KDH minimum 25–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-2",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-2 (Perumahan Kepadatan Tinggi): KDB maksimum 60–70%; KLB maksimum 3–9.8; KDH minimum 20–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": 50.0,
+        "saran": "1. Pemohon menyesuaikan luas lantai dasar menjadi 718 m² atau kurang.\n2. Pemohon menambah RTH menjadi 430,8 m² atau lebih.",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "KDB",
+            "deskripsi": "KDB harus turun ke maksimal 50% (selisih 33.57 poin dari usulan) → luas lantai dasar bangunan maksimal 718 m²",
+            "nilai_saat_ini": 83.57,
+            "nilai_target": 50.0,
+            "satuan": "persen"
+          },
+          {
+            "parameter": "KDH",
+            "deskripsi": "KDH harus naik ke minimal 30% (kurang 16.07 poin dari usulan) → RTH dibutuhkan minimal 430.8 m² (RTH yang sudah diusulkan pemohon masih kurang 230.8 m²)",
+            "nilai_saat_ini": 13.93,
+            "nilai_target": 30.0,
+            "satuan": "persen"
+          }
+        ]
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Tinggi",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Dampak Terhadap Lingkungan (Hidrologi)' (dampak) setelah beberapa kali percobaan. Status (Tinggi) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": 2.5,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual. Batas luas lantai dasar menurut ketentuan intensitas ruang (718,00 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 718,00 m². Ketentuan intensitas ruang menuntut RTH lebih luas (430,80 m²) daripada syarat penurunan kategori dampak (359,00 m²), sehingga yang diikuti adalah 430,80 m².",
+        "langkah_konkret": [
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Turunkan luas lantai dasar bangunan ke maksimal 1077 m² (KDB maks 75%) agar indeks limpasan turun ke kategori Sedang.",
+            "nilai_saat_ini": 1200.0,
+            "nilai_target": 1077.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Tingkatkan luas RTH ke minimal 359 m² (KDH min 25%) untuk memperluas daerah peresapan air alami.",
+            "nilai_saat_ini": 200.0,
+            "nilai_target": 359.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Dimensi Minimum Sumur Resapan",
+            "deskripsi": "Sediakan sumur atau kolam resapan dengan dimensi minimum 0.62 m³. Lokasi berada di kawasan resapan air, jadi ini sejalan dengan ketentuan khusus kawasan resapan air.",
+            "nilai_saat_ini": 0.0,
+            "nilai_target": 0.62,
+            "satuan": "m³"
+          }
+        ]
+      },
+      "low_confidence": true
+    }
+  ],
+  "rekomendasi_sistem": "Tidak Setuju",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Perlu peninjauan manual oleh petugas terkait poin ini. 1. Pemohon menyesuaikan luas lantai dasar menjadi 718 m² atau kurang.\n2. Pemohon menambah RTH menjadi 430,8 m² atau lebih.",
+    "paragraf_dampak": "Perlu peninjauan manual oleh petugas terkait poin ini. Batas luas lantai dasar menurut ketentuan intensitas ruang (718,00 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 718,00 m². Ketentuan intensitas ruang menuntut RTH lebih luas (430,80 m²) daripada syarat penurunan kategori dampak (359,00 m²), sehingga yang diikuti adalah 430,80 m²."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Pemohon menyesuaikan luas lantai dasar menjadi 718 m² atau kurang.",
+      "Pemohon menambah RTH menjadi 430,8 m² atau lebih.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Batas luas lantai dasar menurut ketentuan intensitas ruang (718,00 m²) lebih ketat daripada syarat penurunan kategori dampak (1.077,00 m²), sehingga yang harus diikuti adalah 718,00 m². Ketentuan intensitas ruang menuntut RTH lebih luas (430,80 m²) daripada syarat penurunan kategori dampak (359,00 m²), sehingga yang diikuti adalah 430,80 m²."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: itbx, dampak) tidak dapat dihasilkan otomatis dan perlu peninjauan manual.",
+    "Batas waktu pemrosesan tercapai, sehingga sebagian penjelasan tidak sempat dihasilkan otomatis dan perlu ditinjau manual atau permohonan diulang."
+  ],
+  "low_confidence_keseluruhan": true
+}

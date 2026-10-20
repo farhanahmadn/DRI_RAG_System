@@ -1,0 +1,122 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Lolos Bersyarat",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan lolos bersyarat pemeriksaan gate hukum — terdapat catatan pada tahap intensitas bangunan (KDB/KLB/KDH) yang perlu ditindaklanjuti."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Rendah",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Rendah untuk kegiatan Penyediaan Makan Minum (kelas bangunan: Perdagangan dan Jasa Lingkungan)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "B",
+      "reasoning_pendek": "Status bersyarat ditetapkan karena kegiatan berada di sub-zona perumahan R-3, dengan ketentuan jam operasional maksimal 22.00 dan pengelolaan limbah mandiri.",
+      "reasoning_panjang": "**Bersyarat** status ditetapkan karena kegiatan penyediaan makan minum berada di sub-zona perumahan kepadatan sedang (R-3) yang diatur sebagai kegiatan bersyarat. **Kegiatan di zona perumahan R-3, penyediaan makan minum bersyarat** sesuai dengan ketentuan lampiran V.B yang mengharuskan jam operasional tidak melebihi pukul 22.00 dan pengelolaan limbah secara mandiri. **Pemohon perlu menyesuaikan jam operasional dan pengelolaan limbah sesuai ketentuan**.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Matriks ITBX (R-3)",
+          "halaman": 0,
+          "kutipan": "Data KBLI referensi",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vb-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 274,
+          "kutipan": "Lampiran V.B — Penjelasan Ketentuan Kegiatan (T/B) Sub-zona Perumahan Kepadatan Sedang (R-3):\nSub-zona Perumahan Kepadatan Sedang (R-3)\na. Kegiatan pada kelompok real estate yang diperbolehkan secara terbatas pada sub-zona perumahan kepadatan sedang wajib memenuhi ketentuan terbatas hanya untuk perumahan dan kegiatan yang diperbolehkan maupun bersyarat sesuai dengan kelompok penyediaan akomodasi dan penyediaan makan minum serta perdagangan besar dan eceran, reparasi dan perawatan mobil dan sepeda motor pada sub-zona Perumahan Kepadatan Sedang (R-3).\nb. Kegiatan pada kelompok aktivitas jasa lainnya yang diperbolehkan secara terbatas pada sub-zona perumahan kepadatan sedang wajib memenuhi ketentuan sebagai berikut:\n1. hanya untuk memenuhi kebutuhan masyakarakat sekitar;\n2. jam operasional (jam buka) dibatasi sampai dengan maksimal pukul 22.00 kecuali dengan izin instansi berwenang; dan\na. Kegiatan pada kelompok pertanian, kehutanan, dan perikanan yang diperbolehkan secara bersyarat pada sub-zona perumahan kepadatan sedang wajib memenuhi ketentuan sebagai berikut:\n1. tidak mencemari lingkungan baik air, tanah, udara;\n2. melakukan pengelolaan limbah/sampah;\n3. memiliki dokumen lingkungan sesuai jenis kegiatan dan skalanya berdasar peraturan perundangan;\n4. khusus peternakan domba dan kambing jumlah ternak maksimal 100 ekor dan/atau telah terbangun sebelum perbup ditetapkan;\n5. khusus peternakan unggas jumlah ternak maksimal 20.000 ekor dan/atau telah terbangun sebelum perbup ditetapkan;\n6. khusus usaha peternakan eksisting sebelum perbup ditetapkan yang memiliki jumlah ternak lebih dari ketentuan pada angka 4 dan 5 tetap diperbolehkan;\n7. khusus budidaya ikan laut wajib memenuhi ketentuan tidak mengganggu ekosistem sekitar.\nSarana dan Prasarana minimum berupa:\na. jaringan jalan lingkungan;\nb. jaringan listrik;\nc. jaringan air bersih;\nd. pengolahan limbah komunal/individu;\ne. pengelolaan sampah;\nf. saluran pembuangan air hujan/peresapan air hujan lingkungan; dan\ng. fasilitas lingkungan seperti sarana perniagaan,",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "1. Memastikan jam operasional tidak melebihi pukul 22.00.\n2. Menyusun rencana pengelolaan limbah dan sampah secara mandiri sesuai ketentuan.",
+        "disclaimer": null,
+        "langkah_konkret": []
+      },
+      "low_confidence": false
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MEMENUHI_SYARAT",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Intensitas Bangunan (KDB/KLB/KDH)' (intensitas) setelah beberapa kali percobaan. Status (memenuhi syarat) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Rendah",
+      "reasoning_pendek": "Kegiatan penyediaan makan minum dua lantai di zona perumahan memiliki dampak lingkungan hidrologi yang tergolong rendah, karena luas bangunan dan RTH yang diusulkan berada dalam batas yang aman.",
+      "reasoning_panjang": "Kegiatan yang diusulkan berupa penyediaan makan minum dengan bangunan dua lantai berada di zona perumahan (kode R). Kategori dampak ditentukan oleh indeks limpasan air, yang dipengaruhi oleh luas bangunan dan RTH yang diusulkan, bukan oleh lokasi. Karena lokasi tidak berada di kawasan resapan air, ketentuan khusus kawasan resapan air tidak berlaku. Dengan demikian, dampak lingkungan hidrologi dinilai rendah. Meskipun dampak rendah, tetap disarankan untuk menjaga RTH minimal 260 m² dan memastikan luas bangunan tidak melebihi 140 m², serta menyediakan sumur atau kolam resapan air hujan dan merawat saluran drainase sebagai praktik baik.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": null,
+        "saran": "1. Pertahankan luas RTH minimal 260 m² sesuai usulan.\n2. Jaga luas bangunan tidak melebihi 140 m² sesuai usulan.\n3. Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai rekomendasi praktik baik.",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Pertahankan luas RTH minimal 260 m² sesuai usulan, jangan dialihfungsikan agar daerah peresapan air tetap terjaga.",
+            "nilai_saat_ini": 260.0,
+            "nilai_target": 260.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Jaga luas bangunan tidak melebihi 140 m² sesuai usulan. Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya.",
+            "nilai_saat_ini": 140.0,
+            "nilai_target": 140.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Sumur/Kolam Resapan",
+            "deskripsi": "Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai praktik baik pengelolaan limpasan. Lokasi bukan kawasan resapan air, jadi ini rekomendasi, bukan kewajiban dari ketentuan kawasan resapan air.",
+            "nilai_saat_ini": null,
+            "nilai_target": null,
+            "satuan": null
+          }
+        ]
+      },
+      "low_confidence": false
+    }
+  ],
+  "rekomendasi_sistem": "Setuju Bersyarat",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Pemohon harus memastikan jam operasional tidak melebihi pukul 22.00 dan menyusun rencana pengelolaan limbah serta sampah secara mandiri sesuai ketentuan. Status ITBX dinyatakan B, sedangkan intensitas bangunan memenuhi syarat. Namun, petugas terkait masih perlu meninjau secara manual poin ini.",
+    "paragraf_dampak": "Status dampak lingkungan dinilai rendah. Pemohon diharapkan mempertahankan luas RTH minimal 260 m², menjaga luas bangunan tidak melebihi 140 m², serta menyediakan sumur atau kolam resapan air hujan dan merawat saluran drainase sebagai praktik baik."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Memastikan jam operasional tidak melebihi pukul 22.00.",
+      "Menyusun rencana pengelolaan limbah dan sampah secara mandiri sesuai ketentuan.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Pertahankan luas RTH minimal 260 m² sesuai usulan.",
+      "Jaga luas bangunan tidak melebihi 140 m² sesuai usulan.",
+      "Sediakan sumur atau kolam resapan air hujan dan rawat saluran drainase sebagai rekomendasi praktik baik."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: intensitas) tidak dapat dihasilkan otomatis dan perlu peninjauan manual.",
+    "Batas waktu pemrosesan tercapai, sehingga sebagian penjelasan tidak sempat dihasilkan otomatis dan perlu ditinjau manual atau permohonan diulang."
+  ],
+  "low_confidence_keseluruhan": true
+}

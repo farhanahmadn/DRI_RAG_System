@@ -1,0 +1,115 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Lolos",
+    "decisive_stage": "intensitas",
+    "kalimat": "Permohonan lolos pemeriksaan gate hukum — kegiatan dan intensitas bangunan memenuhi seluruh ketentuan yang berlaku."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Rendah",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Rendah untuk kegiatan Rumah Tinggal (kelas bangunan: Perumahan Tunggal)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx",
+      "kategori": "Klasifikasi Kegiatan (ITBX)",
+      "status": "I",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (I) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "intensitas",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH)",
+      "status": "MEMENUHI_SYARAT",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Intensitas Bangunan (KDB/KLB/KDH)' (intensitas) setelah beberapa kali percobaan. Status (memenuhi syarat) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": null,
+        "saran": "Perlu peninjauan manual oleh petugas terkait poin ini.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Rendah",
+      "reasoning_pendek": "Kategori Dampak rendah karena indeks limpasan air yang dihasilkan oleh rumah tinggal dua lantai di zona perumahan tidak melebihi ambang batas. Namun, karena lokasi berada di kawasan resapan air, pemohon tetap harus memenuhi ketentuan zero delta Q dan menyediakan sumur atau kolam resapan.",
+      "reasoning_panjang": "Jenis bangunan yang diusulkan adalah rumah tinggal (KBLI Rumah) dengan klasifikasi perumahan tunggal dua lantai. Klasifikasi ini memengaruhi koefisien limpasan atap, sehingga indeks limpasan air yang dihitung tidak melebihi ambang batas yang ditetapkan, sehingga kategori Dampak rendah. Meskipun dampak rendah, lokasi berada di kawasan resapan air, sehingga ketentuan khusus kawasan resapan air (Pasal 53 ayat 3 huruf a sampai c) berlaku. Kewajiban utama bagi pengembangan baru adalah memastikan air tidak melimpas (zero delta Q), tidak merusak fungsi resapan, dan tidak mencemari air. Untuk memenuhi ketentuan ini, pemohon harus menyediakan sumur atau kolam resapan yang mendukung fungsi resapan air.",
+      "sitasi": [
+        {
+          "citation_id": "rdtr-sleman-tengah-p53-a3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "53",
+          "halaman": 52,
+          "kutipan": "(3) Ketentuan khusus kawasan resapan air sebagaimana dimaksud pada ayat (1) pada Zona Badan Jalan dengan kode BJ, Sub-zona Tanaman\n\nPangan dengan kode P-1, Zona Pembangkitan Tenaga Listrik dengan kode PTL, Zona Kawasan Peruntukan Industri dengan kode KPI, Zona Pariwisata dengan kode W, Sub-zona Perumahan Kepadatan Sedang dengan kode R-3, Sub-zona perumahan kepadatan rendah dengan kode R-4, Sub-zona sarana pelayanan umum skala kota dengan kode SPU-1, Sub-zona sarana pelayanan umum skala kecamatan dengan kode SPU-2, Sub-zona sarana pelayanan umum skala kelurahan dengan kode SPU-3, Sub-zona Perdagangan dan Jasa Skala Kota dengan kode K-1, Sub-zona Perdagangan dan Jasa Skala WP dengan kode K-2, Sub-zona Perdagangan dan Jasa Skala SWP dengan kode K-3, Zona Perkantoran dengan kode KT, Sub-zona Instalasi Pengolahan Air Minum (IPAM) dengan kode PL-3, Sub-zona Instalasi Pengolahan Air Limbah (IPAL) dengan kode PL-4, zona pengelolaan persampahan dengan kode PP, Zona Pertahanan dan Keamanan dengan kode HK meliputi:\na. pengembangan baru dengan syarat memastikan air tidak melimpas (*zero delta Q policy*);\nb. bukan merupakan kegiatan yang tidak mendukung atau merusak fungsi kawasan resapan air;\nc. tidak menyebabkan pencemaran air; dan\nd. penyediaan sumur resapan dan/atau kolam resapan pada lahan terbangun yang sudah ada sesuai dengan peraturan yang berlaku.",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": null,
+        "saran": "1. Pertahankan luas RTH minimal 480 m² sesuai usulan.\n2. Jaga luas bangunan tidak melebihi 150 m² sesuai usulan.\n3. Pastikan air hujan tidak melimpas (zero delta Q).\n4. Sediakan sumur atau kolam resapan untuk mendukung ketentuan kawasan resapan air.\n5. Rawat saluran drainase secara berkala.",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Pertahankan luas RTH minimal 480 m² sesuai usulan, jangan dialihfungsikan agar daerah peresapan air tetap terjaga.",
+            "nilai_saat_ini": 480.0,
+            "nilai_target": 480.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Jaga luas bangunan tidak melebihi 150 m² sesuai usulan. Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya.",
+            "nilai_saat_ini": 150.0,
+            "nilai_target": 150.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Sumur/Kolam Resapan",
+            "deskripsi": "Lokasi berada di kawasan resapan air: pastikan air hujan tidak melimpas keluar lahan (zero delta Q). Sediakan sumur atau kolam resapan untuk mendukungnya, karena ketentuan khusus kawasan resapan air mewajibkannya pada lahan terbangun yang sudah ada.",
+            "nilai_saat_ini": null,
+            "nilai_target": null,
+            "satuan": null
+          }
+        ]
+      },
+      "low_confidence": false
+    }
+  ],
+  "rekomendasi_sistem": "Setuju",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Perlu peninjauan manual oleh petugas terkait poin ini. Perlu peninjauan manual oleh petugas terkait poin ini.",
+    "paragraf_dampak": "Pertahankan luas RTH minimal 480 m² sesuai usulan. Jaga luas bangunan tidak melebihi 150 m² sesuai usulan. Pastikan air hujan tidak melimpas (zero delta Q). Sediakan sumur atau kolam resapan untuk mendukung ketentuan kawasan resapan air. Rawat saluran drainase secara berkala."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Perlu peninjauan manual oleh petugas terkait poin ini.",
+      "Pertahankan luas RTH minimal 480 m² sesuai usulan.",
+      "Jaga luas bangunan tidak melebihi 150 m² sesuai usulan.",
+      "Pastikan air hujan tidak melimpas (zero delta Q).",
+      "Sediakan sumur atau kolam resapan untuk mendukung ketentuan kawasan resapan air.",
+      "Rawat saluran drainase secara berkala."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Sebagian penjelasan (poin: itbx, intensitas) tidak dapat dihasilkan otomatis dan perlu peninjauan manual.",
+    "Batas waktu pemrosesan tercapai, sehingga sebagian penjelasan tidak sempat dihasilkan otomatis dan perlu ditinjau manual atau permohonan diulang."
+  ],
+  "low_confidence_keseluruhan": true
+}

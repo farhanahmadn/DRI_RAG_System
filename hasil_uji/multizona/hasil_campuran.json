@@ -1,0 +1,281 @@
+{
+  "ringkasan_gate": {
+    "final_gate_status": "Tidak Lolos",
+    "decisive_stage": "itbx",
+    "kalimat": "Permohonan tidak lolos pemeriksaan gate hukum — terdapat pelanggaran pada tahap klasifikasi kegiatan (ITBX) yang bersifat mutlak."
+  },
+  "ringkasan_dampak": {
+    "impact_category": "Rendah",
+    "impact_score": null,
+    "kalimat": "Dampak terhadap lingkungan (hidrologi) tergolong Rendah untuk kegiatan Pertanian Tanaman Semusim (kelas bangunan: Perdagangan Sekeliling Pusat Kota)."
+  },
+  "poin": [
+    {
+      "poin_id": "itbx_P",
+      "kategori": "Klasifikasi Kegiatan (ITBX) - Zona Pertanian",
+      "status": "B",
+      "reasoning_pendek": "Penjelasan otomatis tidak tersedia untuk poin ini.",
+      "reasoning_panjang": "Sistem tidak berhasil menghasilkan penjelasan yang memenuhi standar validasi untuk poin 'Klasifikasi Kegiatan (ITBX)' (itbx) setelah beberapa kali percobaan. Status (B) tetap berdasarkan data asli dari back-end. Mohon dilakukan peninjauan manual oleh petugas.",
+      "sitasi": [],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "1. Syarat yang harus dipenuhi pemohon: Tidak mengganggu ekosistem setempat.\n2. Syarat yang harus dipenuhi pemohon: Pemeliharaan fungsi irigasi.",
+        "disclaimer": "Penjelasan otomatis tidak tersedia untuk poin ini. Perlu verifikasi manual.",
+        "langkah_konkret": []
+      },
+      "low_confidence": true,
+      "zona": {
+        "nama_zona": "Zona Pertanian",
+        "kode_zona": "P",
+        "luas_m2": 623.55,
+        "persentase": 50.4
+      }
+    },
+    {
+      "poin_id": "intensitas_P",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH) - Zona Pertanian",
+      "status": "MELAMPAUI_BATAS",
+      "reasoning_pendek": "Permohonan ini melampaui batas KDB, KLB, dan KDH yang ditetapkan untuk Zona Pertanian P-1, sehingga tidak memenuhi ketentuan intensitas ruang.",
+      "reasoning_panjang": "Permohonan ini berada di Zona Pertanian P-1, di mana ambang KDB maksimal 10 %, KLB maksimal 1 m², dan KDH minimal 88 %. Usulan pemohon menunjukkan KDB 68,36 %, KLB 1,37 m², dan KDH 31,64 %. Karena semua nilai usulan melebihi ambang maksimal atau kurang dari ambang minimal, status intensitas dinyatakan melampaui batas. Peraturan Bupati Sleman Nomor 80 Tahun 2023 (Lampiran VI) dan RDTR Sleman ketentuan intensitas ruang menegaskan ketentuan tersebut. Oleh karena itu, permohonan tidak memenuhi syarat intensitas ruang untuk zona ini.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Ketentuan Intensitas Ruang (P)",
+          "halaman": 0,
+          "kutipan": "KDB maks 10 , KLB maks 1, KDH min 88",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-p-1",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 370,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona P-1 (Tanaman Pangan): KDB maksimum 10%; KLB maksimum 0.1; KDH minimum 85–88%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": 10.0,
+        "saran": "1. Pemohon harus menurunkan KDB ke maksimal 10 % dengan mengurangi luas lantai dasar hingga 124,4 m².\n2. Pemohon harus menurunkan KLB ke maksimal 1 m² dengan mengurangi luas total lantai bangunan hingga 1244 m².\n3. Pemohon harus meningkatkan KDH ke minimal 88 % dengan menambah RTH hingga minimal 1094,72 m².\n4. Setelah penyesuaian, pemohon dapat mengajukan ulang permohonan untuk evaluasi kembali.",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "KDB",
+            "deskripsi": "KDB harus turun ke maksimal 10% (selisih 58.36 poin dari usulan) → luas lantai dasar bangunan maksimal 124.4 m²",
+            "nilai_saat_ini": 68.36,
+            "nilai_target": 10.0,
+            "satuan": "persen"
+          },
+          {
+            "parameter": "KLB",
+            "deskripsi": "KLB harus turun ke maksimal 1 (selisih 0.37 dari usulan) → luas total lantai bangunan maksimal 1244 m²",
+            "nilai_saat_ini": 1.37,
+            "nilai_target": 1.0,
+            "satuan": "rasio"
+          },
+          {
+            "parameter": "KDH",
+            "deskripsi": "KDH harus naik ke minimal 88% (kurang 56.36 poin dari usulan) → RTH dibutuhkan minimal 1094.72 m²",
+            "nilai_saat_ini": 31.64,
+            "nilai_target": 88.0,
+            "satuan": "persen"
+          }
+        ]
+      },
+      "low_confidence": false,
+      "zona": {
+        "nama_zona": "Zona Pertanian",
+        "kode_zona": "P",
+        "luas_m2": 623.55,
+        "persentase": 50.4
+      }
+    },
+    {
+      "poin_id": "itbx_R",
+      "kategori": "Klasifikasi Kegiatan (ITBX) - Zona Perumahan",
+      "status": "X",
+      "reasoning_pendek": "Kegiatan Pertanian Tanaman Semusim tidak diizinkan di Zona Perumahan, sehingga status ITBX X menunjukkan penolakan.",
+      "reasoning_panjang": "Kegiatan yang diajukan oleh pemohon, yaitu Pertanian Tanaman Semusim, termasuk dalam kategori KBLI Pertanian. Berdasarkan data matriks ITBX yang merujuk pada RDTR Sleman, zona yang dinilai adalah Zona Perumahan (kode R). Pasal yang mengatur klasifikasi kegiatan di zona ini menyatakan bahwa kegiatan pertanian tidak diizinkan di zona perumahan. Dengan demikian, alasan yang tercantum dalam REASON—\"Tidak lolos: kegiatan tidak diizinkan (X) di Zona Perumahan\"—menunjukkan bahwa status ITBX X adalah hasil verifikasi bahwa kegiatan tersebut tidak memenuhi ketentuan zona. Karena kelengkapan data matriks RDTR bernilai False, data matriks RDTR lengkap dan tidak ada kekosongan yang mempengaruhi penilaian. Oleh karena itu, pemohon tidak dapat memperoleh izin di zona ini tanpa melakukan perubahan kegiatan atau pindah zona.",
+      "sitasi": [
+        {
+          "citation_id": "anchor-0",
+          "dokumen": "RDTR Sleman",
+          "pasal": "Matriks ITBX (R)",
+          "halaman": 0,
+          "kutipan": "Data KBLI referensi",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "kategorikal",
+        "target": null,
+        "saran": "1. Pemohon harus menyesuaikan kegiatan menjadi jenis yang diizinkan di Zona Perumahan, seperti kegiatan komersial atau industri ringan yang sesuai dengan klasifikasi zona.\n2. Jika pemohon tetap ingin melakukan pertanian, ia harus memindahkan lokasi kegiatan ke zona yang mengizinkan pertanian, misalnya Zona Industri atau Zona Pertanian.\n3. Sebelum mengajukan permohonan baru, pemohon perlu memverifikasi kembali klasifikasi zona dan KBLI yang relevan dengan data RDTR terbaru.",
+        "disclaimer": null,
+        "langkah_konkret": []
+      },
+      "low_confidence": false,
+      "zona": {
+        "nama_zona": "Zona Perumahan",
+        "kode_zona": "R",
+        "luas_m2": 612.86,
+        "persentase": 49.6
+      }
+    },
+    {
+      "poin_id": "intensitas_R",
+      "kategori": "Intensitas Bangunan (KDB/KLB/KDH) - Zona Perumahan",
+      "status": "Tidak Dinilai",
+      "reasoning_pendek": "Status intensitas belum dinilai karena belum ada data perhitungan KDB, KLB, atau KDH untuk zona R-3 yang dimohon.",
+      "reasoning_panjang": "Permohonan ini berada di Zona Perumahan sub-zona R-3. Menurut Lampiran VI Pasal 42 ayat (4) huruf b, ketentuan intensitas pemanfaatan ruang di zona R-3 mencakup KDB maksimum 50–60 %, KLB maksimum 2–8 m², dan KDH minimum 25–30 %. Namun, data perhitungan KDB, KLB, atau KDH tidak tersedia, sehingga status intensitas dinyatakan *Tidak Dinilai*. Tanpa data tersebut, tidak dapat dipastikan apakah permohonan memenuhi batas maksimum atau minimum yang ditetapkan. Oleh karena itu, penilaian intensitas harus menunggu data lengkap atau verifikasi manual.",
+      "sitasi": [
+        {
+          "citation_id": "rdtr-sleman-tengah-vi-r-3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "",
+          "halaman": 371,
+          "kutipan": "Lampiran VI — Ketentuan Intensitas Pemanfaatan Ruang Zona R-3 (Perumahan Kepadatan Sedang): KDB maksimum 50–60%; KLB maksimum 2–8; KDH minimum 25–30%. Nilai bervariasi menurut kawasan resapan air (resapan/non-resapan) dan hierarki jalan (arteri/kolektor/lokal/lingkungan).",
+          "terverifikasi": true
+        },
+        {
+          "citation_id": "rdtr-sleman-tengah-p44-a1",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "44",
+          "halaman": 43,
+          "kutipan": "(1) Ketentuan intensitas pemanfaatan ruang sebagaimana dimaksud dalam Pasal 42 ayat (4) huruf b, meliputi:\na. KDB maksimal;\nb. KLB maksimal;\nc. KDH minimal;\nd. KTB maksimal; dan\ne. luas minimal bidang tanah.",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik",
+        "target": null,
+        "saran": "Tidak dievaluasi karena proses pemeriksaan berhenti pada tahapan sebelumnya, tidak ada rekomendasi untuk poin ini.",
+        "disclaimer": null,
+        "langkah_konkret": []
+      },
+      "low_confidence": false,
+      "zona": {
+        "nama_zona": "Zona Perumahan",
+        "kode_zona": "R",
+        "luas_m2": 612.86,
+        "persentase": 49.6
+      }
+    },
+    {
+      "poin_id": "dampak",
+      "kategori": "Dampak Terhadap Lingkungan (Hidrologi)",
+      "status": "Rendah",
+      "reasoning_pendek": "Kegiatan pertanian tanaman semusim dengan bangunan satu lantai di zona pertanian dan perumahan memiliki dampak lingkungan hidrologi yang tergolong Rendah, karena indeks limpasan air tidak melebihi ambang yang ditetapkan.",
+      "reasoning_panjang": "Kegiatan yang diusulkan adalah pertanian tanaman semusim (KBLI Pertanian) dengan bangunan satu lantai yang termasuk dalam kategori perdagangan sekeliling pusat kota. Jenis bangunan ini memengaruhi koefisien limpasan atap, sehingga meskipun luas bangunan dan RTH sama, dampak hidrologi dapat berbeda dibandingkan bangunan jenis lain. Perhitungan indeks limpasan air, yang didasarkan pada luas bangunan dan RTH yang diusulkan, menunjukkan bahwa dampak lingkungan hidrologi berada pada kategori Rendah. Lokasi berada di kawasan resapan air, sehingga ketentuan khusus kawasan resapan air (Pasal 53 ayat 3 huruf a sampai c) berlaku. Untuk pengembangan baru, kewajiban utama adalah memastikan air tidak melimpas (zero delta Q), tidak merusak fungsi resapan, dan tidak mencemari air. Meskipun dampak tergolong Rendah, masih diperlukan langkah-langkah pencegahan dan pemeliharaan untuk menjaga fungsi resapan air, seperti mempertahankan luas RTH minimal 1111 m², menjaga luas bangunan tidak melebihi 100 m², memastikan air hujan tidak melimpas, menyediakan sumur atau kolam resapan, dan merawat saluran drainase.",
+      "sitasi": [
+        {
+          "citation_id": "rdtr-sleman-tengah-p53-a3",
+          "dokumen": "Peraturan Bupati Sleman Nomor 80 Tahun 2023 tentang RDTR Kawasan Sleman Tengah Tahun 2023-2043",
+          "pasal": "53",
+          "halaman": 52,
+          "kutipan": "(3) Ketentuan khusus kawasan resapan air sebagaimana dimaksud pada ayat (1) pada Zona Badan Jalan dengan kode BJ, Sub-zona Tanaman\n\nPangan dengan kode P-1, Zona Pembangkitan Tenaga Listrik dengan kode PTL, Zona Kawasan Peruntukan Industri dengan kode KPI, Zona Pariwisata dengan kode W, Sub-zona Perumahan Kepadatan Sedang dengan kode R-3, Sub-zona perumahan kepadatan rendah dengan kode R-4, Sub-zona sarana pelayanan umum skala kota dengan kode SPU-1, Sub-zona sarana pelayanan umum skala kecamatan dengan kode SPU-2, Sub-zona sarana pelayanan umum skala kelurahan dengan kode SPU-3, Sub-zona Perdagangan dan Jasa Skala Kota dengan kode K-1, Sub-zona Perdagangan dan Jasa Skala WP dengan kode K-2, Sub-zona Perdagangan dan Jasa Skala SWP dengan kode K-3, Zona Perkantoran dengan kode KT, Sub-zona Instalasi Pengolahan Air Minum (IPAM) dengan kode PL-3, Sub-zona Instalasi Pengolahan Air Limbah (IPAL) dengan kode PL-4, zona pengelolaan persampahan dengan kode PP, Zona Pertahanan dan Keamanan dengan kode HK meliputi:\na. pengembangan baru dengan syarat memastikan air tidak melimpas (*zero delta Q policy*);\nb. bukan merupakan kegiatan yang tidak mendukung atau merusak fungsi kawasan resapan air;\nc. tidak menyebabkan pencemaran air; dan\nd. penyediaan sumur resapan dan/atau kolam resapan pada lahan terbangun yang sudah ada sesuai dengan peraturan yang berlaku.",
+          "terverifikasi": true
+        }
+      ],
+      "rekomendasi": {
+        "tipe": "numerik-mitigasi",
+        "target": null,
+        "saran": "1. Pemohon harus mempertahankan luas RTH minimal 1111 m² sesuai usulan.\n2. Pemohon harus menjaga luas bangunan tidak melebihi 100 m² sesuai usulan.\n3. Pemohon harus memastikan air hujan tidak melimpas (zero delta Q).\n4. Pemohon harus menyediakan sumur atau kolam resapan untuk mendukung fungsi resapan.\n5. Pemohon harus merawat saluran drainase secara berkala.",
+        "disclaimer": null,
+        "langkah_konkret": [
+          {
+            "parameter": "Luas RTH",
+            "deskripsi": "Pertahankan luas RTH minimal 1111 m² sesuai usulan, jangan dialihfungsikan agar daerah peresapan air tetap terjaga.",
+            "nilai_saat_ini": 1111.0,
+            "nilai_target": 1111.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Luas Bangunan (Atap)",
+            "deskripsi": "Jaga luas bangunan tidak melebihi 100 m² sesuai usulan. Penambahan luas bangunan di kemudian hari perlu ditinjau ulang dampak limpasannya.",
+            "nilai_saat_ini": 100.0,
+            "nilai_target": 100.0,
+            "satuan": "m²"
+          },
+          {
+            "parameter": "Sumur/Kolam Resapan",
+            "deskripsi": "Lokasi berada di kawasan resapan air: pastikan air hujan tidak melimpas keluar lahan (zero delta Q). Sediakan sumur atau kolam resapan untuk mendukungnya, karena ketentuan khusus kawasan resapan air mewajibkannya pada lahan terbangun yang sudah ada.",
+            "nilai_saat_ini": null,
+            "nilai_target": null,
+            "satuan": null
+          }
+        ]
+      },
+      "low_confidence": false,
+      "zona": null
+    }
+  ],
+  "rekomendasi_sistem": "Tidak Setuju",
+  "narasi_rekomendasi": {
+    "paragraf_gate_intensitas": "Zona Pertanian: Syarat yang harus dipenuhi pemohon: Tidak mengganggu ekosistem setempat. Syarat yang harus dipenuhi pemohon: Pemeliharaan fungsi irigasi. Pemohon harus menurunkan KDB ke maksimal 10 % dengan mengurangi luas lantai dasar hingga 124,4 m². Pemohon harus menurunkan KLB ke maksimal 1 m² dengan mengurangi luas total lantai bangunan hingga 1244 m². Pemohon harus meningkatkan KDH ke minimal 88 % dengan menambah RTH hingga minimal 1094,72 m². Setelah penyesuaian, pemohon dapat mengajukan ulang permohonan untuk evaluasi kembali. Zona Perumahan: Pemohon harus menyesuaikan kegiatan menjadi jenis yang diizinkan di Zona Perumahan, seperti kegiatan komersial atau industri ringan yang sesuai dengan klasifikasi zona. Jika pemohon tetap ingin melakukan pertanian, ia harus memindahkan lokasi kegiatan ke zona yang mengizinkan pertanian, misalnya Zona Industri atau Zona Pertanian. Sebelum mengajukan permohonan baru, pemohon perlu memverifikasi kembali klasifikasi zona dan KBLI yang relevan dengan data RDTR terbaru. Tidak dievaluasi karena proses pemeriksaan berhenti pada tahapan sebelumnya, tidak ada rekomendasi untuk poin ini.",
+    "paragraf_dampak": "Pemohon harus mempertahankan luas RTH minimal 1111 m² sesuai usulan. Pemohon harus menjaga luas bangunan tidak melebihi 100 m² sesuai usulan. Pemohon harus memastikan air hujan tidak melimpas (zero delta Q). Pemohon harus menyediakan sumur atau kolam resapan untuk mendukung fungsi resapan. Pemohon harus merawat saluran drainase secara berkala."
+  },
+  "kesimpulan": {
+    "langkah_berdampak": [
+      "Zona Pertanian: Syarat yang harus dipenuhi pemohon: Tidak mengganggu ekosistem setempat.",
+      "Zona Pertanian: Syarat yang harus dipenuhi pemohon: Pemeliharaan fungsi irigasi.",
+      "Zona Pertanian: Pemohon harus menurunkan KDB ke maksimal 10 % dengan mengurangi luas lantai dasar hingga 124,4 m².",
+      "Zona Pertanian: Pemohon harus menurunkan KLB ke maksimal 1 m² dengan mengurangi luas total lantai bangunan hingga 1244 m².",
+      "Zona Pertanian: Pemohon harus meningkatkan KDH ke minimal 88 % dengan menambah RTH hingga minimal 1094,72 m².",
+      "Zona Pertanian: Setelah penyesuaian, pemohon dapat mengajukan ulang permohonan untuk evaluasi kembali.",
+      "Zona Perumahan: Pemohon harus menyesuaikan kegiatan menjadi jenis yang diizinkan di Zona Perumahan, seperti kegiatan komersial atau industri ringan yang sesuai dengan klasifikasi zona.",
+      "Zona Perumahan: Jika pemohon tetap ingin melakukan pertanian, ia harus memindahkan lokasi kegiatan ke zona yang mengizinkan pertanian, misalnya Zona Industri atau Zona Pertanian.",
+      "Zona Perumahan: Sebelum mengajukan permohonan baru, pemohon perlu memverifikasi kembali klasifikasi zona dan KBLI yang relevan dengan data RDTR terbaru.",
+      "Zona Perumahan: Tidak dievaluasi karena proses pemeriksaan berhenti pada tahapan sebelumnya, tidak ada rekomendasi untuk poin ini.",
+      "Pemohon harus mempertahankan luas RTH minimal 1111 m² sesuai usulan.",
+      "Pemohon harus menjaga luas bangunan tidak melebihi 100 m² sesuai usulan.",
+      "Pemohon harus memastikan air hujan tidak melimpas (zero delta Q).",
+      "Pemohon harus menyediakan sumur atau kolam resapan untuk mendukung fungsi resapan.",
+      "Pemohon harus merawat saluran drainase secara berkala."
+    ],
+    "catatan_lokasi": null
+  },
+  "catatan_global": [
+    "Permohonan ini bersinggungan dengan 2 zona RDTR yang berbeda: Zona Pertanian (P): 50.4% (623.55 m²), Zona Perumahan (R): 49.6% (612.86 m²). Penilaian legalitas ITBX dan intensitas ruang dievaluasi secara mandiri per masing-masing zona.",
+    "Sebagian penjelasan (poin: itbx_P) tidak dapat dihasilkan otomatis dan perlu peninjauan manual."
+  ],
+  "low_confidence_keseluruhan": true,
+  "rekomendasi_per_zona": [
+    {
+      "nama_zona": "Zona Pertanian",
+      "kode_zona": "P",
+      "luas_m2": 623.55,
+      "persentase": 50.4,
+      "status_itbx": "B",
+      "status_intensitas": "MELAMPAUI_BATAS",
+      "status_keputusan": "LOLOS_BERSYARAT",
+      "rekomendasi": "Setuju Bersyarat",
+      "alasan": "Permohonan ini melampaui batas KDB, KLB, dan KDH yang ditetapkan untuk Zona Pertanian P-1, sehingga tidak memenuhi ketentuan intensitas ruang.",
+      "saran": "1. Syarat yang harus dipenuhi pemohon: Tidak mengganggu ekosistem setempat.\n2. Syarat yang harus dipenuhi pemohon: Pemeliharaan fungsi irigasi.\n3. Pemohon harus menurunkan KDB ke maksimal 10 % dengan mengurangi luas lantai dasar hingga 124,4 m².\n4. Pemohon harus menurunkan KLB ke maksimal 1 m² dengan mengurangi luas total lantai bangunan hingga 1244 m².\n5. Pemohon harus meningkatkan KDH ke minimal 88 % dengan menambah RTH hingga minimal 1094,72 m².\n6. Setelah penyesuaian, pemohon dapat mengajukan ulang permohonan untuk evaluasi kembali.",
+      "poin_ids": [
+        "itbx_P",
+        "intensitas_P"
+      ],
+      "low_confidence": true
+    },
+    {
+      "nama_zona": "Zona Perumahan",
+      "kode_zona": "R",
+      "luas_m2": 612.86,
+      "persentase": 49.6,
+      "status_itbx": "X",
+      "status_intensitas": "Tidak Dinilai",
+      "status_keputusan": "TIDAK_LOLOS",
+      "rekomendasi": "Tidak Setuju",
+      "alasan": "Kegiatan Pertanian Tanaman Semusim tidak diizinkan di Zona Perumahan, sehingga status ITBX X menunjukkan penolakan. Status intensitas belum dinilai karena belum ada data perhitungan KDB, KLB, atau KDH untuk zona R-3 yang dimohon.",
+      "saran": "1. Pemohon harus menyesuaikan kegiatan menjadi jenis yang diizinkan di Zona Perumahan, seperti kegiatan komersial atau industri ringan yang sesuai dengan klasifikasi zona.\n2. Jika pemohon tetap ingin melakukan pertanian, ia harus memindahkan lokasi kegiatan ke zona yang mengizinkan pertanian, misalnya Zona Industri atau Zona Pertanian.\n3. Sebelum mengajukan permohonan baru, pemohon perlu memverifikasi kembali klasifikasi zona dan KBLI yang relevan dengan data RDTR terbaru.\n4. Tidak dievaluasi karena proses pemeriksaan berhenti pada tahapan sebelumnya, tidak ada rekomendasi untuk poin ini.",
+      "poin_ids": [
+        "itbx_R",
+        "intensitas_R"
+      ],
+      "low_confidence": false
+    }
+  ]
+}
