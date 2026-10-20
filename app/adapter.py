@@ -16,7 +16,17 @@ from app.reasoning.calculator import (
 from app.ketentuan_khusus import tentukan_kawasan_resapan, tentukan_rawan_kekeringan
 from app.tipe_bangunan import ambil_tipe_bangunan
 from app.reasoning.rekomendasi import turunkan_rekomendasi
-from app.schemas import AdapterResult, L2Assessment, Lokasi, PoinKonteks
+from app.schemas import (
+    AdapterResult,
+    IntensitasTahap,
+    IntensitasZona,
+    ItbxZona,
+    L2Assessment,
+    Lokasi,
+    ParameterIntensitas,
+    PoinKonteks,
+    ZonaInfo,
+)
 
 # Kata kunci heuristik deteksi fallback ITBX (Blueprint §5.2: "kolom matriks RDTR kosong/otomatis").
 # TIDAK ADA contoh nyata kasus fallback di fixture kita saat ini (keduanya status "I" dgn reason
@@ -168,6 +178,18 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
         # Sub-zona pemilik ambang hanya dipakai bila BE mengirim kodenya berbentuk sub-zona ("R-3").
         zona = nama_pemilik
         zona_subzone = kode_pemilik if kode_pemilik and re.match(r"^[A-Za-z]+-\d", kode_pemilik) else None
+    return _poin_dari_intensitas(intensitas, assessment, zona, zona_subzone)
+
+
+def _poin_dari_intensitas(
+    intensitas: IntensitasTahap,
+    assessment: L2Assessment,
+    zona: str | None,
+    zona_subzone: str | None,
+    zona_info: ZonaInfo | None = None,
+) -> PoinKonteks:
+    """Poin intensitas dari satu objek `IntensitasTahap` — dipakai jalur satu zona (`tahapan.intensitas`)
+    dan jalur multi-zona (satu per entri `intensitas_zones`)."""
     return PoinKonteks(
         poin_id="intensitas",
         kategori="Intensitas Bangunan (KDB/KLB/KDH)",
@@ -209,7 +231,111 @@ def _bangun_poin_intensitas(assessment: L2Assessment) -> PoinKonteks:
         dasar_hukum=intensitas.dasar_hukum,
         zona=zona,
         zona_subzone=zona_subzone,
+        zona_info=zona_info,
     )
+
+
+# ---------------------------------------------------------------------------
+# Lahan multi-zona (permintaan BE 2026-10-20): ITBX dan intensitas dinilai dan dijelaskan PER ZONA,
+# hidrologi tetap satu.
+# ---------------------------------------------------------------------------
+
+_RE_SUBZONA = re.compile(r"^[A-Za-z]+-\d")
+
+
+def _cocok_intensitas(zona_itbx: ItbxZona, daftar: list[IntensitasZona]) -> IntensitasZona | None:
+    """Entri `intensitas_zones` untuk zona ITBX ini: nama zona sama, atau kode intensitas turunan kode ITBX
+    ("P-1" untuk "P")."""
+    nama = (zona_itbx.nama_zona or "").strip().lower()
+    kode = (zona_itbx.kode_zona or "").strip().upper()
+    for z in daftar:
+        if nama and (z.nama_zona or "").strip().lower() == nama:
+            return z
+    for z in daftar:
+        k = (z.kode_zona or "").strip().upper()
+        if kode and (k == kode or k.startswith(kode + "-")):
+            return z
+    return None
+
+
+def zona_terpisah(assessment: L2Assessment) -> list[tuple[ItbxZona, IntensitasZona | None]] | None:
+    """Pasangan (zona ITBX, zona intensitas) bila permohonan menyilang >= 2 zona dan BE mengirim
+    `itbx_zones`; None untuk lahan satu zona (jalur lama, tidak berubah)."""
+    zona_itbx = assessment.gate_hukum.itbx_zones or []
+    if len(zona_itbx) < 2:
+        return None
+    daftar = assessment.gate_hukum.intensitas_zones or []
+    return [(z, _cocok_intensitas(z, daftar)) for z in zona_itbx]
+
+
+def _info_zona(z: ItbxZona, inten: IntensitasZona | None) -> ZonaInfo:
+    return ZonaInfo(
+        nama_zona=z.nama_zona, kode_zona=z.kode_zona,
+        luas_m2=z.luas_m2 if z.luas_m2 is not None else (inten.luas_irisan_m2 if inten else None),
+        persentase=z.persentase if z.persentase is not None else (inten.persentase if inten else None),
+    )
+
+
+def _subzona_zona(z: ItbxZona, inten: IntensitasZona | None, assessment: L2Assessment) -> str | None:
+    """Kode sub-zona presisi (mis. "P-1") untuk retrieval zona ini, bila diketahui."""
+    if inten and inten.kode_zona and _RE_SUBZONA.match(inten.kode_zona):
+        return inten.kode_zona
+    lokasi_sub = assessment.lokasi.rdtr_subzone or ""
+    kode = (z.kode_zona or "").strip().upper()
+    if kode and lokasi_sub.upper().startswith(kode + "-"):
+        return lokasi_sub
+    return None
+
+
+def _bangun_poin_itbx_zona(z: ItbxZona, inten: IntensitasZona | None, assessment: L2Assessment) -> PoinKonteks:
+    return PoinKonteks(
+        poin_id="itbx",
+        kategori="Klasifikasi Kegiatan (ITBX)",
+        tipe_rekomendasi="kategorikal",
+        status=z.status,
+        fakta={
+            "lolos": z.lolos,
+            "kbli_diusulkan": z.kbli_diusulkan,
+            "kegiatan_diusulkan": z.kegiatan_diusulkan,
+            "kegiatan_diizinkan": z.kegiatan_diizinkan,
+            "kegiatan_terbatas": z.kegiatan_terbatas,
+            "kegiatan_bersyarat": z.kegiatan_bersyarat,
+            "kegiatan_terbatas_bersyarat": z.kegiatan_terbatas_bersyarat,
+            "keterangan_ketentuan": z.keterangan_ketentuan,
+            "reason": z.reason,
+            "fallback_data_kosong": deteksi_fallback_itbx(z.reason),
+        },
+        dasar_hukum=z.dasar_hukum,
+        zona=z.nama_zona,
+        zona_subzone=_subzona_zona(z, inten, assessment),
+        zona_info=_info_zona(z, inten),
+    )
+
+
+def _bangun_poin_intensitas_zona(z: ItbxZona, inten: IntensitasZona | None, assessment: L2Assessment) -> PoinKonteks:
+    info = _info_zona(z, inten)
+    subzona = _subzona_zona(z, inten, assessment)
+    tidak_dinilai = PoinKonteks(
+        poin_id="intensitas", kategori="Intensitas Bangunan (KDB/KLB/KDH)", tipe_rekomendasi="numerik",
+        status="Tidak Dinilai", fakta={"dinilai": False}, dasar_hukum=[],
+        zona=z.nama_zona, zona_subzone=subzona, zona_info=info,
+    )
+    if inten is None or inten.status not in ("MEMENUHI_SYARAT", "MELAMPAUI_BATAS") or not inten.parameter:
+        # Zona ini tidak dievaluasi intensitasnya (mis. ITBX X, atau BE tidak mengirim entri).
+        return tidak_dinilai
+    try:
+        tahap = IntensitasTahap(
+            status=inten.status,
+            lolos=inten.status == "MEMENUHI_SYARAT",
+            parameter={nama: ParameterIntensitas(**p) for nama, p in inten.parameter.items()},
+            luas_tapak_m2=inten.luas_tapak_m2, jumlah_lantai=inten.jumlah_lantai,
+            luas_rth_usulan_m2=inten.luas_rth_usulan_m2, reason=inten.reason, dasar_hukum=inten.dasar_hukum,
+            nama_zona=inten.nama_zona, kode_zona=inten.kode_zona,
+            hierarki_jalan=inten.hierarki_jalan, kawasan_resapan=inten.kawasan_resapan,
+        )
+    except Exception:  # noqa: BLE001 — parameter zona rusak: jangan menjatuhkan seluruh permohonan
+        return tidak_dinilai
+    return _poin_dari_intensitas(tahap, assessment, z.nama_zona, subzona, info)
 
 
 def _bangun_poin_dampak(assessment: L2Assessment) -> PoinKonteks:
@@ -269,6 +395,14 @@ def adaptasi(assessment: L2Assessment) -> AdapterResult:
     # status/parameter tahap-tahap di bawahnya.
     kategori_dampak = normalisasi_kategori_dampak(assessment.impact_assessment.impact_category)
     rekomendasi_sistem = turunkan_rekomendasi(assessment.gate_hukum.final_gate_status, kategori_dampak)
+    pasangan = zona_terpisah(assessment)
+    if pasangan:
+        poin: list[PoinKonteks] = []
+        for z, inten in pasangan:
+            poin.append(_bangun_poin_itbx_zona(z, inten, assessment))
+            poin.append(_bangun_poin_intensitas_zona(z, inten, assessment))
+        poin.append(_bangun_poin_dampak(assessment))  # hidrologi tetap satu (digabung)
+        return AdapterResult(poin=poin, rekomendasi_sistem=rekomendasi_sistem)
     return AdapterResult(
         poin=[
             _bangun_poin_itbx(assessment),
@@ -304,3 +438,17 @@ def cek_konsistensi_intensitas(assessment: L2Assessment) -> list[str]:
         masalah.append("intensitas MELAMPAUI_BATAS tapi final_gate_status=Lolos (harusnya Lolos Bersyarat)")
 
     return masalah
+
+
+def cek_konsistensi_poin_intensitas(poin: PoinKonteks) -> list[str]:
+    """Cek silang status vs parameter.memenuhi untuk poin intensitas PER ZONA (multi-zona). Cek terhadap
+    `final_gate_status` sengaja tidak dilakukan di sini: gate adalah keputusan seluruh permohonan, bukan satu zona."""
+    parameter = (poin.fakta or {}).get("parameter") or {}
+    if poin.status not in ("MEMENUHI_SYARAT", "MELAMPAUI_BATAS") or not parameter:
+        return []
+    ada_pelanggaran = any(not v.get("memenuhi", True) for v in parameter.values())
+    if poin.status == "MELAMPAUI_BATAS" and not ada_pelanggaran:
+        return ["status=MELAMPAUI_BATAS tapi semua parameter.memenuhi=True"]
+    if poin.status == "MEMENUHI_SYARAT" and ada_pelanggaran:
+        return ["status=MEMENUHI_SYARAT tapi ada parameter.memenuhi=False"]
+    return []

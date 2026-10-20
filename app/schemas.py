@@ -124,12 +124,56 @@ class Tahapan(BaseModel):
 
 
 class IntensitasZona(BaseModel):
-    """Hasil intensitas PER ZONA (kasus lahan menyilang beberapa zona). Hanya field yg dipakai
-    adapter utk menentukan zona pemilik ambang pada `tahapan.intensitas`."""
+    """Hasil intensitas PER ZONA (kasus lahan menyilang beberapa zona). Untuk lahan satu zona hanya dipakai
+    adapter menentukan zona pemilik ambang pada `tahapan.intensitas`. Untuk lahan multi-zona (>= 2 entri
+    `itbx_zones`), tiap entri menjadi satu poin intensitas tersendiri."""
     nama_zona: str | None = None
     kode_zona: str | None = None
     status: str | None = None
     parameter: dict[str, Any] = {}
+    hierarki_jalan: str | None = None
+    kawasan_resapan: bool | None = None
+    luas_irisan_m2: float | None = None
+    persentase: float | None = None
+    luas_tapak_m2: float | None = None
+    jumlah_lantai: int | None = None
+    luas_rth_usulan_m2: float | None = None
+    reason: str | None = None
+    dasar_hukum: list[DasarHukum] = []
+
+
+class ItbxZona(BaseModel):
+    """Hasil ITBX PER ZONA pada lahan yang menyilang beberapa zona RDTR."""
+    nama_zona: str | None = None
+    kode_zona: str | None = None
+    luas_m2: float | None = None
+    persentase: float | None = None
+    status: Literal["I", "T", "B", "TB", "X"]
+    status_keputusan: str | None = None
+    rekomendasi_sistem: str | None = None
+    lolos: bool = True
+    kbli_diusulkan: str | None = None
+    kegiatan_diusulkan: str | None = None
+    kegiatan_diizinkan: list[str] = []
+    kegiatan_terbatas: list[str] = []
+    kegiatan_bersyarat: list[str] = []
+    kegiatan_terbatas_bersyarat: list[str] = []
+    keterangan_ketentuan: list[str] = []
+    reason: str = ""
+    dasar_hukum: list[DasarHukum] = []
+
+
+class KeputusanZona(BaseModel):
+    """Ringkasan keputusan sistem BE per zona (`keputusan_sistem_per_zona`)."""
+    nama_zona: str | None = None
+    kode_zona: str | None = None
+    luas_m2: float | None = None
+    persentase: float | None = None
+    status_keputusan: str | None = None
+    rekomendasi_sistem: str | None = None
+    itbx_status: str | None = None
+    intensitas_status: str | None = None
+    catatan: str | None = None
 
 
 class GateHukum(BaseModel):
@@ -140,6 +184,13 @@ class GateHukum(BaseModel):
     decisive_stage: str | None = None
     tahapan: Tahapan
     intensitas_zones: list[IntensitasZona] | None = None
+    # Lahan multi-zona (permintaan BE 2026-10-20): ITBX dan intensitas dinilai dan dijelaskan PER ZONA,
+    # hidrologi tetap satu (digabung).
+    is_multi_zone: bool | None = None
+    total_zones: int | None = None
+    pemberitahuan: str | None = None
+    itbx_zones: list[ItbxZona] | None = None
+    keputusan_sistem_per_zona: list[KeputusanZona] | None = None
 
 
 class ImpactAssessment(BaseModel):
@@ -254,6 +305,14 @@ class L2Envelope(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ZonaInfo(BaseModel):
+    """Identitas zona sebuah poin pada permohonan multi-zona. None untuk poin lahan satu zona."""
+    nama_zona: str | None = None
+    kode_zona: str | None = None
+    luas_m2: float | None = None
+    persentase: float | None = None
+
+
 class PoinKonteks(BaseModel):
     poin_id: str
     kategori: str
@@ -277,6 +336,8 @@ class PoinKonteks(BaseModel):
     kawasan_resapan: bool | None = None
     # Idem utk kawasan rawan kekeringan (Pasal 50 ayat 10), mis. SWP E Blok I.E.1-2.
     rawan_kekeringan: bool | None = None
+    # Terisi hanya pada permohonan multi-zona untuk poin per-zona (itbx dan intensitas).
+    zona_info: ZonaInfo | None = None
 
 
 class AdapterResult(BaseModel):
@@ -336,6 +397,8 @@ class PoinOutput(BaseModel):
     sitasi: list[SitasiOutput]
     rekomendasi: RekomendasiOutput
     low_confidence: bool = False
+    # Additif: terisi hanya untuk poin per-zona pada permohonan multi-zona (poin_id "itbx_P", dst).
+    zona: ZonaInfo | None = None
 
 
 class RingkasanGateOutput(BaseModel):
@@ -366,6 +429,23 @@ class NarasiRekomendasiOutput(BaseModel):
     paragraf_dampak: str
 
 
+class RekomendasiZonaOutput(BaseModel):
+    """Rekomendasi PER ZONA untuk permohonan multi-zona, dirakit deterministik dari poin per-zona
+    (itbx dan intensitas) yang sudah lolos guardrail. Hidrologi tidak dipecah per zona."""
+    nama_zona: str | None = None
+    kode_zona: str | None = None
+    luas_m2: float | None = None
+    persentase: float | None = None
+    status_itbx: str | None = None
+    status_intensitas: str | None = None
+    status_keputusan: str | None = None
+    rekomendasi: str
+    alasan: str
+    saran: str
+    poin_ids: list[str]
+    low_confidence: bool = False
+
+
 class OutputL3(BaseModel):
     ringkasan_gate: RingkasanGateOutput
     ringkasan_dampak: RingkasanDampakOutput
@@ -375,3 +455,5 @@ class OutputL3(BaseModel):
     kesimpulan: KesimpulanOutput
     catatan_global: list[str] = []
     low_confidence_keseluruhan: bool
+    # Kosong untuk lahan satu zona. Untuk multi-zona: satu entri per zona, urut sama dengan `itbx_zones` BE.
+    rekomendasi_per_zona: list[RekomendasiZonaOutput] = []

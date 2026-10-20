@@ -25,7 +25,7 @@ import re
 from dataclasses import dataclass, field
 
 from app import batas_waktu
-from app.adapter import cek_konsistensi_intensitas
+from app.adapter import cek_konsistensi_intensitas, cek_konsistensi_poin_intensitas
 from app.batas_waktu import BatasWaktuTerlampaui
 from app.reasoning.calculator import (
     bangun_langkah_dampak_poin,
@@ -553,7 +553,8 @@ def _paksa_field_wajib(
 
     # Cek #4 — wire cek_konsistensi_intensitas dari adapter.py. TIDAK PERNAH menimpa status/parameter.
     if poin.poin_id == "intensitas":
-        masalah_konsistensi = cek_konsistensi_intensitas(assessment)
+        masalah_konsistensi = (cek_konsistensi_poin_intensitas(poin) if poin.zona_info is not None
+                               else cek_konsistensi_intensitas(assessment))
         if masalah_konsistensi:
             update["low_confidence"] = True
             logger.warning(

@@ -188,6 +188,67 @@
               }
             ],
             "title": "Intensitas Zones"
+          },
+          "is_multi_zone": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Multi Zone"
+          },
+          "total_zones": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Zones"
+          },
+          "pemberitahuan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pemberitahuan"
+          },
+          "itbx_zones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ItbxZona"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Itbx Zones"
+          },
+          "keputusan_sistem_per_zona": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KeputusanZona"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keputusan Sistem Per Zona"
           }
         },
         "type": "object",
@@ -656,11 +717,107 @@
             "type": "object",
             "title": "Parameter",
             "default": {}
+          },
+          "hierarki_jalan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hierarki Jalan"
+          },
+          "kawasan_resapan": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kawasan Resapan"
+          },
+          "luas_irisan_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Irisan M2"
+          },
+          "persentase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persentase"
+          },
+          "luas_tapak_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Tapak M2"
+          },
+          "jumlah_lantai": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jumlah Lantai"
+          },
+          "luas_rth_usulan_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas Rth Usulan M2"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "dasar_hukum": {
+            "items": {
+              "$ref": "#/components/schemas/DasarHukum"
+            },
+            "type": "array",
+            "title": "Dasar Hukum",
+            "default": []
           }
         },
         "type": "object",
         "title": "IntensitasZona",
-        "description": "Hasil intensitas PER ZONA (kasus lahan menyilang beberapa zona). Hanya field yg dipakai\nadapter utk menentukan zona pemilik ambang pada `tahapan.intensitas`."
+        "description": "Hasil intensitas PER ZONA (kasus lahan menyilang beberapa zona). Untuk lahan satu zona hanya dipakai\nadapter menentukan zona pemilik ambang pada `tahapan.intensitas`. Untuk lahan multi-zona (>= 2 entri\n`itbx_zones`), tiap entri menjadi satu poin intensitas tersendiri."
       },
       "ItbxTahap": {
         "properties": {
@@ -761,6 +918,279 @@
           "reason"
         ],
         "title": "ItbxTahap"
+      },
+      "ItbxZona": {
+        "properties": {
+          "nama_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nama Zona"
+          },
+          "kode_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kode Zona"
+          },
+          "luas_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas M2"
+          },
+          "persentase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persentase"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "I",
+              "T",
+              "B",
+              "TB",
+              "X"
+            ],
+            "title": "Status"
+          },
+          "status_keputusan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Keputusan"
+          },
+          "rekomendasi_sistem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rekomendasi Sistem"
+          },
+          "lolos": {
+            "type": "boolean",
+            "title": "Lolos",
+            "default": true
+          },
+          "kbli_diusulkan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kbli Diusulkan"
+          },
+          "kegiatan_diusulkan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kegiatan Diusulkan"
+          },
+          "kegiatan_diizinkan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Diizinkan",
+            "default": []
+          },
+          "kegiatan_terbatas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Terbatas",
+            "default": []
+          },
+          "kegiatan_bersyarat": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Bersyarat",
+            "default": []
+          },
+          "kegiatan_terbatas_bersyarat": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kegiatan Terbatas Bersyarat",
+            "default": []
+          },
+          "keterangan_ketentuan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keterangan Ketentuan",
+            "default": []
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "dasar_hukum": {
+            "items": {
+              "$ref": "#/components/schemas/DasarHukum"
+            },
+            "type": "array",
+            "title": "Dasar Hukum",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ItbxZona",
+        "description": "Hasil ITBX PER ZONA pada lahan yang menyilang beberapa zona RDTR."
+      },
+      "KeputusanZona": {
+        "properties": {
+          "nama_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nama Zona"
+          },
+          "kode_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kode Zona"
+          },
+          "luas_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas M2"
+          },
+          "persentase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persentase"
+          },
+          "status_keputusan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Keputusan"
+          },
+          "rekomendasi_sistem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rekomendasi Sistem"
+          },
+          "itbx_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Itbx Status"
+          },
+          "intensitas_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intensitas Status"
+          },
+          "catatan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catatan"
+          }
+        },
+        "type": "object",
+        "title": "KeputusanZona",
+        "description": "Ringkasan keputusan sistem BE per zona (`keputusan_sistem_per_zona`)."
       },
       "KesimpulanOutput": {
         "properties": {
@@ -1161,6 +1591,14 @@
           "low_confidence_keseluruhan": {
             "type": "boolean",
             "title": "Low Confidence Keseluruhan"
+          },
+          "rekomendasi_per_zona": {
+            "items": {
+              "$ref": "#/components/schemas/RekomendasiZonaOutput"
+            },
+            "type": "array",
+            "title": "Rekomendasi Per Zona",
+            "default": []
           }
         },
         "type": "object",
@@ -1256,6 +1694,16 @@
             "type": "boolean",
             "title": "Low Confidence",
             "default": false
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZonaInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1325,6 +1773,120 @@
           "saran"
         ],
         "title": "RekomendasiOutput"
+      },
+      "RekomendasiZonaOutput": {
+        "properties": {
+          "nama_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nama Zona"
+          },
+          "kode_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kode Zona"
+          },
+          "luas_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas M2"
+          },
+          "persentase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persentase"
+          },
+          "status_itbx": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Itbx"
+          },
+          "status_intensitas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Intensitas"
+          },
+          "status_keputusan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Keputusan"
+          },
+          "rekomendasi": {
+            "type": "string",
+            "title": "Rekomendasi"
+          },
+          "alasan": {
+            "type": "string",
+            "title": "Alasan"
+          },
+          "saran": {
+            "type": "string",
+            "title": "Saran"
+          },
+          "poin_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Poin Ids"
+          },
+          "low_confidence": {
+            "type": "boolean",
+            "title": "Low Confidence",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "rekomendasi",
+          "alasan",
+          "saran",
+          "poin_ids"
+        ],
+        "title": "RekomendasiZonaOutput",
+        "description": "Rekomendasi PER ZONA untuk permohonan multi-zona, dirakit deterministik dari poin per-zona\n(itbx dan intensitas) yang sudah lolos guardrail. Hidrologi tidak dipecah per zona."
       },
       "RingkasanDampakOutput": {
         "properties": {
@@ -1494,6 +2056,57 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ZonaInfo": {
+        "properties": {
+          "nama_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nama Zona"
+          },
+          "kode_zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kode Zona"
+          },
+          "luas_m2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Luas M2"
+          },
+          "persentase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persentase"
+          }
+        },
+        "type": "object",
+        "title": "ZonaInfo",
+        "description": "Identitas zona sebuah poin pada permohonan multi-zona. None untuk poin lahan satu zona."
       }
     }
   }

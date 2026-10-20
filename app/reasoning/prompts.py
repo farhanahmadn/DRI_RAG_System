@@ -596,6 +596,13 @@ def build_user_prompt(
     lines.append(f"- poin_id: {poin.poin_id}")
     lines.append(f"- kategori: {poin.kategori}")
     lines.append(f"- tipe_rekomendasi: {poin.tipe_rekomendasi}")
+    if poin.zona_info is not None and poin.zona_info.nama_zona:
+        z = poin.zona_info
+        lines.append(f"- ZONA_YANG_DINILAI: {z.nama_zona}" + (f" (kode {z.kode_zona})" if z.kode_zona else ""))
+        lines.append(
+            "- Permohonan ini menyilang beberapa zona RDTR dan tiap zona dinilai terpisah. Jelaskan HANYA untuk "
+            "zona ini, sebut nama zonanya, dan jangan membahas atau menyimpulkan penilaian zona lain."
+        )
     lines.append("")
 
     lines.append("## Fakta (dihitung kode — gunakan APA ADANYA, jangan disimpulkan ulang)")
@@ -666,7 +673,7 @@ SYSTEM_PROMPT_KESIMPULAN = """Anda merangkum hasil pre-check izin bangunan Kabup
 
 ATURAN WAJIB (jangan dilanggar):
 1. Ringkasan per-poin di bawah SUDAH FINAL (status, saran) — tugas Anda HANYA merangkum jadi langkah_berdampak (daftar langkah/pertimbangan untuk REVIEWER dalam mengambil keputusan — ACC / ACC bersyarat / tolak) dan catatan_lokasi (satu kalimat kalau relevan, atau null kalau tidak ada). JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
-2. langkah_berdampak HARUS dirangkai/diringkas HANYA dari "saran" per-poin persis seperti tertulis — JANGAN menambah langkah yang tidak berdasar pada saran poin manapun. KHUSUS: kalau saran suatu poin berbunyi "tidak diperlukan tindakan khusus" ATAU "tidak dievaluasi" (atau senada — termasuk poin yang belum pernah diperiksa krn proses berhenti di tahapan sebelumnya), JANGAN tulis langkah/kewajiban apa pun untuk poin itu di langkah_berdampak — poin itu cukup dilewati, bukan diberi kalimat pengganti yang menyiratkan ada yang harus dilakukan atau sudah terpenuhi.
+2. Poin ber-zona (itbx_X, intensitas_X) menilai SATU zona; kalau suatu langkah khusus untuk satu zona, sebut nama zonanya di langkah itu. langkah_berdampak HARUS dirangkai/diringkas HANYA dari "saran" per-poin persis seperti tertulis — JANGAN menambah langkah yang tidak berdasar pada saran poin manapun. KHUSUS: kalau saran suatu poin berbunyi "tidak diperlukan tindakan khusus" ATAU "tidak dievaluasi" (atau senada — termasuk poin yang belum pernah diperiksa krn proses berhenti di tahapan sebelumnya), JANGAN tulis langkah/kewajiban apa pun untuk poin itu di langkah_berdampak — poin itu cukup dilewati, bukan diberi kalimat pengganti yang menyiratkan ada yang harus dilakukan atau sudah terpenuhi.
 3. Angka BOLEH disebut HANYA bila dikutip PERSIS seperti tertulis di "saran" per-poin (mis. luas maksimal, persentase target, dimensi) — itu lebih berguna bagi reviewer daripada "persentase tertentu". JANGAN menulis frasa samar seperti "persentase tertentu" atau "dimensi tertentu" kalau angkanya ada di saran. JANGAN membuat, menghitung, atau membulatkan angka sendiri, dan JANGAN menyebut skor.
 4. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat langsung ke pemohon — sebut pemohon sebagai orang ketiga, JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, dan ringkas.
 
@@ -690,7 +697,8 @@ def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str
     lines.append(f"rekomendasi_sistem keseluruhan: {rekomendasi_sistem}")
     lines.append("")
     for poin in poin_list:
-        lines.append(f"- [{poin.poin_id}] status={poin.status}, low_confidence={poin.low_confidence}")
+        zona = f", zona={poin.zona.nama_zona}" if poin.zona and poin.zona.nama_zona else ""
+        lines.append(f"- [{poin.poin_id}] status={poin.status}{zona}, low_confidence={poin.low_confidence}")
         lines.append(f"  saran: {poin.rekomendasi.saran}")
 
     lines.append("")
@@ -714,7 +722,7 @@ SYSTEM_PROMPT_NARASI_REKOMENDASI = """Anda menulis narasi rekomendasi akhir pre-
 
 ATURAN WAJIB (jangan dilanggar):
 1. Ringkasan per-poin di bawah SUDAH FINAL (status, saran) — tugas Anda HANYA menulis ulang jadi 2 paragraf prosa mengalir, BUKAN daftar butir. JANGAN menghitung ulang angka, menyimpulkan status baru, atau mengubah verdict apa pun.
-2. "paragraf_gate_intensitas" merangkum HANYA poin itbx dan intensitas (klasifikasi kegiatan dan intensitas bangunan KDB/KLB/KDH) — sebutkan status keduanya dan inti saran/tindak lanjutnya kalau ada.
+2. "paragraf_gate_intensitas" merangkum HANYA poin itbx dan intensitas (klasifikasi kegiatan dan intensitas bangunan KDB/KLB/KDH) — sebutkan status keduanya dan inti saran/tindak lanjutnya kalau ada. Bila ada beberapa zona (poin itbx_X dan intensitas_X per zona), jelaskan tiap zona secara terpisah dengan menyebut nama zonanya, jangan dicampur.
 3. "paragraf_dampak" merangkum HANYA poin dampak (Dampak Terhadap Lingkungan/Hidrologi) — sebutkan status/kategorinya dan inti saran/tindak lanjutnya kalau ada.
 4. Kalau saran suatu poin berbunyi "tidak diperlukan tindakan khusus" ATAU "tidak dievaluasi" (atau senada), JANGAN tulis kewajiban/tindakan apa pun untuk poin itu — sebut singkat bahwa poin itu sudah memenuhi ketentuan atau belum dinilai, TANPA menyiratkan ada yang harus dilakukan.
 5. Angka BOLEH disebut HANYA bila dikutip PERSIS seperti tertulis di "saran" per-poin (mis. luas maksimal, persentase target) — JANGAN menulis frasa samar seperti "persentase tertentu" kalau angkanya ada di saran. JANGAN membuat, menghitung, atau membulatkan angka sendiri, dan JANGAN menyebut skor.
@@ -735,10 +743,10 @@ def build_narasi_rekomendasi_prompt(poin_list: list[PoinOutput], rekomendasi_sis
     lines.append(f"rekomendasi_sistem keseluruhan: {rekomendasi_sistem}")
     lines.append("")
     lines.append("### Untuk paragraf_gate_intensitas (ITBX + Intensitas SAJA):")
-    for poin_id in ("itbx", "intensitas"):
-        poin = by_id.get(poin_id)
-        if poin:
-            lines.append(f"- [{poin.poin_id}] status={poin.status}")
+    for poin in poin_list:
+        if poin.poin_id.split("_", 1)[0] in ("itbx", "intensitas"):
+            zona = f" zona={poin.zona.nama_zona}" if poin.zona and poin.zona.nama_zona else ""
+            lines.append(f"- [{poin.poin_id}] status={poin.status}{zona}")
             lines.append(f"  saran: {poin.rekomendasi.saran}")
     lines.append("")
     lines.append("### Untuk paragraf_dampak (Dampak Terhadap Lingkungan/Hidrologi SAJA):")

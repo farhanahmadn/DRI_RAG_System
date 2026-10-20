@@ -18,7 +18,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 
-from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan
+from app.adapter import adaptasi, deteksi_fallback_itbx, di_luar_cakupan, zona_terpisah
 from app.logging_util import log_precheck
 from app import batas_waktu
 from app.tipe_bangunan import ambil_tipe_bangunan, frasa_tipe_bangunan
@@ -38,6 +38,7 @@ from app.reasoning.prompts import (
     build_kesimpulan_prompt,
     build_narasi_rekomendasi_prompt,
 )
+from app.reasoning.rekomendasi import turunkan_rekomendasi
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
 from app.schemas import (
@@ -47,6 +48,7 @@ from app.schemas import (
     OutputL3,
     PoinKonteks,
     PoinOutput,
+    RekomendasiZonaOutput,
     RingkasanDampakOutput,
     RingkasanGateOutput,
 )
@@ -246,14 +248,9 @@ def _rakit_ringkasan_dampak(assessment: L2Assessment) -> RingkasanDampakOutput:
 _TOLERANSI_M2 = 0.5
 
 
-def _catatan_batas_berbeda(poin_konteks: list) -> str | None:
-    """Catatan deterministik bila batas luas dari ketentuan INTENSITAS dan dari syarat penurunan
-    kategori DAMPAK berbeda (APP-2026-UJI-4: lantai dasar maks 861,6 m² vs 1.077,00 m²). Keduanya
-    angka yang benar menurut aturannya masing-masing, tapi pemohon yang membaca keduanya akan
-    bingung mana yang harus diikuti. Yang diikuti = yang lebih ketat, supaya memenuhi keduanya."""
-    by_id = {p.poin_id: p for p in poin_konteks}
-    inten, damp = by_id.get("intensitas"), by_id.get("dampak")
-    if not inten or not damp or "Tidak Dinilai" in (inten.status, damp.status):
+def _catatan_satu_zona(inten, damp) -> str | None:
+    """Catatan batas lebih ketat untuk SATU pasangan (poin intensitas, poin dampak)."""
+    if "Tidak Dinilai" in (inten.status, damp.status):
         return None
     target = inten.fakta.get("target") or {}
     penyesuaian = (damp.fakta.get("target_mitigasi") or {}).get("penyesuaian_lahan") or {}
@@ -287,6 +284,33 @@ def _catatan_batas_berbeda(poin_konteks: list) -> str | None:
     return " ".join(kalimat) or None
 
 
+
+def _catatan_batas_berbeda(poin_konteks: list) -> str | None:
+    """Catatan deterministik bila batas luas dari ketentuan INTENSITAS dan dari syarat penurunan
+    kategori DAMPAK berbeda (APP-2026-UJI-4: lantai dasar maks 861,6 m² vs 1.077,00 m²). Keduanya
+    angka yang benar menurut aturannya masing-masing, tapi pemohon yang membaca keduanya akan
+    bingung mana yang harus diikuti. Yang diikuti = yang lebih ketat, supaya memenuhi keduanya.
+
+    Dampak yang tidak butuh mitigasi korektif (Rendah/Sedang) tidak punya syarat penurunan kategori, jadi
+    `rekomendasi_mitigasi` BE (bila ada) diabaikan di sini. Pada lahan multi-zona, tiap zona dibandingkan
+    sendiri dengan dampak (yang satu) dan catatannya diberi nama zona."""
+    damp = next((p for p in poin_konteks if p.poin_id == "dampak"), None)
+    intensitas = [p for p in poin_konteks if p.poin_id == "intensitas"]
+    if not damp or not intensitas:
+        return None
+    if ((damp.fakta or {}).get("mitigasi") or {}).get("perlu_mitigasi") is False:
+        return None
+    banyak_zona = len(intensitas) > 1
+    bagian: list[str] = []
+    for inten in intensitas:
+        catatan = _catatan_satu_zona(inten, damp)
+        if not catatan:
+            continue
+        nama = inten.zona_info.nama_zona if banyak_zona and inten.zona_info and inten.zona_info.nama_zona else None
+        bagian.append(f"{nama}: {catatan}" if nama else catatan)
+    return " ".join(bagian) or None
+
+
 def _terapkan_catatan_batas(poin_list: list[PoinOutput], poin_konteks: list) -> list[PoinOutput]:
     catatan = _catatan_batas_berbeda(poin_konteks)
     if not catatan:
@@ -298,6 +322,90 @@ def _terapkan_catatan_batas(poin_list: list[PoinOutput], poin_konteks: list) -> 
             gabung = f"{lama} {catatan}".strip()
             p = p.model_copy(update={"rekomendasi": p.rekomendasi.model_copy(update={"disclaimer": gabung})})
         hasil.append(p)
+    return hasil
+
+
+def _id_dasar(poin_id: str) -> str:
+    """"itbx_P" -> "itbx", "dampak" -> "dampak". Poin per-zona diberi akhiran kode zona di output."""
+    return poin_id.split("_", 1)[0]
+
+
+def _label_zona(poin: PoinOutput) -> str | None:
+    return poin.zona.nama_zona if poin.zona and poin.zona.nama_zona else None
+
+
+def _tandai_zona(hasil: list, konteks: list) -> list:
+    """Beri identitas zona pada keluaran poin per-zona (lahan multi-zona): poin_id "itbx_P", kategori diberi
+    nama zona, dan `zona` terisi. Dilakukan SETELAH guardrail selesai supaya validasi yang bergantung pada
+    poin_id dasar ("itbx", "intensitas") tidak terganggu."""
+    keluar, terpakai = [], set()
+    for (out, diag), k in zip(hasil, konteks):
+        if k.zona_info is None:
+            keluar.append((out, diag))
+            continue
+        kode = (k.zona_info.kode_zona or k.zona_info.nama_zona or "zona").replace(" ", "")
+        id_baru, n = f"{k.poin_id}_{kode}", 2
+        while id_baru in terpakai:
+            id_baru, n = f"{k.poin_id}_{kode}{n}", n + 1
+        terpakai.add(id_baru)
+        label = k.zona_info.nama_zona
+        out = out.model_copy(update={
+            "poin_id": id_baru, "zona": k.zona_info,
+            "kategori": f"{out.kategori} - {label}" if label else out.kategori,
+        })
+        diag.poin_id = id_baru
+        keluar.append((out, diag))
+    return keluar
+
+
+_PEMETAAN_KEPUTUSAN = {"LOLOS": "Lolos", "LOLOS_BERSYARAT": "Lolos Bersyarat", "TIDAK_LOLOS": "Tidak Lolos"}
+
+
+def _status_gate_zona(status_keputusan: str | None, status_itbx: str | None, status_intensitas: str | None) -> str:
+    """Status gate sebuah zona: dari `status_keputusan` BE bila ada, kalau tidak diturunkan dari status tahap
+    dengan aturan yang sama dengan gate keseluruhan (X -> Tidak Lolos, B/T/TB atau melampaui batas -> Lolos
+    Bersyarat)."""
+    if status_keputusan and status_keputusan.upper() in _PEMETAAN_KEPUTUSAN:
+        return _PEMETAAN_KEPUTUSAN[status_keputusan.upper()]
+    if status_itbx == "X":
+        return "Tidak Lolos"
+    if status_itbx in ("B", "T", "TB") or status_intensitas == "MELAMPAUI_BATAS":
+        return "Lolos Bersyarat"
+    return "Lolos"
+
+
+def _rakit_rekomendasi_per_zona(assessment: L2Assessment, poin_list: list[PoinOutput]) -> list[RekomendasiZonaOutput]:
+    """Satu rekomendasi per zona (lahan multi-zona), deterministik dari poin itbx dan intensitas zona itu.
+    Hidrologi tidak dipecah. Kosong untuk lahan satu zona."""
+    pasangan = zona_terpisah(assessment)
+    if not pasangan:
+        return []
+    keputusan = {(k.nama_zona or "").strip().lower(): k
+                 for k in (assessment.gate_hukum.keputusan_sistem_per_zona or [])}
+    hasil: list[RekomendasiZonaOutput] = []
+    for z, _inten in pasangan:
+        poin_zona = [p for p in poin_list
+                     if p.zona is not None and (p.zona.kode_zona or "") == (z.kode_zona or "")
+                     and _id_dasar(p.poin_id) in ("itbx", "intensitas")]
+        itbx = next((p for p in poin_zona if _id_dasar(p.poin_id) == "itbx"), None)
+        inten = next((p for p in poin_zona if _id_dasar(p.poin_id) == "intensitas"), None)
+        kz = keputusan.get((z.nama_zona or "").strip().lower())
+        status_inten = inten.status if inten else (kz.intensitas_status if kz else None)
+        status_keputusan = (kz.status_keputusan if kz and kz.status_keputusan else z.status_keputusan)
+        gate_zona = _status_gate_zona(status_keputusan, itbx.status if itbx else z.status, status_inten)
+        rekomendasi = turunkan_rekomendasi(gate_zona, None)
+        alasan_poin = [p.reasoning_pendek for p in poin_zona if not p.low_confidence and p.reasoning_pendek.strip()]
+        alasan = " ".join(alasan_poin) or (kz.catatan if kz and kz.catatan else "Penjelasan otomatis belum tersedia untuk zona ini.")
+        butir = _butir_bermakna([p.rekomendasi.saran for p in poin_zona if p.rekomendasi.saran.strip()])
+        saran = "\n".join(f"{i}. {b}" for i, b in enumerate(butir, 1)) if len(butir) > 1 else (butir[0] if butir else "")
+        hasil.append(RekomendasiZonaOutput(
+            nama_zona=z.nama_zona, kode_zona=z.kode_zona,
+            luas_m2=z.luas_m2, persentase=z.persentase,
+            status_itbx=itbx.status if itbx else z.status, status_intensitas=status_inten,
+            status_keputusan=status_keputusan, rekomendasi=rekomendasi,
+            alasan=alasan, saran=saran, poin_ids=[p.poin_id for p in poin_zona],
+            low_confidence=any(p.low_confidence for p in poin_zona),
+        ))
     return hasil
 
 
@@ -345,11 +453,25 @@ def _sebagai_kalimat(butir: str) -> str:
     return butir if butir.endswith((".", "!", "?")) else butir + "."
 
 
+def _kelompok_saran(poin_list: list[PoinOutput]) -> list[tuple[str | None, list[str]]]:
+    """Kelompokkan saran per zona (urut kemunculan). Lahan satu zona = satu kelompok tanpa label, perilaku lama."""
+    if not any(_label_zona(p) for p in poin_list):
+        return [(None, [p.rekomendasi.saran for p in poin_list if p.rekomendasi.saran.strip()])]
+    kelompok: dict[str | None, list[str]] = {}
+    for p in poin_list:
+        if p.rekomendasi.saran.strip():
+            kelompok.setdefault(_label_zona(p), []).append(p.rekomendasi.saran)
+    return list(kelompok.items())
+
+
 def _rakit_kesimpulan_fallback(poin_list: list[PoinOutput]) -> KesimpulanOutput:
     """Dipakai kalau panggilan LLM sintesis gagal/melanggar aturan — deterministik, butir saran
     per-poin verbatim (sudah lolos guardrail, jadi aman ditampilkan apa adanya), satu butir per
-    baris tanpa nomor sisipan."""
-    langkah = _butir_bermakna([p.rekomendasi.saran for p in poin_list if p.rekomendasi.saran.strip()])
+    baris tanpa nomor sisipan. Butir poin per-zona diberi awalan nama zona."""
+    langkah: list[str] = []
+    for label, daftar in _kelompok_saran(poin_list):
+        butir = _butir_bermakna(daftar)
+        langkah.extend(f"{label}: {b}" if label else b for b in butir)
     return KesimpulanOutput(langkah_berdampak=langkah, catatan_lokasi=None)
 
 
@@ -397,15 +519,17 @@ def _rakit_kesimpulan(poin_list: list[PoinOutput], rekomendasi_sistem: str,
 def _rakit_narasi_rekomendasi_fallback(poin_list: list[PoinOutput]) -> NarasiRekomendasiOutput:
     """Dipakai kalau panggilan LLM narasi gagal/melanggar aturan — deterministik, gabungan saran
     per-poin verbatim (sudah lolos guardrail) per kelompok paragraf, pola sama dgn
-    `_rakit_kesimpulan_fallback`."""
-    by_id = {p.poin_id: p for p in poin_list}
-    saran_gate = [
-        by_id[pid].rekomendasi.saran for pid in ("itbx", "intensitas")
-        if pid in by_id and by_id[pid].rekomendasi.saran.strip()
-    ]
-    poin_dampak = by_id.get("dampak")
+    `_rakit_kesimpulan_fallback`. Pada lahan multi-zona tiap zona ditulis terpisah dengan awalan namanya."""
+    poin_gate = [p for p in poin_list if _id_dasar(p.poin_id) in ("itbx", "intensitas")]
+    poin_dampak = next((p for p in poin_list if _id_dasar(p.poin_id) == "dampak"), None)
     saran_dampak = poin_dampak.rekomendasi.saran if poin_dampak and poin_dampak.rekomendasi.saran.strip() else ""
-    kalimat_gate = " ".join(_sebagai_kalimat(b) for b in _butir_bermakna(saran_gate))
+
+    bagian_gate: list[str] = []
+    for label, daftar in _kelompok_saran(poin_gate):
+        kalimat = " ".join(_sebagai_kalimat(b) for b in _butir_bermakna(daftar))
+        if kalimat:
+            bagian_gate.append(f"{label}: {kalimat}" if label else kalimat)
+    kalimat_gate = " ".join(bagian_gate)
     kalimat_dampak = " ".join(_sebagai_kalimat(b) for b in _butir_bermakna([saran_dampak])) if saran_dampak else ""
     return NarasiRekomendasiOutput(
         paragraf_gate_intensitas=kalimat_gate or "Tidak ada catatan tambahan untuk ITBX dan intensitas bangunan.",
@@ -476,7 +600,7 @@ def _intensitas_dinilai(poin: PoinOutput) -> bool:
     yang tidak ada, jadi ia disaring di sini (ditemukan lewat fixture
     l2_sample_itbx_x_tanpa_intensitas.json).
     """
-    return poin.poin_id == "intensitas" and poin.status != "Tidak Dinilai"
+    return _id_dasar(poin.poin_id) == "intensitas" and poin.status != "Tidak Dinilai"
 
 
 def _rakit_catatan_global(
@@ -502,6 +626,11 @@ def _rakit_catatan_global(
 
     if di_luar_wilayah:
         catatan.append(CAVEAT_DI_LUAR_CAKUPAN)
+
+    # Lahan multi-zona: pemberitahuan BE (zona apa saja dan luasnya) dibawa apa adanya, supaya pembaca tahu
+    # ITBX dan intensitas di bawah dinilai per zona sedangkan hidrologi satu.
+    if zona_terpisah(assessment) and assessment.gate_hukum.pemberitahuan:
+        catatan.append(assessment.gate_hukum.pemberitahuan.strip())
 
     # Hanya kalau ada poin intensitas: tanpa poin itu, tak ada ambang KDB/KLB/KDH yang dikutip
     # dan caveat ini cuma jadi derau. Lapis ini DETERMINISTIK — prompt juga membawa caveat yang
@@ -563,6 +692,7 @@ def _jalankan_precheck_inti(assessment: L2Assessment, retriever: Retriever) -> O
         except FuturesTimeoutError:
             logger.error("Poin %r tak selesai dalam anggaran waktu — fallback low_confidence.", poin.poin_id)
             hasil_poin.append(_poin_batas_waktu(poin))
+    hasil_poin = _tandai_zona(hasil_poin, hasil_adaptasi.poin)
     poin_list = _terapkan_catatan_batas([p for p, _ in hasil_poin], hasil_adaptasi.poin)
     diagnostik = [d for _, d in hasil_poin]
 
@@ -592,6 +722,7 @@ def _jalankan_precheck_inti(assessment: L2Assessment, retriever: Retriever) -> O
         # Di luar cakupan = seluruh dasar hukum patut diragukan -> tandai low_confidence walau
         # ketiga poin sendiri lolos guardrail dgn mulus.
         low_confidence_keseluruhan=any(p.low_confidence for p in poin_list) or di_luar_wilayah,
+        rekomendasi_per_zona=_rakit_rekomendasi_per_zona(assessment, poin_list),
     )
     if any(d.sebab() == "melewati_batas_waktu" for d in diagnostik) or any(
             "BatasWaktuTerlampaui" in str(v) for v in sintesis.values()):
