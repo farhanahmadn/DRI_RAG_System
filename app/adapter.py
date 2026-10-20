@@ -287,6 +287,15 @@ def _subzona_zona(z: ItbxZona, inten: IntensitasZona | None, assessment: L2Asses
     return None
 
 
+_RE_LUAS_DI_REASON = re.compile(r"\s+seluas\s+[\d.,]+\s*m\S*", re.IGNORECASE)
+
+
+def _reason_tanpa_luas(reason: str) -> str:
+    """Buang frasa "seluas 623,55 m" dari `reason` zona: luas irisan zona bukan luas kegiatan, dan LLM pernah menulis
+    "luas kegiatan 623,55 m² berada dalam batas yang diizinkan" (APP-2026-0022). Luas zona tetap ada di `zona`."""
+    return _RE_LUAS_DI_REASON.sub("", reason or "").strip()
+
+
 def _bangun_poin_itbx_zona(z: ItbxZona, inten: IntensitasZona | None, assessment: L2Assessment) -> PoinKonteks:
     return PoinKonteks(
         poin_id="itbx",
@@ -302,7 +311,7 @@ def _bangun_poin_itbx_zona(z: ItbxZona, inten: IntensitasZona | None, assessment
             "kegiatan_bersyarat": z.kegiatan_bersyarat,
             "kegiatan_terbatas_bersyarat": z.kegiatan_terbatas_bersyarat,
             "keterangan_ketentuan": z.keterangan_ketentuan,
-            "reason": z.reason,
+            "reason": _reason_tanpa_luas(z.reason),
             "fallback_data_kosong": deteksi_fallback_itbx(z.reason),
         },
         dasar_hukum=z.dasar_hukum,

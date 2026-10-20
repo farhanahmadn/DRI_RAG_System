@@ -432,7 +432,6 @@ def _bangun_fakta_dampak(poin: PoinKonteks) -> list[str]:
         lines.append(
             f"\nKawasan yang dinilai pada perhitungan hidrologi (dari back-end): {kawasan['nama']}"
             + (f" (kode {kawasan['kode']})" if kawasan.get("kode") else "")
-            + (f", status ITBX kegiatan di kawasan itu {kawasan['status_itbx']}" if kawasan.get("status_itbx") else "")
             + "."
         )
     lines.append(

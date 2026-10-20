@@ -458,15 +458,26 @@ _RE_LABEL_TEKNIS = re.compile(
 )
 
 
+_RE_BOOL_DATA_MATRIKS = re.compile(
+    r"\s*\(?\s*kelengkapan data matriks RDTR\s*:\s*(?:True|False)\s*\)?", re.IGNORECASE)
+_RE_KLB_PERSEN = re.compile(
+    r"(\bKLB\b(?:(?!\bKD[BH]\b)(?:\d[.,]\d|[^.\n%])){0,45}?\d+(?:[.,]\d+)?)\s*%")
+
+
 def _bersihkan_label_teknis(teks: str | None) -> str | None:
     """Ganti nama label teknis yang tersalin dari prompt dgn padanan Bahasa Indonesia biasa.
     Label tak dikenal tetap dinormalkan (huruf kecil, garis bawah -> spasi) supaya label BARU yang
     ditambahkan ke prompt nanti tidak diam-diam bocor lagi."""
     if not teks:
         return teks
-    return _RE_LABEL_TEKNIS.sub(
+    teks = _RE_LABEL_TEKNIS.sub(
         lambda m: _LABEL_TEKNIS.get(m.group(0), m.group(0).lower().replace("_", " ")), teks
     )
+    # "FALLBACK_DATA_KOSONG: False" -> "kelengkapan data matriks RDTR: False": nilai Boolean mentah dan mekanisme
+    # internal tidak untuk petugas (APP-2026-0022). Seluruh frasa dibuang.
+    teks = _RE_BOOL_DATA_MATRIKS.sub("", teks)
+    # KLB adalah rasio, bukan persen: "KLB maksimum 1 %" -> "KLB maksimum 1".
+    return _RE_KLB_PERSEN.sub(lambda m: m.group(1), teks)
 
 
 def _bersihkan_disclaimer_fallback_palsu(disclaimer: str | None) -> str | None:

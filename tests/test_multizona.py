@@ -150,3 +150,28 @@ def test_itbx_status_i_tak_membawa_syarat_lampiran_vb():
     assert _saring_pengisi_poin([vb, pasal], p) == [pasal]
     b = p.model_copy(update={"status": "B"})
     assert _saring_pengisi_poin([vb], b) == [vb]  # status B membutuhkan syaratnya
+
+
+class TestPembersihanTeks:
+    def test_klb_tidak_diberi_persen_tapi_kdb_kdh_tetap(self):
+        from app.reasoning.guardrail import _bersihkan_label_teknis as b
+        assert b("ambang KDB maksimum 10 %, KLB maksimum 1 %, dan KDH minimum 88 %") == \
+            "ambang KDB maksimum 10 %, KLB maksimum 1, dan KDH minimum 88 %"
+        assert b("KLB 0.08 berada di bawah ambang maksimal 1 %.") == "KLB 0.08 berada di bawah ambang maksimal 1."
+        assert b("KLB 0.08, dan KDH 89.31 % memenuhi") == "KLB 0.08, dan KDH 89.31 % memenuhi"
+
+    def test_boolean_data_matriks_dibuang(self):
+        from app.reasoning.guardrail import _bersihkan_label_teknis as b
+        assert "False" not in b("berdasarkan data lengkap (FALLBACK_DATA_KOSONG: False), maka lolos")
+        assert "False" not in b("data matriks RDTR yang lengkap (kelengkapan data matriks RDTR: False), sehingga")
+
+    def test_reason_zona_tanpa_luas(self):
+        from app.adapter import _reason_tanpa_luas
+        assert _reason_tanpa_luas("Lolos karena kegiatan Diizinkan (I) di Zona Pertanian seluas 623,55 m") == \
+            "Lolos karena kegiatan Diizinkan (I) di Zona Pertanian"
+        p = adaptasi(_muat()).poin[0]
+        assert "seluas" not in p.fakta["reason"]
+
+    def test_prompt_dampak_tak_memuat_status_itbx_kawasan(self):
+        d = adaptasi(_muat()).poin[-1]
+        assert "status ITBX kegiatan di kawasan itu" not in build_user_prompt(d, [], None, None)
