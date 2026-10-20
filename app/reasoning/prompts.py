@@ -676,6 +676,8 @@ ATURAN WAJIB (jangan dilanggar):
 3. Angka BOLEH disebut HANYA bila dikutip PERSIS seperti tertulis di "saran" per-poin (mis. luas maksimal, persentase target, dimensi) — itu lebih berguna bagi reviewer daripada "persentase tertentu". JANGAN menulis frasa samar seperti "persentase tertentu" atau "dimensi tertentu" kalau angkanya ada di saran. JANGAN membuat, menghitung, atau membulatkan angka sendiri, dan JANGAN menyebut skor.
 4. Tulisan ini adalah bahan decision-support untuk REVIEWER (petugas Pemda), bukan nasihat langsung ke pemohon — sebut pemohon sebagai orang ketiga, JANGAN memakai "Anda". Tulis dalam Bahasa Indonesia yang jelas, profesional, dan ringkas.
 
+5. "ringkasan" adalah ringkasan eksekutif 1-2 kalimat yang menggabungkan aspek hukum (ITBX), intensitas, dan hidrologi, serta menyebut rekomendasi_sistem keseluruhan. Aturan angka dan larangan tanda titik koma (;) sama seperti di atas. Bila ada beberapa zona, sebut tiap zona dengan namanya.
+
 Balas HANYA dalam format JSON sesuai skema yang diberikan."""
 
 
@@ -703,7 +705,7 @@ def build_kesimpulan_prompt(poin_list: list[PoinOutput], rekomendasi_sistem: str
     lines.append("")
     lines.append(
         "## Tugas\n"
-        "Rangkum ringkasan per-poin di atas menjadi langkah_berdampak (daftar kalimat "
+        "Rangkum ringkasan per-poin di atas menjadi ringkasan (1-2 kalimat), langkah_berdampak (daftar kalimat "
         "langkah/pertimbangan untuk reviewer dalam mengambil keputusan, pemohon disebut sebagai "
         "orang ketiga) dan catatan_lokasi (satu kalimat atau null)."
     )

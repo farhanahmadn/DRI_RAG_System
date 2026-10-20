@@ -117,11 +117,17 @@ class TestKeluaranMultiZona:
         assert "Zona Pertanian:" in out.narasi_rekomendasi.paragraf_gate_intensitas
         assert "Zona Perumahan:" in out.narasi_rekomendasi.paragraf_gate_intensitas
 
-    def test_satu_zona_tanpa_rekomendasi_per_zona(self, pipeline):
+    def test_satu_zona_tetap_satu_entri_rekomendasi_per_zona(self, pipeline):
+        """Kontrak BE v1.0.0: rekomendasi_per_zona terisi minimal satu elemen, juga untuk lahan satu zona."""
         def satu(d):
             d["gate_hukum"]["itbx_zones"] = d["gate_hukum"]["itbx_zones"][:1]
         out = pipeline(_muat(satu))
-        assert out.rekomendasi_per_zona == [] and [p.poin_id for p in out.poin] == ["itbx", "intensitas", "dampak"]
+        assert [p.poin_id for p in out.poin] == ["itbx", "intensitas", "dampak"]
+        assert len(out.rekomendasi_per_zona) == 1
+        z = out.rekomendasi_per_zona[0]
+        assert (z.nama_zona, z.kode_zona, z.persentase) == ("Zona Pertanian", "P-1", 100.0)
+        assert z.rekomendasi == out.rekomendasi_sistem == "Setuju"  # semua I, intensitas patuh, dampak Rendah
+
 
 
 class TestKonsistensiPerZona:
@@ -214,3 +220,46 @@ class TestTigaZona:
             "itbx_P", "intensitas_P", "itbx_R", "intensitas_R", "itbx_K", "intensitas_K", "dampak"]
         assert [r.kode_zona for r in out.rekomendasi_per_zona] == ["P", "R", "K"]
         assert out.poin[5].zona.nama_zona == "Zona Perdagangan dan Jasa"
+
+
+class TestKontrakBeV1:
+    def test_ringkasan_dampak_membawa_label_resapan_dan_butir(self, pipeline):
+        out = pipeline(_muat())
+        rd = out.ringkasan_dampak
+        assert rd.kawasan_label == "Kawasan Resapan Air" and rd.is_kawasan_resapan is True
+        assert any("indeks perubahan limpasan" in b for b in rd.poin) and any("Koefisien limpasan (C)" in b for b in rd.poin)
+        assert any("8,04% bangunan/atap dan 89,31% ruang terbuka hijau" in b for b in rd.poin)
+        assert not any(";" in b for b in rd.poin)
+
+    def test_catatan_lokasi_dari_data_spasial(self, pipeline):
+        out = pipeline(_muat())
+        assert out.kesimpulan.catatan_lokasi == (
+            "Lokasi berada di blok I.B.3 (SWP B), termasuk kawasan resapan air, pada koridor jalan lokal.")
+
+    def test_catatan_lokasi_menyebut_ketentuan_khusus_aktif(self, pipeline):
+        def kkop(d):
+            d["lokasi"]["ketentuan_khusus"]["kkop"] = True
+        out = pipeline(_muat(kkop))
+        assert "Ketentuan khusus yang tercatat: kawasan keselamatan operasi penerbangan (KKOP)." in out.kesimpulan.catatan_lokasi
+
+    def test_ringkasan_dan_tindak_lanjut_kesimpulan(self, pipeline):
+        out = pipeline(_muat())
+        k = out.kesimpulan
+        assert k.ringkasan.startswith("Permohonan direkomendasikan Setuju.") and ";" not in k.ringkasan
+        assert "Zona Pertanian: ITBX Diizinkan (I), intensitas memenuhi syarat" in k.ringkasan
+        assert k.ringkasan_tindak_lanjut == k.langkah_berdampak and k.langkah_berdampak
+
+    def test_rekomendasi_per_zona_sesuai_kamus_data(self, pipeline):
+        z = pipeline(_muat()).rekomendasi_per_zona[0]
+        assert z.pertimbangan == "Status ITBX Diizinkan (I), intensitas memenuhi syarat." and z.rekomendasi_poin
+        assert z.saran == "\n".join(f"- {b}" for b in z.rekomendasi_poin)
+        assert z.status_keputusan == "LOLOS"
+
+    def test_status_keputusan_zona_terbatas_dan_tolak(self, pipeline):
+        def ubah(d):
+            d["gate_hukum"]["itbx_zones"][0].update(status="T")
+            d["gate_hukum"]["itbx_zones"][1].update(status="X")
+        out = pipeline(_muat(ubah))
+        assert [(r.rekomendasi, r.status_keputusan) for r in out.rekomendasi_per_zona] == [
+            ("Lolos Terbatas", "LOLOS_TERBATAS"), ("Tolak", "TIDAK_LOLOS")]
+        assert out.rekomendasi_sistem == "Tolak"
