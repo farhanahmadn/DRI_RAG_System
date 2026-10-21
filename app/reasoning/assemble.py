@@ -39,7 +39,7 @@ from app.reasoning.prompts import (
     build_kesimpulan_prompt,
     build_narasi_rekomendasi_prompt,
 )
-from app.reasoning.rekomendasi import turunkan_rekomendasi
+from app.reasoning.rekomendasi import gate_efektif, turunkan_rekomendasi
 from app.reasoning.templates import template_low_confidence
 from app.retrieval.base import Retriever
 from app.schemas import (
@@ -228,11 +228,25 @@ def _rakit_kalimat_gate(final_gate_status: str, decisive_stage: str | None, itbx
 def _rakit_ringkasan_gate(assessment: L2Assessment, itbx_fallback: bool) -> RingkasanGateOutput:
     gate = assessment.gate_hukum
     status = status_gate_efektif(assessment)
+    kalimat = _rakit_kalimat_gate(status, gate.decisive_stage, itbx_fallback)
+    if status == "Lolos" and not itbx_fallback and _intensitas_melampaui(assessment):
+        # ITBX penentu tunggal: kegiatan diizinkan, jadi gate tetap Lolos; intensitas yang melampaui batas
+        # dicatat terpisah dan tidak boleh disebut "memenuhi seluruh ketentuan".
+        kalimat = ("Permohonan lolos pemeriksaan gate hukum karena kegiatan diizinkan, namun intensitas bangunan "
+                   "melampaui batas sehingga perlu disesuaikan.")
     return RingkasanGateOutput(
         final_gate_status=status,
         decisive_stage=gate.decisive_stage,
-        kalimat=_rakit_kalimat_gate(status, gate.decisive_stage, itbx_fallback),
+        kalimat=kalimat,
     )
+
+
+def _intensitas_melampaui(assessment: L2Assessment) -> bool:
+    gate = assessment.gate_hukum
+    status = [z.status for z in (gate.intensitas_zones or [])]
+    if gate.tahapan.intensitas is not None:
+        status.append(gate.tahapan.intensitas.status)
+    return "MELAMPAUI_BATAS" in status
 
 
 def _rakit_ringkasan_dampak(assessment: L2Assessment) -> RingkasanDampakOutput:
@@ -471,14 +485,10 @@ def _status_gate_zona(status_keputusan: str | None, status_itbx: str | None, sta
     dengan aturan spesifikasi BE (X -> Tidak Lolos, T/TB -> Lolos Terbatas, B atau melampaui batas -> Lolos
     Bersyarat). Status ITBX tetap ikut menentukan lewat `turunkan_rekomendasi` di pemanggil."""
     if status_keputusan and status_keputusan.upper() in _PEMETAAN_KEPUTUSAN:
-        return _PEMETAAN_KEPUTUSAN[status_keputusan.upper()]
-    if status_itbx == "X":
-        return "Tidak Lolos"
-    if status_itbx in ("T", "TB"):
-        return "Lolos Terbatas"
-    if status_itbx == "B" or status_intensitas == "MELAMPAUI_BATAS":
+        return gate_efektif(_PEMETAAN_KEPUTUSAN[status_keputusan.upper()], status_itbx)
+    if status_itbx == "B":
         return "Lolos Bersyarat"
-    return "Lolos"
+    return gate_efektif("Lolos", status_itbx)
 
 
 def _ke_bullet(butir: list[str]) -> str:

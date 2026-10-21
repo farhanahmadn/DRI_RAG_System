@@ -304,9 +304,10 @@ class TestFixtureAmplop8090:
         poin_itbx = next(p for p in hasil.poin if p.poin_id == "itbx")
         assert poin_itbx.status == "I"
 
-    def test_rekomendasi_sistem_setuju_bersyarat(self):
+    def test_itbx_i_dengan_intensitas_melampaui_tetap_setuju(self):
+        # Tanggapan BE 2026-10-21 (Sovereign Gate): ITBX I -> Lolos/Setuju; intensitas melampaui batas hanya dicatat.
         hasil = adaptasi(_muat_assessment("l2_sample_amplop_8090.json"))
-        assert hasil.rekomendasi_sistem == "Setuju Bersyarat"
+        assert hasil.rekomendasi_sistem == "Setuju"
 
 
 class TestFixtureAmplop2428:

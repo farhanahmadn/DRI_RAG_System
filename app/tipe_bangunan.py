@@ -19,16 +19,16 @@ def ambil_tipe_bangunan(assessment: L2Assessment) -> dict:
     """{"kegiatan", "kbli", "kelas_atap", "jumlah_lantai"} — hanya kunci yang terisi."""
     itbx = assessment.gate_hukum.tahapan.itbx
     impact = assessment.impact_assessment
-    kelas = (impact.c_coefficients or {}).get("Kelas_Atap")
+    kelas = impact.kelas_atap or (impact.c_coefficients or {}).get("Kelas_Atap")
     if not kelas:
         atap = (impact.detailed_surface_breakdown or {}).get("Bangunan/Atap")
         kelas = atap.get("kelas") if isinstance(atap, dict) else None
     intensitas = assessment.gate_hukum.tahapan.intensitas
     hasil = {
-        "kegiatan": itbx.kegiatan_diusulkan,
-        "kbli": itbx.kbli_diusulkan,
+        "kegiatan": impact.kegiatan_diusulkan or itbx.kegiatan_diusulkan,
+        "kbli": impact.kbli_diusulkan or itbx.kbli_diusulkan,
         "kelas_atap": kelas,
-        "jumlah_lantai": intensitas.jumlah_lantai if intensitas is not None else None,
+        "jumlah_lantai": impact.jumlah_lantai or (intensitas.jumlah_lantai if intensitas is not None else None),
     }
     return {k: v for k, v in hasil.items() if v}
 

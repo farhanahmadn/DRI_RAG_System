@@ -236,7 +236,9 @@ class TestSaranItbxDeterministik:
         saran = saran_itbx_deterministik(p)
         assert saran.splitlines() == [
             "1. Syarat yang harus dipenuhi pemohon: Jam operasional dibatasi maksimal pukul 22.00.",
-            "2. Syarat yang harus dipenuhi pemohon: Wajib mengelola limbah, dan sampah secara mandiri."]
+            "2. Syarat yang harus dipenuhi pemohon: Wajib mengelola limbah, dan sampah secara mandiri.",
+            "3. Dokumen pembuktian syarat teknis khusus tersebut diverifikasi oleh petugas PTSP/DPUPKP pada saat "
+            "pemeriksaan berkas lanjutan."]
         assert ";" not in saran and "sudah memenuhi" not in saran.lower()
 
     def test_status_selain_t_b_tb_atau_tanpa_syarat_tidak_deterministik(self):
@@ -251,7 +253,7 @@ class TestSaranItbxDeterministik:
             "Penyediaan makan minum wajib dibatasi luas lantai penjualan 100 m2"]
         p = self._itbx(keterangan_ketentuan=banyak, kegiatan_diusulkan="Penyediaan makan minum restoran")
         saran = saran_itbx_deterministik(p)
-        assert saran.count("\n") == 0 and "makan minum" in saran.lower() and "peternakan" not in saran.lower()
+        assert saran.count("\n") == 1 and "makan minum" in saran.lower() and "peternakan" not in saran.lower()
         tak_relevan = self._itbx(keterangan_ketentuan=banyak, kegiatan_diusulkan="Industri pengolahan logam")
         assert saran_itbx_deterministik(tak_relevan) is None
 

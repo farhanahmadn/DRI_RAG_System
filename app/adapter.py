@@ -15,7 +15,7 @@ from app.reasoning.calculator import (
 )
 from app.ketentuan_khusus import tentukan_kawasan_resapan, tentukan_rawan_kekeringan
 from app.tipe_bangunan import ambil_tipe_bangunan
-from app.reasoning.rekomendasi import turunkan_rekomendasi
+from app.reasoning.rekomendasi import gate_efektif, turunkan_rekomendasi
 from app.schemas import (
     AdapterResult,
     IntensitasTahap,
@@ -412,13 +412,7 @@ def _itbx_paling_ketat(assessment: L2Assessment) -> str | None:
 def status_gate_efektif(assessment: L2Assessment) -> str:
     """Status gate menurut spesifikasi BE bagian 4: ITBX X -> Tidak Lolos dan ITBX T/TB -> Lolos Terbatas
     mengalahkan label gate BE (BE kerap melabeli ITBX T sebagai Lolos Bersyarat atau Lolos)."""
-    gate = assessment.gate_hukum.final_gate_status
-    itbx = _itbx_paling_ketat(assessment)
-    if gate == "Tidak Lolos" or itbx == "X":
-        return "Tidak Lolos"
-    if gate == "Lolos Terbatas" or itbx in ("T", "TB"):
-        return "Lolos Terbatas"
-    return gate
+    return gate_efektif(assessment.gate_hukum.final_gate_status, _itbx_paling_ketat(assessment))
 
 
 def adaptasi(assessment: L2Assessment) -> AdapterResult:

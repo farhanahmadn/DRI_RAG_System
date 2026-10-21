@@ -6,7 +6,7 @@ kalkulator deterministik — LLM tidak pernah mengisi field numerik atau menentu
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Input: L2Assessment (gate_hukum + impact_assessment dari back-end)
@@ -131,6 +131,12 @@ class IntensitasZona(BaseModel):
     kode_zona: str | None = None
     status: str | None = None
     parameter: dict[str, Any] = {}
+
+    @field_validator("parameter", mode="before")
+    @classmethod
+    def _parameter_null_jadi_kosong(cls, v):
+        # BE 2026-10-21: zona ITBX X dikirim dengan status TIDAK_DIEVALUASI dan parameter {} atau null.
+        return {} if v is None else v
     hierarki_jalan: str | None = None
     kawasan_resapan: bool | None = None
     luas_irisan_m2: float | None = None
@@ -224,6 +230,11 @@ class ImpactAssessment(BaseModel):
     status_kawasan: str | None = None
     is_kawasan_resapan: bool | None = None
     kawasan_label: str | None = None
+    # BE 2026-10-21 (tanggapan 2.f): atribut kegiatan/bangunan eksplisit, terpisah dari ITBX (lahan multi-zona).
+    kegiatan_diusulkan: str | None = None
+    kbli_diusulkan: str | None = None
+    jumlah_lantai: float | None = None
+    kelas_atap: str | None = None
     data_confidence: str | None = None
     limitations: str | None = None
     # APP-2026-2428 (validasi batas persil, BE): `dinilai=False` sekarang punya penyebab BARU

@@ -84,6 +84,7 @@ class PoinBE(BaseModel):
 class AdvisoryL3(BaseModel):
     rekomendasi_sistem: str
     kesimpulan: KesimpulanOutput
+    ringkasan_tindak_lanjut: list[str] = []
     ringkasan_gate: RingkasanGateOutput
     ringkasan_dampak: RingkasanDampakOutput
     narasi_rekomendasi: NarasiRekomendasiOutput
@@ -117,6 +118,34 @@ def _dasar_regulasi(sitasi: list[SitasiOutput]) -> list[DasarRegulasiBE]:
     return hasil
 
 
+_DASAR_MITIGASI_DAMPAK = [
+    DasarRegulasiBE(
+        judul="FHWA HEC-22 Urban Drainage Design Manual, 4th Edition (2013), Section 3.2.2.1",
+        deskripsi="Rujukan metodologi koefisien limpasan dan ambang indeks limpasan (1,5; 2,5; 4,0) beserta target "
+                  "mitigasi 2,5, ditetapkan BE (tanggapan 2026-10-21). Bukan teks RDTR.",
+        kategori="Standar Teknis"),
+    DasarRegulasiBE(
+        judul="Kebijakan teknis drainase berkelanjutan (SUDS) DPUPKP Kabupaten Sleman",
+        deskripsi="Dasar kebijakan daerah untuk mencegah beban berlebih saluran drainase akibat alih fungsi lahan, "
+                  "ditetapkan BE (tanggapan 2026-10-21). Bukan teks RDTR.",
+        kategori="Kebijakan Daerah"),
+]
+_DASAR_SUMUR = DasarRegulasiBE(
+    judul="SNI 8445:2017 Tata cara perencanaan sumur resapan air hujan untuk lahan pekarangan",
+    deskripsi="Standar desain sumur/kolam resapan, rujukan BE (tanggapan 2026-10-21).",
+    kategori="Standar Teknis")
+
+
+def _dasar_mitigasi_dampak(p: PoinOutput) -> list[DasarRegulasiBE]:
+    """Dasar ambang dan kewajiban mitigasi dampak (rujukan BE, bukan RDTR), hanya bila dampak memerlukan mitigasi."""
+    if _id_dasar(p.poin_id) != "dampak" or p.status not in ("Sedang", "Tinggi", "Sangat Tinggi"):
+        return []
+    dasar = list(_DASAR_MITIGASI_DAMPAK)
+    if "sumur" in (p.rekomendasi.saran or "").lower():
+        dasar.append(_DASAR_SUMUR)
+    return dasar
+
+
 def _rekomendasi_be(p: PoinOutput) -> RekomendasiBE:
     butir = _butir_saran(p.rekomendasi.saran)
     return RekomendasiBE(
@@ -139,7 +168,7 @@ def _status_daun(p: PoinOutput) -> str:
     if dasar == "itbx":
         return _LABEL_STATUS_ITBX.get(p.status, p.status)
     if dasar == "dampak":
-        return "TIDAK_DINILAI" if p.status == "Tidak Dinilai" else p.status.upper()
+        return "TIDAK_DINILAI" if p.status == "Tidak Dinilai" else p.status.upper().replace(" ", "_")
     if p.status == "Tidak Dinilai":
         return "TIDAK_DINILAI"
     return p.status
@@ -150,7 +179,7 @@ def _daun(p: PoinOutput, banyak_zona: bool) -> PoinBE:
     return PoinBE(
         poin_id=poin_id, kategori=p.kategori, status=_status_daun(p),
         reasoning_pendek=p.reasoning_pendek, reasoning_panjang=p.reasoning_panjang,
-        dasar_regulasi=_dasar_regulasi(p.sitasi), rekomendasi=_rekomendasi_be(p),
+        dasar_regulasi=_dasar_regulasi(p.sitasi) + _dasar_mitigasi_dampak(p), rekomendasi=_rekomendasi_be(p),
         sitasi=p.sitasi, zona=p.zona, low_confidence=p.low_confidence,
     )
 
@@ -283,6 +312,7 @@ def ke_kontrak_be(output: OutputL3) -> AdvisoryL3:
 
     return AdvisoryL3(
         rekomendasi_sistem=output.rekomendasi_sistem, kesimpulan=output.kesimpulan,
+        ringkasan_tindak_lanjut=output.kesimpulan.ringkasan_tindak_lanjut,
         ringkasan_gate=gate_ringkas, ringkasan_dampak=output.ringkasan_dampak,
         narasi_rekomendasi=output.narasi_rekomendasi, rekomendasi_per_zona=output.rekomendasi_per_zona,
         poin=akar, catatan_global=output.catatan_global,

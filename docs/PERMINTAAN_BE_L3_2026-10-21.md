@@ -53,6 +53,34 @@ yang ITBX-nya berbeda per zona).
 sebagai "syarat yang harus dipenuhi pemohon" dan tidak menyatakannya terpenuhi. Mohon diputuskan: apakah BE akan mengevaluasi syarat
 numerik seperti ini (lalu menandai tidak terpenuhi), atau dibiarkan sebagai syarat yang diverifikasi petugas?
 
+## 2A. Perbedaan dengan contoh keluaran ideal BE (KBLI 56303, zona K-1)
+
+Contoh ini dibandingkan dengan keluaran kita. Struktur, status, dan logika rekomendasi sudah cocok. Kita menambahkan field
+`ringkasan_tindak_lanjut` di tingkat atas (sama isinya dengan `kesimpulan.ringkasan_tindak_lanjut`). Butir di bawah perlu diputuskan BE.
+
+**a. `langkah_konkret` bertentangan dengan spesifikasi v1.0.0.** Pada simpul `dampak`, contoh memakai array objek
+(`parameter`, `nilai_saat_ini`, `nilai_target`, `satuan`), sedangkan spesifikasi dan simpul `gate_hukum` memakai array string.
+Kita mengirim string di `langkah_konkret` dan objeknya di `langkah_terstruktur`. Mohon pilih satu bentuk.
+
+**b. Format status dampak tidak konsisten.** Contoh ini `"Tinggi"`, contoh BE sebelumnya `SEDANG` huruf kapital. Kita memakai huruf kapital.
+
+**c. Angka limpasan tidak cocok.** Teks menulis "2.65x lipat (C 0.32 menjadi 0.74)", padahal 0,74 / 0,32 = 2,31. Bila 2,65 adalah indeks
+dengan rumus lain, jangan dinarasikan sebagai kenaikan C. Mohon rumus indeks dijelaskan.
+
+**d. Isi yang tidak ada di data L2.** Spesifikasi melarang mengarang, jadi kita tidak menirunya:
+- "area peresapan alami turun 45%".
+- Dokumen SPPL/AMDAL/UKL-UPL, IPAL, PBG/SLF lewat SIMBG, patok batas tanah, akses pengawasan Pemkab.
+- "Dampak Sempadan Bangunan: pelanggaran batas sempadan" (tidak ada data pelanggaran sempadan).
+- "berpotensi memicu genangan atau banjir lokal" dan "batas aman (< 2.5)" tanpa dasar di fakta.
+
+Bila butir-butir ini memang diinginkan, mohon dikirim sebagai data di L2 (mis. syarat ITBX dari `keterangan_ketentuan`) atau diputuskan PM
+sebagai teks standar.
+
+**e. Format `saran` tidak seragam.** Sebagian butir `- ...`, sebagian kalimat biasa (intensitas). Kita selalu memakai butir.
+
+**f. `dasar_regulasi` sangat tipis.** Contoh hanya memuat judul umum tanpa pasal. Kita mengirim sitasi terverifikasi lengkap (pasal, halaman,
+kutipan) di `sitasi[]`. FE sebaiknya tidak bergantung pada `dasar_regulasi` yang lebih sederhana.
+
 ## 3. Dasar aturan mitigasi dampak (bukan masalah, hanya permintaan rujukan)
 
 Kata "wajib" pada mitigasi dampak Sedang/Tinggi/Sangat Tinggi ("Wajib menurunkan KDB dan meningkatkan KDH/RTH") dan ambang indeks limpasan

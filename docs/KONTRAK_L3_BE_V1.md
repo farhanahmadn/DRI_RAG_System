@@ -15,6 +15,7 @@ internal tetap memakai daftar poin datar (`OutputL3`) dan dipetakan di akhir.
 | `kesimpulan.ringkasan` | Dipenuhi | 1-2 kalimat, ditulis LLM bersama langkah, dengan cadangan deterministik dari status poin. |
 | `kesimpulan.langkah_berdampak` | Dipenuhi | Dirangkum dari saran per poin. |
 | `kesimpulan.ringkasan_tindak_lanjut` | Dipenuhi | Salinan persis `langkah_berdampak` (spesifikasi: harus konsisten). |
+| `ringkasan_tindak_lanjut` (tingkat atas) | Dipenuhi | Salinan `kesimpulan.ringkasan_tindak_lanjut`, mengikuti contoh BE. |
 | `kesimpulan.catatan_lokasi` | Dipenuhi | Dari data spasial (blok, SWP, resapan, koridor jalan, ketentuan khusus aktif), bukan tulisan LLM. |
 | `ringkasan_gate.kalimat` | Dipenuhi | Kalimat gate + status ITBX dan intensitas (per zona bila multi-zona). Tambahan: `final_gate_status`, `decisive_stage`. |
 | `ringkasan_dampak.impact_category`, `.kalimat` | Dipenuhi | Tambahan: `impact_score`. |
@@ -30,8 +31,12 @@ Urutan prioritas, kondisi yang lebih tinggi mengalahkan yang di bawahnya (`app/r
 
 1. **Tolak**: gate `Tidak Lolos`, atau ITBX X.
 2. **Lolos Terbatas**: gate `Lolos Terbatas`, atau ITBX T (juga TB). Mengalahkan Setuju Bersyarat walau BE melabeli gate `Lolos Bersyarat`.
-3. **Setuju Bersyarat**: gate `Lolos Bersyarat`, ITBX B, atau dampak **Sedang/Tinggi/Sangat Tinggi**.
+3. **Setuju Bersyarat**: ITBX B (gate `Lolos Bersyarat`), atau dampak **Sedang/Tinggi/Sangat Tinggi**.
 4. **Setuju**: semua legal I, intensitas patuh, dampak Rendah.
+
+**ITBX penentu tunggal gate legal** (tanggapan BE 2026-10-21): ITBX I menghasilkan `Lolos`/`Setuju` walau BE melabeli gate
+`Lolos Bersyarat` atau intensitas `MELAMPAUI_BATAS`. Intensitas yang melampaui batas tetap dicatat dan disertai saran reduksi,
+tetapi tidak menurunkan kelolosan legal. Dampak Sedang ke atas tetap membuat `Setuju Bersyarat`.
 
 Pada lahan multi-zona, ITBX paling ketat di antara zona ikut menentukan `rekomendasi_sistem` keseluruhan. Rekomendasi per
 zona hanya memakai ITBX dan intensitas zona itu (hidrologi satu untuk seluruh lahan, jadi tidak dipecah).
@@ -60,7 +65,7 @@ Status akar: `gate_hukum` = `LOLOS`, `LOLOS_BERSYARAT`, `LOLOS_TERBATAS`, `TIDAK
 `PERLU_MITIGASI` (dampak Sedang ke atas), `MEMENUHI_SYARAT` (Rendah), `TIDAK_DINILAI`. Status simpul daun mengikuti
 contoh BE (2026-10-21): ITBX `Diizinkan (I)` / `Terbatas (T)` / `Bersyarat (B)` / `Terbatas dan Bersyarat (TB)` /
 `Tidak Diizinkan (X)`; intensitas `MEMENUHI_SYARAT` / `MELAMPAUI_BATAS`; dampak huruf kapital (`RENDAH`, `SEDANG`,
-`TINGGI`, `SANGAT TINGGI`). Di `rekomendasi_per_zona`, `status_itbx` tetap kode mentah (`I`/`T`/`B`/`X`) sesuai kamus data.
+`TINGGI`, `SANGAT_TINGGI`). Di `rekomendasi_per_zona`, `status_itbx` tetap kode mentah (`I`/`T`/`B`/`X`) sesuai kamus data.
 
 Setiap simpul memuat `reasoning_pendek`, `reasoning_panjang`, `dasar_regulasi[]` {judul, deskripsi, kategori},
 `rekomendasi` {saran, poin[], langkah_konkret[], alasan} dan `sub_poin[]`. Akar mengagregasi anak-anaknya
@@ -104,3 +109,12 @@ nyata (LLM asli), bukan rekaan. Permintaan rinci ke BE: `docs/PERMINTAAN_BE_L3_2
 4. **Zona berstatus ITBX X**: mohon `intensitas_zones` zona itu tetap dikirim dengan `status` yang jelas.
 5. **Sumber kata "wajib" dan ambang indeks 2,5** untuk mitigasi dampak di luar RDTR (kebijakan atau peraturan apa).
 6. **KLB P-1**: 1 (BE) atau 0,1 (Lampiran VI RDTR, resapan lokal).
+
+## 8. Keputusan BE 2026-10-21 (docs/TANGGAPAN_BE_2026-10-21.md)
+
+Seluruh pertanyaan terbuka di atas dijawab BE. Yang berdampak di kode: ITBX penentu tunggal gate; status dampak `SANGAT_TINGGI`;
+`impact_assessment` menerima `kegiatan_diusulkan`, `kbli_diusulkan`, `jumlah_lantai`, `kelas_atap` (diutamakan atas turunan dari ITBX);
+zona X dikirim dengan status `TIDAK_DIEVALUASI` dan `parameter` `{}`/`null` (diterima); `rekomendasi_mitigasi` `null` untuk dampak Rendah;
+KLB P-1 benar 0,1; `langkah_konkret` tetap string dan `langkah_terstruktur` objek; saran selalu butir `- `; syarat ITBX bernilai angka
+diverifikasi petugas PTSP/DPUPKP; dasar ambang dan target mitigasi (HEC-22, kebijakan DPUPKP, SNI 8445:2017) dicantumkan di `dasar_regulasi` dampak.
+Butir yang menunggu BE: lihat bagian "Sisa" di balasan ke pengguna (kategori dampak di `ringkasan_dampak`, Pasal 53 ayat (3) huruf a/b).

@@ -184,7 +184,7 @@ class TestFormatStatusDaun:
                               sitasi=[], rekomendasi=RekomendasiOutput(tipe="kategorikal", saran="s"))
         assert [_status_daun(poin("itbx", s)) for s in ("I", "T", "TB", "X")] == [
             "Diizinkan (I)", "Terbatas (T)", "Terbatas dan Bersyarat (TB)", "Tidak Diizinkan (X)"]
-        assert _status_daun(poin("dampak", "Sangat Tinggi")) == "SANGAT TINGGI"
+        assert _status_daun(poin("dampak", "Sangat Tinggi")) == "SANGAT_TINGGI"
         assert _status_daun(poin("dampak", "Tidak Dinilai")) == "TIDAK_DINILAI"
         assert _status_daun(poin("intensitas_P", "Tidak Dinilai")) == "TIDAK_DINILAI"
 

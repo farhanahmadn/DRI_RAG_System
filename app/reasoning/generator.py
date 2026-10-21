@@ -164,6 +164,9 @@ def saran_itbx_deterministik(poin: PoinKonteks) -> str | None:
         if teks and teks[-1] not in ".!?":
             teks += "."
         butir.append(f"{i}. Syarat yang harus dipenuhi pemohon: {teks}")
+    # Kesepakatan BE 2026-10-21 (2.g): syarat bernilai angka tidak dievaluasi otomatis; diverifikasi petugas.
+    butir.append(f"{len(terpilih) + 1}. Dokumen pembuktian syarat teknis khusus tersebut diverifikasi oleh petugas "
+                 "PTSP/DPUPKP pada saat pemeriksaan berkas lanjutan.")
     return "\n".join(butir)
 
 

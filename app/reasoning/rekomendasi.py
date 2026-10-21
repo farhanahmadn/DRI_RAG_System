@@ -17,6 +17,19 @@ REKOMENDASI_BERSYARAT = "Setuju Bersyarat"
 REKOMENDASI_SETUJU = "Setuju"
 
 
+def gate_efektif(gate_status: str, status_itbx: str | None) -> str:
+    """Status gate setelah ITBX diperlakukan sebagai penentu tunggal (Sovereign Gate, tanggapan BE 2026-10-21):
+    X -> Tidak Lolos, T/TB -> Lolos Terbatas, I -> Lolos walau BE melabeli Lolos Bersyarat (intensitas melampaui
+    batas tidak menurunkan kelolosan legal; ia tetap dicatat sebagai MELAMPAUI_BATAS beserta saran reduksi)."""
+    if gate_status == "Tidak Lolos" or status_itbx == "X":
+        return "Tidak Lolos"
+    if gate_status == "Lolos Terbatas" or status_itbx in ("T", "TB"):
+        return "Lolos Terbatas"
+    if status_itbx == "I" and gate_status == "Lolos Bersyarat":
+        return "Lolos"
+    return gate_status
+
+
 def turunkan_rekomendasi(gate_status: str, impact_category: str | None, status_itbx: str | None = None) -> str:
     """Matriks rekomendasi_sistem, urut prioritas (kondisi yang lebih tinggi mengalahkan yang di bawahnya).
 
@@ -25,7 +38,8 @@ def turunkan_rekomendasi(gate_status: str, impact_category: str | None, status_i
 
     1. Tolak: gate Tidak Lolos, atau ITBX = X.
     2. Lolos Terbatas: gate Lolos Terbatas, atau ITBX = T (juga TB: unsur terbatas).
-    3. Setuju Bersyarat: gate Lolos Bersyarat (ITBX B atau intensitas melampaui batas), ITBX = B, atau dampak
+    3. Setuju Bersyarat: gate Lolos Bersyarat, ITBX = B (intensitas melampaui batas TIDAK ikut menentukan bila
+       ITBX = I; ITBX penentu tunggal gate legal), atau dampak
        Sedang/Tinggi/Sangat Tinggi yang memerlukan mitigasi.
     4. Setuju: semua aspek legal I, intensitas patuh, dampak Rendah (atau belum dinilai: absennya penilaian
        bukan alasan untuk membersyaratkan).
@@ -34,9 +48,10 @@ def turunkan_rekomendasi(gate_status: str, impact_category: str | None, status_i
     Bersyarat, padahal menurut spesifikasi harus Lolos Terbatas)."""
     if gate_status not in ("Lolos", "Lolos Bersyarat", "Lolos Terbatas", "Tidak Lolos"):
         raise ValueError(f"gate_status tidak dikenal: {gate_status!r}")
-    if gate_status == "Tidak Lolos" or status_itbx == "X":
+    gate_status = gate_efektif(gate_status, status_itbx)
+    if gate_status == "Tidak Lolos":
         return REKOMENDASI_TOLAK
-    if gate_status == "Lolos Terbatas" or status_itbx in ("T", "TB"):
+    if gate_status == "Lolos Terbatas":
         return REKOMENDASI_TERBATAS
     if gate_status == "Lolos Bersyarat" or status_itbx == "B":
         return REKOMENDASI_BERSYARAT
