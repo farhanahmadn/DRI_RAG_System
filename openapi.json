@@ -126,6 +126,14 @@
           "kesimpulan": {
             "$ref": "#/components/schemas/KesimpulanOutput"
           },
+          "ringkasan_tindak_lanjut": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ringkasan Tindak Lanjut",
+            "default": []
+          },
           "ringkasan_gate": {
             "$ref": "#/components/schemas/RingkasanGateOutput"
           },
@@ -613,6 +621,50 @@
               }
             ],
             "title": "Kawasan Label"
+          },
+          "kegiatan_diusulkan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kegiatan Diusulkan"
+          },
+          "kbli_diusulkan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kbli Diusulkan"
+          },
+          "jumlah_lantai": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jumlah Lantai"
+          },
+          "kelas_atap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kelas Atap"
           },
           "data_confidence": {
             "anyOf": [
