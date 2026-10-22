@@ -35,7 +35,7 @@ from app.reasoning.calculator import (
 )
 from app.reasoning.generator import _lengkapi_sitasi_dampak, ambil_chunks_pendukung, apakah_aman, generate_poin
 from app.reasoning.llm_client import LayananTidakTersediaError
-from app.reasoning.templates import template_low_confidence
+from app.reasoning.templates import template_intensitas_tidak_dinilai, template_low_confidence
 from app.retrieval.base import Chunk, Retriever
 from app.schemas import L2Assessment, LangkahKonkretOutput, PoinKonteks, PoinOutput
 
@@ -474,6 +474,13 @@ _RE_KLB_AMBANG_M2 = re.compile(
     r"(\bKLB\b(?:(?!\bKD[BH]\b)(?:\d[.,]\d|[^.\n%])){0,60}?\b(?:ambang|batas)\s+(?:maksimal|maksimum|minimal)?\s*\d+(?:[.,]\d+)?)\s*m(?:²|2)(?![\w²])")
 
 
+# "KLB ... tidak lebih dari 1 m²", "KLB ... lebih tinggi 0,37 m²": pembanding yang tidak langsung menempel pada KLB.
+_RE_KLB_BANDING_M2 = re.compile(
+    r"(\bKLB\b(?:(?!\bKD[BH]\b)(?:\d[.,]\d|[^.\n%])){0,60}?\b(?:tidak\s+lebih\s+dari|tidak\s+melebihi|"
+    r"lebih\s+(?:tinggi|rendah|besar|kecil)(?:\s+dari)?|melebihi|kurang\s+dari|selisih(?:nya)?)\s+"
+    r"(?:sebesar\s+)?\d+(?:[.,]\d+)?)\s*m(?:²|2)(?![\w²])")
+
+
 def _bersihkan_label_teknis(teks: str | None) -> str | None:
     """Ganti nama label teknis yang tersalin dari prompt dgn padanan Bahasa Indonesia biasa.
     Label tak dikenal tetap dinormalkan (huruf kecil, garis bawah -> spasi) supaya label BARU yang
@@ -489,7 +496,8 @@ def _bersihkan_label_teknis(teks: str | None) -> str | None:
     # KLB adalah rasio, bukan persen atau luas: "KLB maksimum 1 %" dan "KLB ke maksimal 1 m²" -> "KLB ... 1".
     teks = _RE_KLB_PERSEN.sub(lambda m: m.group(1), teks)
     teks = _RE_KLB_M2.sub(lambda m: m.group(1), teks)
-    return _RE_KLB_AMBANG_M2.sub(lambda m: m.group(1), teks)
+    teks = _RE_KLB_AMBANG_M2.sub(lambda m: m.group(1), teks)
+    return _RE_KLB_BANDING_M2.sub(lambda m: m.group(1), teks)
 
 
 def _bersihkan_disclaimer_fallback_palsu(disclaimer: str | None) -> str | None:
@@ -1369,6 +1377,13 @@ def generate_poin_terdiagnosis(
     Alur & perilaku TIDAK berubah sedikit pun — ini murni penambahan pengamatan (lihat DiagnosaPoin).
     """
     diagnosa = DiagnosaPoin(poin_id=poin.poin_id, berhasil=False)
+
+    if poin.poin_id == "intensitas" and poin.status == "Tidak Dinilai":
+        # Tidak ada ambang atau usulan yang dibandingkan, jadi tidak ada yang perlu dijelaskan LLM. Uji nyata:
+        # LLM justru mengutip pasal dan rentang KLB Lampiran VI untuk poin ini. Reasoning ditulis deterministik,
+        # tanpa sitasi, tanpa panggilan Groq/Jina.
+        diagnosa.berhasil = True
+        return template_intensitas_tidak_dinilai(poin), diagnosa
 
     try:
         chunks = ambil_chunks_pendukung(poin, retriever)

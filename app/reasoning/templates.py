@@ -147,3 +147,21 @@ def template_low_confidence(poin: PoinKonteks) -> PoinOutput:
         ),
         low_confidence=True,
     )
+
+
+def template_intensitas_tidak_dinilai(poin: PoinKonteks) -> PoinOutput:
+    """Poin intensitas "Tidak Dinilai": tidak ada usulan atau ambang yang dibandingkan, jadi narasinya deterministik
+    (tanpa LLM dan tanpa sitasi). Bukan fallback, `low_confidence` False."""
+    zona = f" pada {poin.zona}" if poin.zona else ""
+    pendek = f"Intensitas bangunan{zona} tidak dinilai karena pemeriksaan berhenti pada tahap sebelumnya."
+    panjang = (f"{pendek} Tidak ada usulan KDB, KLB, dan KDH yang dibandingkan dengan ambang, sehingga tidak ada "
+               "penilaian kepatuhan intensitas untuk poin ini.")
+    return PoinOutput(
+        poin_id=poin.poin_id, kategori=poin.kategori, status=poin.status,
+        reasoning_pendek=pendek, reasoning_panjang=panjang, sitasi=[],
+        rekomendasi=RekomendasiOutput(
+            tipe=poin.tipe_rekomendasi, target=None, saran=_saran_tidak_dinilai(poin), disclaimer=None,
+            langkah_konkret=[],
+        ),
+        low_confidence=False,
+    )
